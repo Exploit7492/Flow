@@ -1190,4 +1190,6 @@
     <string name="player_settings_overlay_controls">متحكمات التراكب</string>
     <string name="player_settings_shorts_background_play">تشغيل الفيديوهات القصيرة في الخلفية</string>
     <string name="player_settings_shorts_background_play_subtitle">استمر في تشغيل الفيديوهات القصيرة عندما يكون التطبيق في الخلفية</string>
+    <string name="content_settings_show_app_logo_title">إظهار أيقونة شعار التطبيق</string>
+    <string name="content_settings_show_app_logo_subtitle">إعرض أيقونة شعار Flow بجوار اسم التطبيق في الشريط العلوي للشاشة الرئيسية</string>
 </resources>
