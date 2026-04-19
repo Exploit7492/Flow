@@ -35,7 +35,7 @@
     <string name="cancel">Отмена</string>
     <string name="empty_watch_history">История просмотров пуста</string>
     <string name="empty_watch_history_body">Здесь будут видео, которые вы смотрели</string>
-    <string name="liked">Понравилось</string>
+    <string name="liked">"Понравилось "</string>
     <string name="liked_music">Понравившаяся музыка</string>
     <string name="liked_videos">Понравившиеся видео</string>
     <string name="share_song">Поделиться песней</string>
