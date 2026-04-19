@@ -1331,7 +1331,7 @@ private fun TimeContextCards(brain: UserBrain) {
             
             Card(
                 modifier = Modifier
-                    .width(170.dp) // Increased from 140.dp for top 3 display
+                    .width(170.dp) 
                     .then(
                         if (isActive) Modifier.border(
                             2.dp,
@@ -1342,7 +1342,7 @@ private fun TimeContextCards(brain: UserBrain) {
                 shape = RoundedCornerShape(20.dp),
                 colors = CardDefaults.cardColors(
                     containerColor = if (isActive)
-                        MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f)
+                        MaterialTheme.colorScheme.primary.copy(alpha = 0.5f)
                     else
                         MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)
                 )
@@ -1591,7 +1591,7 @@ private fun MaintenanceSection(
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(20.dp),
             colors = CardDefaults.cardColors(
-                containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.1f)
+                containerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.1f)
             )
         ) {
             Row(
@@ -1605,7 +1605,7 @@ private fun MaintenanceSection(
                     modifier = Modifier
                         .size(48.dp)
                         .background(
-                            MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f),
+                            MaterialTheme.colorScheme.primary.copy(alpha = 0.4f),
                             CircleShape
                         ),
                     contentAlignment = Alignment.Center

@@ -74,6 +74,7 @@ private fun rememberCategoriesLayoutConfig(maxWidth: Dp): CategoriesLayoutConfig
 fun CategoriesScreen(
     onBackClick: () -> Unit,
     onVideoClick: (Video) -> Unit,
+    onChannelClick: (String) -> Unit = {},
     viewModel: CategoriesViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -158,6 +159,7 @@ fun CategoriesScreen(
                                 canLoadMore = uiState.canLoadMore,
                                 isLoadingMore = uiState.isLoadingMore,
                                 onVideoClick = onVideoClick,
+                                onChannelClick = onChannelClick,
                                 onLoadMore = { viewModel.loadMore() }
                             )
                         } else {
@@ -166,6 +168,7 @@ fun CategoriesScreen(
                                 canLoadMore = uiState.canLoadMore,
                                 isLoadingMore = uiState.isLoadingMore,
                                 onVideoClick = onVideoClick,
+                                onChannelClick = onChannelClick,
                                 onLoadMore = { viewModel.loadMore() },
                                 layoutConfig = layoutConfig
                             )
@@ -291,6 +294,7 @@ private fun GridContent(
     canLoadMore: Boolean,
     isLoadingMore: Boolean,
     onVideoClick: (Video) -> Unit,
+    onChannelClick: (String) -> Unit,
     onLoadMore: () -> Unit,
     layoutConfig: CategoriesLayoutConfig
 ) {
@@ -323,6 +327,7 @@ private fun GridContent(
                 video = video,
                 useInternalPadding = false,
                 modifier = Modifier.fillMaxWidth(),
+                onChannelClick = onChannelClick,
                 onClick = { onVideoClick(video) }
             )
         }
@@ -351,6 +356,7 @@ private fun ListContent(
     canLoadMore: Boolean,
     isLoadingMore: Boolean,
     onVideoClick: (Video) -> Unit,
+    onChannelClick: (String) -> Unit,
     onLoadMore: () -> Unit
 ) {
     val listState = rememberLazyListState()
@@ -375,6 +381,7 @@ private fun ListContent(
             VideoCardHorizontal(
                 video = video,
                 modifier = Modifier.fillMaxWidth(),
+                onChannelClick = onChannelClick,
                 onClick = { onVideoClick(video) }
             )
         }

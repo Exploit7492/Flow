@@ -271,14 +271,23 @@ object DlnaCastManager {
     ) {
         scope.launch {
             try {
+                val videoContentType = guessContentType(videoUrl, "video/mp4")
                 val proxyVideoUrl = proxy.registerStream(
                     realUrl = videoUrl,
-                    contentType = guessContentType(videoUrl, "video/mp4")
+                    contentType = videoContentType
                 )
 
-                Log.i(TAG, "Casting via proxy: $proxyVideoUrl")
+                val proxyAudioUrl = audioUrl?.let {
+                    proxy.registerStream(
+                        realUrl = it,
+                        contentType = guessContentType(it, "audio/mp4")
+                    )
+                }
 
-                setAVTransportUri(device, proxyVideoUrl, title, guessContentType(videoUrl, "video/mp4"))
+                Log.i(TAG, "Casting via proxy: $proxyVideoUrl" +
+                    if (proxyAudioUrl != null) " + audio: $proxyAudioUrl" else "")
+
+                setAVTransportUri(device, proxyVideoUrl, title, videoContentType, proxyAudioUrl)
                 delay(500)
                 play(device)
                 _currentDevice.value = device
@@ -416,8 +425,14 @@ object DlnaCastManager {
         }
     }
 
-    private fun setAVTransportUri(device: DlnaDevice, uri: String, title: String, contentType: String = "video/mp4") {
-        val metadata = buildDidlLite(uri, title, contentType)
+    private fun setAVTransportUri(
+        device: DlnaDevice,
+        uri: String,
+        title: String,
+        contentType: String = "video/mp4",
+        audioUri: String? = null
+    ) {
+        val metadata = buildDidlLite(uri, title, contentType, audioUri)
         val body = soapAction(
             "SetAVTransportURI",
             "urn:schemas-upnp-org:service:AVTransport:1",
@@ -484,15 +499,25 @@ object DlnaCastManager {
         """<u:$action xmlns:u="$serviceType">$args</u:$action>""" +
         """</s:Body></s:Envelope>"""
 
-    private fun buildDidlLite(uri: String, title: String, contentType: String = "video/mp4"): String =
-        """<DIDL-Lite xmlns:dc="http://purl.org/dc/elements/1.1/" """ +
-        """xmlns:upnp="urn:schemas-upnp-org:metadata-1-0/upnp/" """ +
-        """xmlns="urn:schemas-upnp-org:metadata-1-0/DIDL-Lite/">""" +
-        """<item id="1" parentID="0" restricted="0">""" +
-        """<dc:title>${escapeXml(title)}</dc:title>""" +
-        """<res protocolInfo="http-get:*:$contentType:*">${escapeXml(uri)}</res>""" +
-        """<upnp:class>object.item.videoItem</upnp:class>""" +
-        """</item></DIDL-Lite>"""
+    private fun buildDidlLite(
+        uri: String,
+        title: String,
+        contentType: String = "video/mp4",
+        audioUri: String? = null
+    ): String {
+        val audioRes = if (audioUri != null) {
+            """<res protocolInfo="http-get:*:audio/mp4:*">${escapeXml(audioUri)}</res>"""
+        } else ""
+        return """<DIDL-Lite xmlns:dc="http://purl.org/dc/elements/1.1/" """ +
+            """xmlns:upnp="urn:schemas-upnp-org:metadata-1-0/upnp/" """ +
+            """xmlns="urn:schemas-upnp-org:metadata-1-0/DIDL-Lite/">""" +
+            """<item id="1" parentID="0" restricted="0">""" +
+            """<dc:title>${escapeXml(title)}</dc:title>""" +
+            """<res protocolInfo="http-get:*:$contentType:*">${escapeXml(uri)}</res>""" +
+            audioRes +
+            """<upnp:class>object.item.videoItem</upnp:class>""" +
+            """</item></DIDL-Lite>"""
+    }
 
     private fun escapeXml(s: String) = s
         .replace("&", "&amp;")

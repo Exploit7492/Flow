@@ -820,22 +820,40 @@ fun GlobalPlayerOverlay(
                 videoTitle = video.title,
                 onDeviceSelected = { device ->
                     var streamUrl = ""
+                    var castAudioUrl: String? = null
                     val streamInfo = playerUiState.streamInfo
                     if (streamInfo != null) {
-                        val castStream = streamInfo.videoStreams
-                            ?.filter { it.height <= 1080 }
+                        val bestMuxed = streamInfo.videoStreams
+                            ?.filter { it.height > 0 }
                             ?.maxByOrNull { it.height }
-                        if (castStream != null) {
-                            streamUrl = castStream.content ?: castStream.url ?: ""
+
+                        if (bestMuxed != null && bestMuxed.height >= 480) {
+                            streamUrl = bestMuxed.content ?: bestMuxed.url ?: ""
+                        } else {
+                            val bestVideoOnly = (streamInfo.videoOnlyStreams ?: emptyList())
+                                .filter { it.height > 0 && it.height <= 1080 }
+                                .filter { it.format?.mimeType?.contains("mp4") == true }
+                                .maxByOrNull { it.height }
+
+                            if (bestVideoOnly != null &&
+                                bestVideoOnly.height > (bestMuxed?.height ?: 0)) {
+                                streamUrl = bestVideoOnly.content ?: bestVideoOnly.url ?: ""
+                                castAudioUrl = streamInfo.audioStreams
+                                    ?.filter { it.format?.mimeType?.contains("mp4") == true }
+                                    ?.maxByOrNull { it.bitrate }
+                                    ?.url
+                            } else if (bestMuxed != null) {
+                                streamUrl = bestMuxed.content ?: bestMuxed.url ?: ""
+                            }
                         }
                     }
                     if (streamUrl.isEmpty()) {
                         streamUrl = EnhancedPlayerManager.getInstance().getPlayer()
                             ?.currentMediaItem?.localConfiguration?.uri?.toString() ?: ""
                     }
-                    
+
                     if (streamUrl.isNotEmpty() && !streamUrl.startsWith("local://")) {
-                        DlnaCastManager.castTo(device, streamUrl, video.title)
+                        DlnaCastManager.castTo(device, streamUrl, video.title, castAudioUrl)
                     }
                     showDlnaDialog = false
                 },

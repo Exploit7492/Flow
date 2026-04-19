@@ -1,6 +1,6 @@
 FLOW CHANGE LOG
-VERSION: 2.0.6
-DATE: 2026-04-17
+VERSION: 2.1.0
+DATE: 2026-04-19
 
 LIBRARIES
 - Bump NewpipeExtractor to latest version (v0.26.1)
@@ -47,6 +47,7 @@ IMPROVEMENTS
 - Engine calibration, improved watch signal for new topics and feed balancing #281
 - Improve Engine performace
 - Add togglable Flow logo icon to top bar
+- Improve mini player handling and smoother animation
 
 FIXES AND STABILITY
 - Fix video player playback speed issue #232
@@ -68,3 +69,6 @@ FIXES AND STABILITY
 - Fix Double-Tap seek handling #286
 - Fix Shorts UI and bugs #287
 - Fix Search bar related issues #272
+- Fix Go-To-Channel in categories screen #294
+- Fix Song Artwork resolution in notification shader #296
+- Fix DLNA casting resolution #299

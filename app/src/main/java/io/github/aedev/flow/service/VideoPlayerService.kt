@@ -317,21 +317,51 @@ class VideoPlayerService : Service() {
         mediaSession.setPlaybackState(playbackState)
     }
     
-    private fun updateNotification() {
-        val video = currentVideo ?: return
-        
-        // Update MediaSession metadata
+    private fun buildMediaMetadata(video: Video, bitmap: Bitmap?): MediaMetadataCompat {
         val duration = EnhancedPlayerManager.getInstance().getDuration()
-        val metadata = MediaMetadataCompat.Builder()
+        val builder = MediaMetadataCompat.Builder()
             .putString(MediaMetadataCompat.METADATA_KEY_TITLE, video.title)
             .putString(MediaMetadataCompat.METADATA_KEY_ARTIST, video.channelName)
             .putString(MediaMetadataCompat.METADATA_KEY_DISPLAY_TITLE, video.title)
             .putString(MediaMetadataCompat.METADATA_KEY_DISPLAY_SUBTITLE, video.channelName)
             .putLong(MediaMetadataCompat.METADATA_KEY_DURATION, duration)
-            .build()
-        
-        mediaSession.setMetadata(metadata)
+        if (bitmap != null) {
+            builder.putBitmap(MediaMetadataCompat.METADATA_KEY_ART, bitmap)
+            builder.putBitmap(MediaMetadataCompat.METADATA_KEY_ALBUM_ART, bitmap)
+        }
+        return builder.build()
+    }
 
+    /**
+     * Attempt to get a higher-resolution YouTube thumbnail URL.
+     * Tries maxresdefault first; falls back to hqdefault, then the original.
+     */
+    private suspend fun loadBestThumbnail(originalUrl: String): Bitmap? = withContext(Dispatchers.IO) {
+        val candidates = mutableListOf<String>()
+        if (originalUrl.contains("i.ytimg.com") || originalUrl.contains("i.youtube.com")) {
+            val highRes = Regex("(mqdefault|hqdefault|sddefault|default)(\\.jpg)").replace(originalUrl, "maxresdefault$2")
+            if (highRes != originalUrl) candidates.add(highRes)
+            val medRes = Regex("(mqdefault|sddefault|default)(\\.jpg)").replace(originalUrl, "hqdefault$2")
+            if (medRes != originalUrl && medRes != highRes) candidates.add(medRes)
+        }
+        candidates.add(originalUrl)
+
+        for (url in candidates) {
+            val bitmap = try {
+                val conn = URL(url).openConnection()
+                conn.connectTimeout = 5000
+                conn.readTimeout = 10000
+                BitmapFactory.decodeStream(conn.getInputStream())
+            } catch (_: Exception) { null }
+            if (bitmap != null) return@withContext bitmap
+        }
+        null
+    }
+
+    private fun updateNotification() {
+        val video = currentVideo ?: return
+
+        mediaSession.setMetadata(buildMediaMetadata(video, cachedThumbnailBitmap))
         showNotification(video, cachedThumbnailBitmap)
 
         val thumbnailUrl = video.thumbnailUrl
@@ -340,18 +370,13 @@ class VideoPlayerService : Service() {
         if (thumbnailLoadJob?.isActive == true) return
 
         cachedThumbnailUrl = thumbnailUrl
-        thumbnailLoadJob = serviceScope.launch(Dispatchers.IO) {
-            val bitmap = try {
-                val url = URL(thumbnailUrl)
-                BitmapFactory.decodeStream(url.openConnection().getInputStream())
-            } catch (_: Exception) {
-                null
-            }
-
+        thumbnailLoadJob = serviceScope.launch {
+            val bitmap = loadBestThumbnail(thumbnailUrl)
             withContext(Dispatchers.Main) {
                 cachedThumbnailBitmap = bitmap
                 if (currentVideo?.thumbnailUrl == thumbnailUrl) {
-                    showNotification(video, cachedThumbnailBitmap)
+                    mediaSession.setMetadata(buildMediaMetadata(video, bitmap))
+                    showNotification(video, bitmap)
                 }
             }
         }

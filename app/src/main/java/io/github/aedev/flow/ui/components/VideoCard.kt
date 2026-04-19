@@ -312,6 +312,7 @@ fun VideoCard(
 fun VideoCardHorizontal(
     video: Video,
     modifier: Modifier = Modifier,
+    onChannelClick: ((String) -> Unit)? = null,
     onClick: () -> Unit
 ) {
     val context = LocalContext.current
@@ -447,7 +448,7 @@ fun VideoCardHorizontal(
     if (showQuickActions) {
         VideoQuickActionsBottomSheet(
             video = video,
-            onChannelClick = null,
+            onChannelClick = onChannelClick,
             onDismiss = { showQuickActions = false }
         )
     }
