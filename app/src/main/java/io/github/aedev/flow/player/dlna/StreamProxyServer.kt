@@ -1,8 +1,15 @@
 package io.github.aedev.flow.player.dlna
 
 import android.content.Context
+import android.media.MediaCodec
+import android.media.MediaExtractor
+import android.media.MediaFormat
+import android.media.MediaMuxer
 import android.net.wifi.WifiManager
+import android.os.Build
+import android.os.ParcelFileDescriptor
 import android.util.Log
+import androidx.annotation.RequiresApi
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -50,6 +57,8 @@ class StreamProxyServer private constructor() {
         private const val TAG = "StreamProxy"
         private const val BUFFER_SIZE = 64 * 1024 // 64KB chunks
         private const val MAX_CONNECTIONS = 8
+        // MediaMuxer.OutputFormat.MUXER_OUTPUT_MPEG_2_TS (API 26+)
+        private const val MUXER_OUTPUT_MPEG_2_TS = 8
 
         @Volatile
         private var instance: StreamProxyServer? = null
@@ -87,6 +96,10 @@ class StreamProxyServer private constructor() {
         val contentType: String,
         val contentLength: Long = -1
     )
+
+    private data class MuxEntry(val videoUrl: String, val audioUrl: String)
+
+    private val muxedStreams = ConcurrentHashMap<String, MuxEntry>()
 
     /**
      * Starts the proxy server on a random available port.
@@ -131,6 +144,7 @@ class StreamProxyServer private constructor() {
     fun stop() {
         isRunning.set(false)
         streams.clear()
+        muxedStreams.clear()
         try {
             serverSocket?.close()
         } catch (e: Exception) {
@@ -159,10 +173,35 @@ class StreamProxyServer private constructor() {
 
         val contentLength = probeContentLength(realUrl)
 
+        streams.clear()
         streams[path] = StreamEntry(realUrl, contentType, contentLength)
 
         val proxyUrl = "http://$localAddress:$localPort$path"
         Log.i(TAG, "Registered stream: $proxyUrl → ${realUrl.take(80)}...")
+        return proxyUrl
+    }
+
+    /**
+     * Registers two adaptive streams (video-only + audio-only) for on-the-fly MPEG-TS muxing.
+     * The returned URL, when fetched by a DLNA renderer, produces a single merged stream so
+     * the renderer gets both video and audio.  Requires API 26+ (Android 8.0).
+     *
+     * @param videoUrl  Direct video-only stream URL (googlevideo.com)
+     * @param audioUrl  Direct audio-only stream URL (googlevideo.com)
+     * @return Local proxy URL served as video/mp2t
+     */
+    @RequiresApi(Build.VERSION_CODES.O)
+    fun registerMuxedStream(videoUrl: String, audioUrl: String): String {
+        if (!isRunning.get()) {
+            Log.w(TAG, "Proxy not running, cannot register muxed stream")
+            return videoUrl
+        }
+        val pathId = java.util.UUID.randomUUID().toString().take(8)
+        val path = "/m/$pathId"
+        muxedStreams.clear()
+        muxedStreams[path] = MuxEntry(videoUrl, audioUrl)
+        val proxyUrl = "http://$localAddress:$localPort$path"
+        Log.i(TAG, "Registered muxed stream: $proxyUrl")
         return proxyUrl
     }
 
@@ -200,6 +239,26 @@ class StreamProxyServer private constructor() {
 
             val method = parts[0].uppercase()
             val path = parts[1]
+
+            // Muxed stream endpoint (/m/…) — MPEG-TS merged video+audio (API 26+)
+            if (path.startsWith("/m/")) {
+                val muxEntry = muxedStreams[path]
+                if (muxEntry == null) {
+                    Log.w(TAG, "Unknown mux path: $path")
+                    sendError(output, 404, "Not Found")
+                    return
+                }
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                    when (method) {
+                        "HEAD" -> handleMuxedHead(output)
+                        "GET"  -> handleMuxedGet(output, muxEntry)
+                        else   -> sendError(output, 405, "Method Not Allowed")
+                    }
+                } else {
+                    sendError(output, 501, "Not Implemented")
+                }
+                return
+            }
 
             val streamEntry = streams[path]
             if (streamEntry == null) {
@@ -327,6 +386,152 @@ class StreamProxyServer private constructor() {
             try {
                 sendError(output, 502, "Proxy Error")
             } catch (_: Exception) {}
+        }
+    }
+
+    /**
+     * Returns headers for a muxed MPEG-TS stream (no Content-Length because it is live-generated).
+     */
+    @RequiresApi(Build.VERSION_CODES.O)
+    private fun handleMuxedHead(output: OutputStream) {
+        val headers = "HTTP/1.1 200 OK\r\n" +
+            "Content-Type: video/mp2t\r\n" +
+            "Accept-Ranges: none\r\n" +
+            "transferMode.dlna.org: Streaming\r\n" +
+            "contentFeatures.dlna.org: DLNA.ORG_OP=00;DLNA.ORG_CI=0;" +
+                "DLNA.ORG_FLAGS=01700000000000000000000000000000\r\n" +
+            "Connection: close\r\n\r\n"
+        output.write(headers.toByteArray())
+        output.flush()
+    }
+
+    /**
+     * Streams a real-time muxed MPEG-TS response from a video-only and an audio-only source.
+     *
+     * Internally uses [MediaExtractor] to read samples from each remote URL and [MediaMuxer]
+     * (MPEG_2_TS format) to interleave them.  A [ParcelFileDescriptor] pipe connects the muxer
+     * output to this HTTP response, so the renderer receives a continuous MPEG-TS stream.
+     *
+     * The MPEG-TS container is streamable without a seek table, making it ideal for DLNA.
+     */
+    @RequiresApi(Build.VERSION_CODES.O)
+    private fun handleMuxedGet(output: OutputStream, entry: MuxEntry) {
+        val pipe = ParcelFileDescriptor.createPipe()
+        val readFd = pipe[0]
+        val writeFd = pipe[1]
+        val videoExtractor = MediaExtractor()
+        val audioExtractor = MediaExtractor()
+
+        try {
+            videoExtractor.setDataSource(entry.videoUrl)
+            audioExtractor.setDataSource(entry.audioUrl)
+
+            val vTrack = (0 until videoExtractor.trackCount).firstOrNull {
+                videoExtractor.getTrackFormat(it).getString(MediaFormat.KEY_MIME)
+                    ?.startsWith("video/") == true
+            } ?: throw IOException("No video track in ${entry.videoUrl.take(60)}")
+
+            val aTrack = (0 until audioExtractor.trackCount).firstOrNull {
+                audioExtractor.getTrackFormat(it).getString(MediaFormat.KEY_MIME)
+                    ?.startsWith("audio/") == true
+            } ?: throw IOException("No audio track in ${entry.audioUrl.take(60)}")
+
+            videoExtractor.selectTrack(vTrack)
+            audioExtractor.selectTrack(aTrack)
+
+            val muxer = MediaMuxer(writeFd.fileDescriptor, MUXER_OUTPUT_MPEG_2_TS)
+            val muxVTrack = muxer.addTrack(videoExtractor.getTrackFormat(vTrack))
+            val muxATrack = muxer.addTrack(audioExtractor.getTrackFormat(aTrack))
+            muxer.start()
+
+            // Send HTTP headers before blocking on the pipe read
+            output.write(("HTTP/1.1 200 OK\r\n" +
+                "Content-Type: video/mp2t\r\n" +
+                "Accept-Ranges: none\r\n" +
+                "transferMode.dlna.org: Streaming\r\n" +
+                "contentFeatures.dlna.org: DLNA.ORG_OP=00;DLNA.ORG_CI=0;" +
+                    "DLNA.ORG_FLAGS=01700000000000000000000000000000\r\n" +
+                "Connection: close\r\n\r\n").toByteArray())
+            output.flush()
+
+            // Mux thread: reads samples from both extractors → writes MPEG-TS to writeFd.
+            // Owns videoExtractor, audioExtractor, muxer, and writeFd; releases all on exit.
+            Thread {
+                try {
+                    val buf = java.nio.ByteBuffer.allocate(1024 * 1024) // 1 MB sample buffer
+                    val info = MediaCodec.BufferInfo()
+                    var vDone = false
+                    var aDone = false
+                    while (!vDone || !aDone) {
+                        val vTime = if (!vDone) videoExtractor.sampleTime else Long.MAX_VALUE
+                        val aTime = if (!aDone) audioExtractor.sampleTime else Long.MAX_VALUE
+                        if (aTime <= vTime && !aDone) {
+                            buf.clear()
+                            val sz = audioExtractor.readSampleData(buf, 0)
+                            if (sz < 0) {
+                                aDone = true
+                            } else {
+                                val keyFrame = if (audioExtractor.sampleFlags and
+                                        MediaExtractor.SAMPLE_FLAG_SYNC != 0)
+                                    MediaCodec.BUFFER_FLAG_KEY_FRAME else 0
+                                info.set(0, sz, audioExtractor.sampleTime, keyFrame)
+                                muxer.writeSampleData(muxATrack, buf, info)
+                                audioExtractor.advance()
+                            }
+                        } else if (!vDone) {
+                            buf.clear()
+                            val sz = videoExtractor.readSampleData(buf, 0)
+                            if (sz < 0) {
+                                vDone = true
+                            } else {
+                                val keyFrame = if (videoExtractor.sampleFlags and
+                                        MediaExtractor.SAMPLE_FLAG_SYNC != 0)
+                                    MediaCodec.BUFFER_FLAG_KEY_FRAME else 0
+                                info.set(0, sz, videoExtractor.sampleTime, keyFrame)
+                                muxer.writeSampleData(muxVTrack, buf, info)
+                                videoExtractor.advance()
+                            }
+                        }
+                    }
+                    try { muxer.stop() } catch (_: Exception) {}
+                    Log.i(TAG, "Mux thread finished successfully")
+                } catch (e: Exception) {
+                    // Broken pipe when renderer disconnects — normal shutdown path
+                    Log.d(TAG, "Mux thread ended: ${e.message}")
+                } finally {
+                    try { muxer.release() } catch (_: Exception) {}
+                    try { writeFd.close() } catch (_: Exception) {}
+                    videoExtractor.release()
+                    audioExtractor.release()
+                }
+            }.also { it.isDaemon = true; it.name = "dlna-mux"; it.start() }
+
+            // Stream pipe output to the DLNA renderer
+            try {
+                ParcelFileDescriptor.AutoCloseInputStream(readFd).use { pipeIn ->
+                    val buf = ByteArray(BUFFER_SIZE)
+                    var total = 0L
+                    while (true) {
+                        val n = pipeIn.read(buf)
+                        if (n == -1) break
+                        output.write(buf, 0, n)
+                        total += n
+                    }
+                    output.flush()
+                    Log.d(TAG, "Muxed stream: ${total / 1024}KB sent")
+                }
+            } catch (_: SocketException) {
+                // Renderer closed connection — mux thread will see broken pipe and exit
+            }
+
+        } catch (e: Exception) {
+            Log.e(TAG, "handleMuxedGet error: ${e.message}")
+            try { sendError(output, 502, "Mux Error") } catch (_: Exception) {}
+            // Release extractors only if the mux thread never took ownership
+            videoExtractor.release()
+            audioExtractor.release()
+            try { writeFd.close() } catch (_: Exception) {}
+            try { readFd.close() } catch (_: Exception) {}
         }
     }
 

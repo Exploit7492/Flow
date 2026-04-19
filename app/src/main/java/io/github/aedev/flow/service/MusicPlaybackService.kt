@@ -4,7 +4,11 @@ import android.app.*
 import android.content.Intent
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+import android.graphics.drawable.BitmapDrawable
 import android.os.Build
+import coil.imageLoader
+import coil.request.ImageRequest
+import coil.request.SuccessResult
 import android.os.IBinder
 import android.support.v4.media.MediaMetadataCompat
 import android.support.v4.media.session.MediaSessionCompat
@@ -18,7 +22,6 @@ import io.github.aedev.flow.player.RepeatMode
 import io.github.aedev.flow.ui.screens.music.MusicTrack
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.collectLatest
-import java.net.URL
 
 
 class MusicPlaybackService : Service() {
@@ -287,38 +290,49 @@ class MusicPlaybackService : Service() {
     }
     
     /**
-     * Loads album art and updates the notification
+     * Loads album art via Coil (proper HTTP headers, disk cache) and updates the notification.
+     * Prefers highResThumbnailUrl (1000×1000) over the raw thumbnailUrl.
      */
     private fun loadAlbumArtAndUpdateNotification() {
         val track = currentTrack ?: return
-        
+
         updateMediaSessionMetadata(track, null)
         showNotification(track, null)
-        
-        // Load album art asynchronously
-        serviceScope.launch(Dispatchers.IO) {
-            val bitmap = try {
-                if (track.thumbnailUrl.isNotEmpty()) {
-                    val url = URL(track.thumbnailUrl)
-                    val connection = url.openConnection()
-                    connection.connectTimeout = 5000
-                    connection.readTimeout = 5000
-                    BitmapFactory.decodeStream(connection.getInputStream())
-                } else {
-                    null
-                }
-            } catch (e: Exception) {
-                null
-            }
-            
-            withContext(Dispatchers.Main) {
-                if (currentTrack?.videoId == track.videoId) {
-                    currentAlbumArt = bitmap
-                    updateMediaSessionMetadata(track, bitmap)
-                    showNotification(track, bitmap)
-                }
+
+        serviceScope.launch {
+            val url = track.highResThumbnailUrl.ifEmpty { track.thumbnailUrl }
+            val bitmap = loadBestAlbumArt(url)
+            if (currentTrack?.videoId == track.videoId) {
+                currentAlbumArt = bitmap
+                updateMediaSessionMetadata(track, bitmap)
+                showNotification(track, bitmap)
             }
         }
+    }
+
+    private suspend fun loadBestAlbumArt(url: String): Bitmap? = withContext(Dispatchers.IO) {
+        if (url.isEmpty()) return@withContext null
+        val request = ImageRequest.Builder(applicationContext)
+            .data(url)
+            .allowHardware(false)
+            .build()
+        val bitmap = when (val result = applicationContext.imageLoader.execute(request)) {
+            is SuccessResult -> (result.drawable as? BitmapDrawable)?.bitmap
+            else -> null
+        }
+        bitmap?.let { ensureMinSize(it, 512) }
+    }
+
+    /**
+     * Scale bitmap up so its shorter side is at least [minPx] pixels.
+     * Prevents FHD+ notification panels from upscaling tiny art and looking blurry.
+     */
+    private fun ensureMinSize(bitmap: Bitmap, minPx: Int): Bitmap {
+        val w = bitmap.width
+        val h = bitmap.height
+        if (w >= minPx && h >= minPx) return bitmap
+        val scale = minPx.toFloat() / minOf(w, h)
+        return Bitmap.createScaledBitmap(bitmap, (w * scale).toInt(), (h * scale).toInt(), true)
     }
     
     /**

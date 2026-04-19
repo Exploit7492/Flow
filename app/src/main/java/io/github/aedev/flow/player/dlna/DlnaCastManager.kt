@@ -2,6 +2,8 @@ package io.github.aedev.flow.player.dlna
 
 import android.content.Context
 import android.net.wifi.WifiManager
+import android.os.Build
+import android.os.SystemClock
 import android.util.Log
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -135,8 +137,8 @@ object DlnaCastManager {
 
                     val buf = ByteArray(4096)
                     val packet = DatagramPacket(buf, buf.size)
-                    val stop = System.currentTimeMillis() + DISCOVERY_TIMEOUT_MS
-                    while (System.currentTimeMillis() < stop) {
+                    val stop = SystemClock.elapsedRealtime() + DISCOVERY_TIMEOUT_MS
+                    while (SystemClock.elapsedRealtime() < stop) {
                         try {
                             socket.receive(packet)
                             val response = String(packet.data, 0, packet.length, Charsets.UTF_8)
@@ -271,23 +273,23 @@ object DlnaCastManager {
     ) {
         scope.launch {
             try {
-                val videoContentType = guessContentType(videoUrl, "video/mp4")
-                val proxyVideoUrl = proxy.registerStream(
-                    realUrl = videoUrl,
-                    contentType = videoContentType
-                )
+                val proxyVideoUrl: String
+                val contentType: String
 
-                val proxyAudioUrl = audioUrl?.let {
-                    proxy.registerStream(
-                        realUrl = it,
-                        contentType = guessContentType(it, "audio/mp4")
-                    )
+                if (audioUrl != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                    proxyVideoUrl = proxy.registerMuxedStream(videoUrl, audioUrl)
+                    contentType = "video/mp2t"
+                    Log.i(TAG, "Casting muxed MPEG-TS: $proxyVideoUrl")
+                } else {
+                    contentType = guessContentType(videoUrl, "video/mp4")
+                    proxyVideoUrl = proxy.registerStream(videoUrl, contentType)
+                    if (audioUrl != null) {
+                        proxy.registerStream(audioUrl, guessContentType(audioUrl, "audio/mp4"))
+                    }
+                    Log.i(TAG, "Casting via proxy: $proxyVideoUrl")
                 }
 
-                Log.i(TAG, "Casting via proxy: $proxyVideoUrl" +
-                    if (proxyAudioUrl != null) " + audio: $proxyAudioUrl" else "")
-
-                setAVTransportUri(device, proxyVideoUrl, title, videoContentType, proxyAudioUrl)
+                setAVTransportUri(device, proxyVideoUrl, title, contentType)
                 delay(500)
                 play(device)
                 _currentDevice.value = device
@@ -316,9 +318,17 @@ object DlnaCastManager {
                 _currentDevice.value = null
                 _castPosition.value = 0
                 _castDuration.value = 0
-                proxy.stop()
             }
         }
+    }
+
+    /**
+     * Stops playback and fully shuts down the proxy server.
+     * Call this when the user explicitly disconnects from the device.
+     */
+    fun disconnect() {
+        stop()
+        proxy.stop()
     }
 
     fun pause() {
@@ -429,10 +439,9 @@ object DlnaCastManager {
         device: DlnaDevice,
         uri: String,
         title: String,
-        contentType: String = "video/mp4",
-        audioUri: String? = null
+        contentType: String = "video/mp4"
     ) {
-        val metadata = buildDidlLite(uri, title, contentType, audioUri)
+        val metadata = buildDidlLite(uri, title, contentType)
         val body = soapAction(
             "SetAVTransportURI",
             "urn:schemas-upnp-org:service:AVTransport:1",
@@ -502,19 +511,14 @@ object DlnaCastManager {
     private fun buildDidlLite(
         uri: String,
         title: String,
-        contentType: String = "video/mp4",
-        audioUri: String? = null
+        contentType: String = "video/mp4"
     ): String {
-        val audioRes = if (audioUri != null) {
-            """<res protocolInfo="http-get:*:audio/mp4:*">${escapeXml(audioUri)}</res>"""
-        } else ""
         return """<DIDL-Lite xmlns:dc="http://purl.org/dc/elements/1.1/" """ +
             """xmlns:upnp="urn:schemas-upnp-org:metadata-1-0/upnp/" """ +
             """xmlns="urn:schemas-upnp-org:metadata-1-0/DIDL-Lite/">""" +
             """<item id="1" parentID="0" restricted="0">""" +
             """<dc:title>${escapeXml(title)}</dc:title>""" +
             """<res protocolInfo="http-get:*:$contentType:*">${escapeXml(uri)}</res>""" +
-            audioRes +
             """<upnp:class>object.item.videoItem</upnp:class>""" +
             """</item></DIDL-Lite>"""
     }

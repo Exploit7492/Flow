@@ -858,7 +858,7 @@ fun GlobalPlayerOverlay(
                     showDlnaDialog = false
                 },
                 onStopCasting = {
-                    DlnaCastManager.stop()
+                    DlnaCastManager.disconnect()
                     showDlnaDialog = false
                 },
                 onDismiss = {

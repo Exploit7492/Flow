@@ -5,6 +5,10 @@ import android.content.Intent
 import android.util.Log
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+import android.graphics.drawable.BitmapDrawable
+import coil.imageLoader
+import coil.request.ImageRequest
+import coil.request.SuccessResult
 import android.os.Build
 import android.os.IBinder
 import android.support.v4.media.MediaMetadataCompat
@@ -21,7 +25,6 @@ import kotlinx.coroutines.flow.collectLatest
 import android.content.Context
 import android.net.wifi.WifiManager
 import android.os.PowerManager
-import java.net.URL
 
 /**
  * Foreground service for video playback with media session and notification support.
@@ -333,29 +336,58 @@ class VideoPlayerService : Service() {
     }
 
     /**
-     * Attempt to get a higher-resolution YouTube thumbnail URL.
-     * Tries maxresdefault first; falls back to hqdefault, then the original.
+     * Build candidate thumbnail URLs in descending resolution order.
+     * Extracts the video ID so each URL is a clean, predictable path.
      */
-    private suspend fun loadBestThumbnail(originalUrl: String): Bitmap? = withContext(Dispatchers.IO) {
+    private fun buildThumbnailCandidates(originalUrl: String): List<String> {
         val candidates = mutableListOf<String>()
         if (originalUrl.contains("i.ytimg.com") || originalUrl.contains("i.youtube.com")) {
-            val highRes = Regex("(mqdefault|hqdefault|sddefault|default)(\\.jpg)").replace(originalUrl, "maxresdefault$2")
-            if (highRes != originalUrl) candidates.add(highRes)
-            val medRes = Regex("(mqdefault|sddefault|default)(\\.jpg)").replace(originalUrl, "hqdefault$2")
-            if (medRes != originalUrl && medRes != highRes) candidates.add(medRes)
+            val videoId = Regex("(?:vi|vi_webp)/([a-zA-Z0-9_-]+)/").find(originalUrl)
+                ?.groupValues?.getOrNull(1)
+            if (videoId != null) {
+                candidates.add("https://i.ytimg.com/vi/$videoId/maxresdefault.jpg") // 1280×720
+                candidates.add("https://i.ytimg.com/vi/$videoId/sddefault.jpg")     // 640×480
+                candidates.add("https://i.ytimg.com/vi/$videoId/hqdefault.jpg")     // 480×360
+            }
         }
-        candidates.add(originalUrl)
+        if (originalUrl !in candidates) candidates.add(originalUrl)
+        return candidates
+    }
 
-        for (url in candidates) {
-            val bitmap = try {
-                val conn = URL(url).openConnection()
-                conn.connectTimeout = 5000
-                conn.readTimeout = 10000
-                BitmapFactory.decodeStream(conn.getInputStream())
-            } catch (_: Exception) { null }
-            if (bitmap != null) return@withContext bitmap
+    /**
+     * Load the best available thumbnail via Coil (proper HTTP headers, disk cache).
+     * Falls back down the resolution ladder on any failure.
+     * Scales the result up to at least [minPx] so FHD+ notification panels
+     * don't upscale a tiny bitmap and look blurry.
+     */
+    private suspend fun loadBestThumbnail(originalUrl: String): Bitmap? = withContext(Dispatchers.IO) {
+        for (url in buildThumbnailCandidates(originalUrl)) {
+            val request = ImageRequest.Builder(applicationContext)
+                .data(url)
+                .allowHardware(false)
+                .build()
+            val bitmap = when (val result = applicationContext.imageLoader.execute(request)) {
+                is SuccessResult -> (result.drawable as? BitmapDrawable)?.bitmap
+                else -> null
+            }
+            if (bitmap != null) return@withContext ensureMinSize(bitmap, 512)
         }
         null
+    }
+
+    /**
+     * Scale [bitmap] up so its shorter side is at least [minPx] pixels.
+     * Uses bilinear filtering to avoid blocky upscaling artefacts.
+     * Returns the original unchanged if it's already large enough.
+     */
+    private fun ensureMinSize(bitmap: Bitmap, minPx: Int): Bitmap {
+        val w = bitmap.width
+        val h = bitmap.height
+        if (w >= minPx && h >= minPx) return bitmap
+        val scale = minPx.toFloat() / minOf(w, h)
+        val newW = (w * scale).toInt()
+        val newH = (h * scale).toInt()
+        return Bitmap.createScaledBitmap(bitmap, newW, newH, true)
     }
 
     private fun updateNotification() {

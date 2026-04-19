@@ -41,6 +41,6 @@ object CastHelper {
 
     /** Stop casting and return playback to the phone. */
     fun stopCasting() {
-        DlnaCastManager.stop()
+        DlnaCastManager.disconnect()
     }
 }

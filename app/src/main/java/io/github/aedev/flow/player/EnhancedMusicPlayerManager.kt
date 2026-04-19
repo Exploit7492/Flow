@@ -340,13 +340,11 @@ object EnhancedMusicPlayerManager {
                     MediaMetadata.Builder()
                     .setTitle(t.title)
                     .setArtist(t.artist)
-                    .setArtworkUri(Uri.parse(t.thumbnailUrl))
+                    .setArtworkUri(Uri.parse(t.highResThumbnailUrl))
                     .build()
                 )
                 .build()
         }
-        
-        Log.d("EnhancedMusicPlayer", "Playing ${track.title}. Queue size: ${mediaItems.size}. Start index: ${startIndex}")
         
         val startIdx = if (startIndex >= 0) startIndex else activeQueue.indexOfFirst { it.videoId == track.videoId }.coerceAtLeast(0)
         
@@ -376,7 +374,7 @@ object EnhancedMusicPlayerManager {
                         MediaMetadata.Builder()
                             .setTitle(track.title)
                             .setArtist(track.artist)
-                            .setArtworkUri(Uri.parse(track.thumbnailUrl))
+                            .setArtworkUri(Uri.parse(track.highResThumbnailUrl))
                             .build()
                     )
                     .build()
