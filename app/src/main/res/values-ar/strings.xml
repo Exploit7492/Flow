@@ -1196,5 +1196,26 @@
     <string name="player_settings_shorts_playback_mode_loop">Loop (تكرار الفيديو القصير الحالي)</string>
     <string name="player_settings_shorts_playback_mode_auto_next">التشغيل التلقائي للتالي (الإنتقال إلي الفيديو القصير التالي)</string>
     <string name="player_settings_shorts_playback_mode_dialog_title">وضع مشغل الفيديوهات القصيرة</string>
-    <string name="player_settings_shorts_playback_mode_dialog_body">اختر كيف يتصرف الفيديو القصير عند ما ينتهي الفيديو القصير الحالي من التشغيل:</string>
+    <string name="player_settings_shorts_playback_mode_dialog_body">اختر كيف يتصرف الفيديو القصير عندما ينتهي الفيديو القصير الحالي من التشغيل:</string>
+    <string name="appearance_category_custom">مخصص</string>
+    <string name="appearance_customize_theme">تخصيص الموضوع</string>
+    <string name="appearance_customizer_title">محرر الموضوعات الخاصة</string>
+    <string name="appearance_customizer_reset">إعادة الضبط</string>
+    <string name="appearance_customizer_save">حفظ الموضوع</string>
+    <string name="appearance_role_primary">أساسي</string>
+    <string name="appearance_role_on_primary">على الأساسي</string>
+    <string name="appearance_role_secondary">ثانوي</string>
+    <string name="appearance_role_on_secondary">علي الثانوي</string>
+    <string name="appearance_role_background">الخلفية</string>
+    <string name="appearance_role_on_background">علي الخلفية</string>
+    <string name="appearance_role_surface">السطح</string>
+    <string name="appearance_role_on_surface">علي السطح</string>
+    <string name="appearance_role_surface_variant">بديل السطح</string>
+    <string name="appearance_role_on_surface_variant">علي بديل السطح</string>
+    <string name="appearance_role_error">خطأ</string>
+    <string name="appearance_role_on_error">علي الخطأ</string>
+    <string name="theme_name_monochrome">أحادي اللون</string>
+    <string name="theme_desc_monochrome">أسود نقي و أبيض ناصع</string>
+    <string name="theme_name_custom">مخصص</string>
+    <string name="theme_desc_custom">ابتكر لوحة ألوان إحترافية خاصة بك</string>
 </resources>
