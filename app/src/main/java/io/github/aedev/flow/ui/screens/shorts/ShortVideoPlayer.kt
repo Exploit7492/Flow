@@ -70,9 +70,12 @@ fun ShortVideoPage(
     onShareClick: () -> Unit,
     onWantMore: () -> Unit = {},
     onNotInterested: () -> Unit = {},
+    onVideoEnded: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
+    val playerPreferences = remember { io.github.aedev.flow.data.local.PlayerPreferences(context) }
+    val shortsPlaybackMode by playerPreferences.shortsPlaybackMode.collectAsState(initial = "loop")
     val haptic = LocalHapticFeedback.current
     val scope = rememberCoroutineScope()
     val playerPool = remember { ShortsPlayerPool.getInstance() }
@@ -173,6 +176,26 @@ fun ShortVideoPage(
             }
         } else {
             playerView.player = null
+        }
+    }
+
+    // ── Add listener to detect when video ends (for auto-play-next) ──
+    DisposableEffect(isActive, pageIndex, shortsPlaybackMode) {
+        val player = playerPool.getPlayerForIndex(pageIndex)
+        val eventListener = object : androidx.media3.common.Player.Listener {
+            override fun onPlaybackStateChanged(playbackState: Int) {
+                if (playbackState == androidx.media3.common.Player.STATE_ENDED && shortsPlaybackMode == "auto_next") {
+                    onVideoEnded()
+                }
+            }
+        }
+        
+        if (isActive && player != null) {
+            player.addListener(eventListener)
+        }
+
+        onDispose {
+            player?.removeListener(eventListener)
         }
     }
 

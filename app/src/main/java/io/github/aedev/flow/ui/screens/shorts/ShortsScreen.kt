@@ -355,7 +355,14 @@ fun ShortsScreen(
                             context.startActivity(Intent.createChooser(sendIntent, null))
                         },
                         onWantMore = { viewModel.wantMoreLikeThis(short) },
-                        onNotInterested = { viewModel.notInterested(short) }
+                        onNotInterested = { viewModel.notInterested(short) },
+                        onVideoEnded = {
+                            scope.launch {
+                                if (page < uiState.shorts.size - 1) {
+                                    pagerState.animateScrollToPage(page + 1)
+                                }
+                            }
+                        }
                     )
                 }
 

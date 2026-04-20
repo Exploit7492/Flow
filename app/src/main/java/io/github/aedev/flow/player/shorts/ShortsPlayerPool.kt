@@ -84,6 +84,7 @@ class ShortsPlayerPool private constructor() {
     private var isInitialized = false
     private var dataSourceFactory: DefaultDataSource.Factory? = null
     private var preferredAudioLanguage: String = "original"
+    private var shortsPlaybackMode: String = "loop" 
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
 
@@ -102,6 +103,14 @@ class ShortsPlayerPool private constructor() {
             PlayerPreferences(context).preferredAudioLanguage.collect { language ->
                 preferredAudioLanguage = language
                 updateTrackSelectors(language)
+            }
+        }
+
+        // Observe shorts playback mode preference
+        scope.launch {
+            PlayerPreferences(context).shortsPlaybackMode.collect { mode ->
+                shortsPlaybackMode = mode
+                Log.d(TAG, "Shorts playback mode changed to: $mode")
             }
         }
 
@@ -244,7 +253,8 @@ class ShortsPlayerPool private constructor() {
 
         // Set playback state
         player.playWhenReady = shouldPlay
-        player.repeatMode = Player.REPEAT_MODE_ONE
+        // Set repeat mode based on playback preference: "loop" → REPEAT_MODE_ONE, "auto_next" → REPEAT_MODE_OFF
+        player.repeatMode = if (shortsPlaybackMode == "loop") Player.REPEAT_MODE_ONE else Player.REPEAT_MODE_OFF
         
         if (shouldPlay) {
             _currentVideoId.value = videoId
@@ -334,7 +344,7 @@ class ShortsPlayerPool private constructor() {
 
         preparePlayerInternal(player, videoUrl, newAudioUrl)
         player.playWhenReady = wasPlaying
-        player.repeatMode = Player.REPEAT_MODE_ONE
+        player.repeatMode = if (shortsPlaybackMode == "loop") Player.REPEAT_MODE_ONE else Player.REPEAT_MODE_OFF
     }
 
     /**
@@ -358,7 +368,7 @@ class ShortsPlayerPool private constructor() {
         preparePlayerInternal(player, newVideoUrl, audioUrl)
         player.playWhenReady = wasPlaying
         player.seekTo(position)
-        player.repeatMode = Player.REPEAT_MODE_ONE
+        player.repeatMode = if (shortsPlaybackMode == "loop") Player.REPEAT_MODE_ONE else Player.REPEAT_MODE_OFF
     }
 
     private fun preparePlayerInternal(player: ExoPlayer, videoUrl: String, audioUrl: String?) {

@@ -144,6 +144,9 @@ class PlayerPreferences(private val context: Context) {
         // Shorts background playback
         val SHORTS_BACKGROUND_PLAY = booleanPreferencesKey("shorts_background_play")
 
+        // Shorts playback mode: "loop" (default) or "auto_next"
+        val SHORTS_PLAYBACK_MODE = stringPreferencesKey("shorts_playback_mode")
+
         // Cache size
         val MEDIA_CACHE_SIZE_MB = intPreferencesKey("media_cache_size_mb")
 
@@ -870,6 +873,18 @@ class PlayerPreferences(private val context: Context) {
     suspend fun setShortsBackgroundPlay(enabled: Boolean) {
         context.playerPreferencesDataStore.edit { preferences ->
             preferences[Keys.SHORTS_BACKGROUND_PLAY] = enabled
+        }
+    }
+
+    // Shorts playback mode (default LOOP — repeats the current short)
+    val shortsPlaybackMode: Flow<String> = context.playerPreferencesDataStore.data
+        .map { preferences ->
+            preferences[Keys.SHORTS_PLAYBACK_MODE] ?: "loop"
+        }
+
+    suspend fun setShortsPlaybackMode(mode: String) {
+        context.playerPreferencesDataStore.edit { preferences ->
+            preferences[Keys.SHORTS_PLAYBACK_MODE] = mode
         }
     }
 

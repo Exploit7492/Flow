@@ -318,12 +318,14 @@ fun SubscriptionsScreen(
                                     if (uiState.isFullWidthView) {
                                         VideoCardFullWidth(
                                             video = video,
-                                            onClick = { onVideoClick(video) }
+                                            onClick = { onVideoClick(video) },
+                                            onChannelClick = onChannelClick
                                         )
                                     } else {
                                         VideoCardHorizontal(
                                             video = video,
-                                            onClick = { onVideoClick(video) }
+                                            onClick = { onVideoClick(video) },
+                                            onChannelClick = onChannelClick
                                         )
                                     }
                                 }

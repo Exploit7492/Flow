@@ -25,6 +25,7 @@ FEATURES
 - Add new video title lines customizer #283
 - Add new action button to video card
 - Add new SponsorBlock segments download with videos #278
+- Add new shorts playback behavior toggle
 
 IMPROVEMENTS
 - New miniplayer secondary action buttons layout #225

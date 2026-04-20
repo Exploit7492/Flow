@@ -573,6 +573,11 @@
     <string name="player_settings_background_play_subtitle">Continue playing when app is in background</string>
     <string name="player_settings_shorts_background_play">Shorts Background Play</string>
     <string name="player_settings_shorts_background_play_subtitle">Continue playing Shorts when app is in background</string>
+    <string name="player_settings_shorts_playback_mode_title">Shorts Playback Mode</string>
+    <string name="player_settings_shorts_playback_mode_loop">Loop (repeat current short)</string>
+    <string name="player_settings_shorts_playback_mode_auto_next">Auto Play Next (advance to next short)</string>
+    <string name="player_settings_shorts_playback_mode_dialog_title">Shorts Playback Mode</string>
+    <string name="player_settings_shorts_playback_mode_dialog_body">Choose how Shorts should behave when the current short finishes playing:</string>
     <string name="player_settings_autoplay">Autoplay</string>
     <string name="player_settings_autoplay_subtitle">Automatically play the next video</string>
     <string name="player_settings_skip_silence">Skip Silence</string>

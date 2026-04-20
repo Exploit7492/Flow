@@ -79,6 +79,7 @@ fun PlayerSettingsScreen(
     val manualPipButtonEnabled by playerPreferences.manualPipButtonEnabled.collectAsState(initial = true)
     val backgroundPlayEnabled by playerPreferences.backgroundPlayEnabled.collectAsState(initial = false)
     val shortsBackgroundPlay by playerPreferences.shortsBackgroundPlay.collectAsState(initial = false)
+    val shortsPlaybackMode by playerPreferences.shortsPlaybackMode.collectAsState(initial = "loop")
     val preferredAudioLanguage by playerPreferences.preferredAudioLanguage.collectAsState(initial = "original")
     val playDuringCalls by playerPreferences.playDuringCalls.collectAsState(initial = false)
     val currentLyricsProvider by playerPreferences.preferredLyricsProvider.collectAsState(initial = "LRCLIB")
@@ -93,6 +94,7 @@ fun PlayerSettingsScreen(
     var showLyricsProviderSheet by remember { mutableStateOf(false) }
     var showSeekDurationDialog by remember { mutableStateOf(false) }
     var showUserIdDialog by remember { mutableStateOf(false) }
+    var showShortsPlaybackModeDialog by remember { mutableStateOf(false) }
 
     val customSpeedsEnabled by playerPreferences.customSpeedsEnabled.collectAsState(initial = false)
     val customSpeedPresetsRaw by playerPreferences.customSpeedPresets.collectAsState(initial = "")
@@ -233,6 +235,16 @@ fun PlayerSettingsScreen(
                         subtitle = stringResource(R.string.player_settings_shorts_background_play_subtitle),
                         checked = shortsBackgroundPlay,
                         onCheckedChange = { coroutineScope.launch { playerPreferences.setShortsBackgroundPlay(it) } }
+                    )
+                    HorizontalDivider(Modifier.padding(start = 56.dp), color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
+                    SettingsClickItem(
+                        icon = Icons.Outlined.SwapVert,
+                        title = stringResource(R.string.player_settings_shorts_playback_mode_title),
+                        subtitle = if (shortsPlaybackMode == "loop") 
+                            stringResource(R.string.player_settings_shorts_playback_mode_loop)
+                        else 
+                            stringResource(R.string.player_settings_shorts_playback_mode_auto_next),
+                        onClick = { showShortsPlaybackModeDialog = true }
                     )
                     HorizontalDivider(Modifier.padding(start = 56.dp), color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
                     SettingsSwitchItem(
@@ -574,6 +586,59 @@ fun PlayerSettingsScreen(
             },
             confirmButton = {
                 TextButton(onClick = { showAudioLanguageDialog = false }) {
+                    Text(stringResource(R.string.btn_close))
+                }
+            }
+        )
+    }
+
+    // Shorts Playback Mode Selection Dialog
+    if (showShortsPlaybackModeDialog) {
+        AlertDialog(
+            onDismissRequest = { showShortsPlaybackModeDialog = false },
+            title = {
+                Text(
+                    stringResource(R.string.player_settings_shorts_playback_mode_dialog_title),
+                    style = MaterialTheme.typography.titleLarge
+                )
+            },
+            text = {
+                Column {
+                    Text(
+                        stringResource(R.string.player_settings_shorts_playback_mode_dialog_body),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(bottom = 16.dp)
+                    )
+                    listOf("loop" to R.string.player_settings_shorts_playback_mode_loop,
+                           "auto_next" to R.string.player_settings_shorts_playback_mode_auto_next).forEach { (mode, labelRes) ->
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable {
+                                    coroutineScope.launch {
+                                        playerPreferences.setShortsPlaybackMode(mode)
+                                    }
+                                    showShortsPlaybackModeDialog = false
+                                }
+                                .padding(vertical = 12.dp, horizontal = 8.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            RadioButton(
+                                selected = shortsPlaybackMode == mode,
+                                onClick = null
+                            )
+                            Spacer(modifier = Modifier.width(12.dp))
+                            Text(
+                                text = stringResource(labelRes),
+                                style = MaterialTheme.typography.bodyLarge
+                            )
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { showShortsPlaybackModeDialog = false }) {
                     Text(stringResource(R.string.btn_close))
                 }
             }
