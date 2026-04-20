@@ -273,7 +273,7 @@ private fun HistoryVideoCard(
             // Progress bar
             if (entry.progressPercentage > 0) {
                 LinearProgressIndicator(
-                    progress = entry.progressPercentage / 100f,
+                    progress = if (entry.progressPercentage >= 90f) 1f else entry.progressPercentage / 100f,
                     modifier = Modifier
                         .align(Alignment.BottomCenter)
                         .fillMaxWidth()

@@ -418,10 +418,16 @@ fun PlayerInitEffect(
 
             Log.d(TAG, "Playing offline file for $videoId: $localFilePath")
             EnhancedPlayerManager.getInstance().initialize(context)
+            val savedPos = uiState.savedPosition?.first()
+                ?: io.github.aedev.flow.data.local.ViewHistory
+                    .getInstance(context)
+                    .getPlaybackPosition(videoId)
+                    .first()
             EnhancedPlayerManager.getInstance().playLocalFile(
                 videoId,
                 localFilePath,
-                savedSegments = uiState.offlineSponsorBlockSegments
+                savedSegments = uiState.offlineSponsorBlockSegments,
+                preservePosition = savedPos.takeIf { it > 500L }
             )
             applyRememberedSpeed(context, screenState)
             return@LaunchedEffect

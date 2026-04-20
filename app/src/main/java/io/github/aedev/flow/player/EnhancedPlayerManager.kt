@@ -363,8 +363,13 @@ class EnhancedPlayerManager private constructor() {
      *   When non-empty, they are applied directly without a network call, enabling
      *   offline sponsor-skip. Pass null to fall back to fetching from the API.
      */
-    fun playLocalFile(videoId: String, filePath: String, savedSegments: List<SponsorBlockSegment>? = null) {
-        Log.d(TAG, "playLocalFile: videoId=$videoId, path=$filePath, offlineSegments=${savedSegments?.size}")
+    fun playLocalFile(
+        videoId: String,
+        filePath: String,
+        savedSegments: List<SponsorBlockSegment>? = null,
+        preservePosition: Long? = null
+    ) {
+        Log.d(TAG, "playLocalFile: videoId=$videoId, path=$filePath, offlineSegments=${savedSegments?.size}, resumePos=$preservePosition")
         resetPlaybackStateForNewVideo(videoId)
         currentVideoId = videoId
         startPlaybackTracker()
@@ -380,7 +385,8 @@ class EnhancedPlayerManager private constructor() {
         loadMediaInternal(
             videoStream = null,
             audioStream = null,
-            localFilePath = filePath
+            localFilePath = filePath,
+            preservePosition = preservePosition
         )
     }
 

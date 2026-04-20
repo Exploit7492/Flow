@@ -75,8 +75,8 @@ fun VideoCard(
     val context = LocalContext.current
     val watchProgress by produceState<Float?>(initialValue = null, video.id) {
         ViewHistory.getInstance(context).getVideoHistory(video.id).collectLatest { entry ->
-            value = if (entry != null && entry.duration > 0 && entry.progressPercentage in 3f..90f) {
-                entry.progressPercentage / 100f
+            value = if (entry != null && entry.duration > 0 && entry.progressPercentage >= 3f) {
+                if (entry.progressPercentage >= 90f) 1.0f else entry.progressPercentage / 100f
             } else null
         }
     }
@@ -327,8 +327,8 @@ fun VideoCardHorizontal(
     val displayThumbnailUrl = deArrowResult?.thumbnailUrl ?: video.thumbnailUrl
     val watchProgress by produceState<Float?>(initialValue = null, video.id) {
         ViewHistory.getInstance(context).getVideoHistory(video.id).collectLatest { entry ->
-            value = if (entry != null && entry.duration > 0 && entry.progressPercentage in 3f..90f) {
-                entry.progressPercentage / 100f
+            value = if (entry != null && entry.duration > 0 && entry.progressPercentage >= 3f) {
+                if (entry.progressPercentage >= 90f) 1.0f else entry.progressPercentage / 100f
             } else null
         }
     }
@@ -467,8 +467,8 @@ fun VideoCardFullWidth(
     val context = LocalContext.current
     val watchProgress by produceState<Float?>(initialValue = null, video.id) {
         ViewHistory.getInstance(context).getVideoHistory(video.id).collectLatest { entry ->
-            value = if (entry != null && entry.duration > 0 && entry.progressPercentage in 3f..90f) {
-                entry.progressPercentage / 100f
+            value = if (entry != null && entry.duration > 0 && entry.progressPercentage >= 3f) {
+                if (entry.progressPercentage >= 90f) 1.0f else entry.progressPercentage / 100f
             } else null
         }
     }
@@ -715,8 +715,8 @@ fun CompactVideoCard(
     val context = LocalContext.current
     val watchProgress by produceState<Float?>(initialValue = null, video.id) {
         ViewHistory.getInstance(context).getVideoHistory(video.id).collectLatest { entry ->
-            value = if (entry != null && entry.duration > 0 && entry.progressPercentage in 3f..90f) {
-                entry.progressPercentage / 100f
+            value = if (entry != null && entry.duration > 0 && entry.progressPercentage >= 3f) {
+                if (entry.progressPercentage >= 90f) 1.0f else entry.progressPercentage / 100f
             } else null
         }
     }

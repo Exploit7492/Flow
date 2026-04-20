@@ -1,6 +1,6 @@
 FLOW CHANGE LOG
 VERSION: 2.1.0
-DATE: 2026-04-19
+DATE: 2026-04-20
 
 LIBRARIES
 - Bump NewpipeExtractor to latest version (v0.26.1)
@@ -49,6 +49,7 @@ IMPROVEMENTS
 - Improve Engine performace
 - Add togglable Flow logo icon to top bar
 - Improve mini player handling and smoother animation
+- Improve video progress tracking #300
 
 FIXES AND STABILITY
 - Fix video player playback speed issue #232
