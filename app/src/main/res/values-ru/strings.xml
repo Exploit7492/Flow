@@ -679,4 +679,15 @@
     <string name="block_topic_placeholder">например: макияж, фортнайт, асмр</string>
     <string name="desc_add_topic">Добавить тему</string>
     <string name="quick_add">Быстрое добавление</string>
+    <string name="content_settings_title_lines_1">1 строка</string>
+    <string name="content_settings_title_lines_2">2 строки</string>
+    <string name="content_settings_title_lines_3">3 строки</string>
+    <string name="content_settings_title_lines_unlimited">Неограниченно</string>
+    <string name="content_settings_video_card_actions_title">Кнопки «Нравится» и «Не нравится» на карточке видео</string>
+    <string name="content_settings_video_card_actions_subtitle">Отображать кнопки «Нравится» и «Не нравится» на карточках видео, чтобы быстро настроить рекомендации</string>
+    <string name="content_settings_show_app_logo_title">Отображать логотип приложения</string>
+    <string name="content_settings_show_app_logo_subtitle">Отображать значок логотипа Flow рядом с названием приложения в верхней панели главного экрана</string>
+    <string name="player_settings_shorts_background_play">Воспроизведение Shorts в фоновом режиме</string>
+    <string name="player_settings_shorts_background_play_subtitle">Продолжать воспроизведение Shorts, когда приложение работает в фоновом режиме</string>
+    <string name="currently_following">Текущие подписки</string>
 </resources>
