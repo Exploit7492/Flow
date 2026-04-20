@@ -178,10 +178,10 @@ class SubscriptionsViewModel : ViewModel() {
         val (shorts, regular) = sortedVideos.partition { video -> video.isShort }
         Log.i(TAG, "updateVideos: total=${sortedVideos.size} → regular=${regular.size}, shorts=${shorts.size}")
 
-        // ── Up to 3 shorts per channel (most recent first) ──────────────────
+        // ── 1 short per channel (most recent first) ──────────────────
         val latestShortPerChannel = shorts
             .groupBy { it.channelId }
-            .flatMap { (_, channelShorts) -> channelShorts.sortedByDescending { it.timestamp }.take(3) }
+            .flatMap { (_, channelShorts) -> channelShorts.sortedByDescending { it.timestamp }.take(1) }
             .sortedByDescending { it.timestamp }
         Log.i(TAG, "Shorts after per-channel dedup: ${latestShortPerChannel.size}/${shorts.size}")
 

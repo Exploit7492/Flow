@@ -47,6 +47,7 @@ import io.github.aedev.flow.ui.screens.shorts.ShortsScreen
 import io.github.aedev.flow.ui.screens.subscriptions.SubscriptionsScreen
 import io.github.aedev.flow.ui.screens.channel.ChannelScreen
 import io.github.aedev.flow.ui.screens.onboarding.OnboardingScreen
+import io.github.aedev.flow.ui.theme.CustomThemeColors
 import io.github.aedev.flow.ui.theme.ThemeMode
 import androidx.media3.common.util.UnstableApi
 import java.net.URLEncoder
@@ -63,7 +64,9 @@ fun NavGraphBuilder.flowAppGraph(
     playerUiStateResult: State<VideoPlayerUiState>, 
     playerVisibleState: MutableState<Boolean>, 
     currentTheme: ThemeMode,
+    customThemeColors: CustomThemeColors,
     onThemeChange: (ThemeMode) -> Unit,
+    onCustomThemeColorsChange: (CustomThemeColors) -> Unit,
     disableShortsPlayer: Boolean = false
 ) {
     // =============================================
@@ -377,7 +380,9 @@ fun NavGraphBuilder.flowAppGraph(
         showBottomNav.value = false
         io.github.aedev.flow.ui.screens.settings.AppearanceScreen(
             currentTheme = currentTheme,
+            customThemeColors = customThemeColors,
             onThemeChange = onThemeChange,
+            onCustomThemeColorsChange = onCustomThemeColorsChange,
             onNavigateBack = { navController.popBackStack() }
         )
     }

@@ -21,6 +21,7 @@ import io.github.aedev.flow.player.GlobalPlayerState
 import io.github.aedev.flow.ui.FlowApp
 import io.github.aedev.flow.ui.theme.FlowTheme
 import io.github.aedev.flow.ui.theme.ThemeMode
+import io.github.aedev.flow.ui.theme.CustomThemeColors
 import io.github.aedev.flow.updater.ApkUpdateHelper
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.Dispatchers
@@ -117,6 +118,7 @@ class MainActivity : ComponentActivity() {
         setContent {
             val scope = rememberCoroutineScope()
             var themeMode by remember { mutableStateOf(ThemeMode.LIGHT) }
+            var customThemeColors by remember { mutableStateOf(CustomThemeColors.default()) }
             // State to control splash visibility
             var showSplash by remember { mutableStateOf(true) }
 
@@ -129,7 +131,7 @@ class MainActivity : ComponentActivity() {
             }
 
             if (pendingCrashLog != null) {
-                FlowTheme(themeMode = themeMode) {
+                FlowTheme(themeMode = themeMode, customThemeColors = customThemeColors) {
                     CrashReporterScreen(
                         crashLog = pendingCrashLog!!,
                         onClearAndRestart = {
@@ -163,13 +165,19 @@ class MainActivity : ComponentActivity() {
                     themeMode = mode
                 }
             }
+
+            LaunchedEffect(Unit) {
+                dataManager.customThemeColors.collect { colors ->
+                    customThemeColors = colors
+                }
+            }
             
             // Initialize Flow Neuro Engine
             LaunchedEffect(Unit) {
                 io.github.aedev.flow.data.recommendation.FlowNeuroEngine.initialize(applicationContext)
             }
 
-            FlowTheme(themeMode = themeMode) {
+            FlowTheme(themeMode = themeMode, customThemeColors = customThemeColors) {
                 // Show Dialog Overlay if update exists (github flavor only)
                 if (BuildConfig.UPDATER_ENABLED && updateInfo != null) {
                     UpdateDialog(
@@ -224,10 +232,17 @@ class MainActivity : ComponentActivity() {
 
                     FlowApp(
                         currentTheme = themeMode,
+                        customThemeColors = customThemeColors,
                         onThemeChange = { newTheme ->
                             themeMode = newTheme
                             scope.launch {
                                 dataManager.setThemeMode(newTheme)
+                            }
+                        },
+                        onCustomThemeColorsChange = { colors ->
+                            customThemeColors = colors
+                            scope.launch {
+                                dataManager.setCustomThemeColors(colors)
                             }
                         },
                         deeplinkVideoId = deeplinkVideoId,

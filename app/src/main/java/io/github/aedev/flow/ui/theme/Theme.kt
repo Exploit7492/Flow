@@ -14,7 +14,8 @@ enum class ThemeMode {
     LIGHT, DARK, OLED, SYSTEM, LAVENDER_MIST, OCEAN_BLUE, FOREST_GREEN, SUNSET_ORANGE, PURPLE_NEBULA, MIDNIGHT_BLACK,
     ROSE_GOLD, ARCTIC_ICE, CRIMSON_RED, MINTY_FRESH, COSMIC_VOID, SOLAR_FLARE, CYBERPUNK,
     ROYAL_GOLD, NORDIC_HORIZON, ESPRESSO, GUNMETAL,
-    MINT_LIGHT, ROSE_LIGHT, SKY_LIGHT, CREAM_LIGHT
+    MINT_LIGHT, ROSE_LIGHT, SKY_LIGHT, CREAM_LIGHT,
+    MONOCHROME, CUSTOM
 }
 
 data class ExtendedColors(
@@ -341,9 +342,50 @@ private val CreamLightColorScheme = lightColorScheme(
     error = ErrorColor
 )
 
+private val MonochromeColorScheme = darkColorScheme(
+    primary = Color(0xFFFFFFFF),
+    onPrimary = Color(0xFF000000),
+    secondary = Color(0xFFFFFFFF),
+    onSecondary = Color(0xFF000000),
+    tertiary = Color(0xFF777777),
+    onTertiary = Color(0xFFFFFFFF),
+    background = Color(0xFF000000),
+    onBackground = Color(0xFFFFFFFF),
+    surface = Color(0xFF000000),
+    onSurface = Color(0xFFFFFFFF),
+    surfaceVariant = Color(0xFF111111),
+    onSurfaceVariant = Color(0xFFE0E0E0),
+    error = Color(0xFFFFB4AB),
+    onError = Color(0xFF690005),
+    outline = Color(0xFF888888),
+    scrim = Color(0xCC000000)
+)
+
+private fun customThemeColorScheme(colors: CustomThemeColors): ColorScheme {
+    return darkColorScheme(
+        primary = Color(colors.primary),
+        onPrimary = Color(colors.onPrimary),
+        secondary = Color(colors.secondary),
+        onSecondary = Color(colors.onSecondary),
+        tertiary = Color(colors.tertiary),
+        onTertiary = Color(colors.onTertiary),
+        background = Color(colors.background),
+        onBackground = Color(colors.onBackground),
+        surface = Color(colors.surface),
+        onSurface = Color(colors.onSurface),
+        surfaceVariant = Color(colors.surfaceVariant),
+        onSurfaceVariant = Color(colors.onSurfaceVariant),
+        error = Color(colors.error),
+        onError = Color(colors.onError),
+        outline = Color(colors.outline),
+        scrim = Color(colors.scrim)
+    )
+}
+
 @Composable
 fun FlowTheme(
     themeMode: ThemeMode = ThemeMode.SYSTEM,
+    customThemeColors: CustomThemeColors = CustomThemeColors.default(),
     content: @Composable () -> Unit
 ) {
     val darkTheme = isSystemInDarkTheme()
@@ -380,6 +422,8 @@ fun FlowTheme(
         ThemeMode.ROSE_LIGHT -> RoseLightColorScheme
         ThemeMode.SKY_LIGHT -> SkyLightColorScheme
         ThemeMode.CREAM_LIGHT -> CreamLightColorScheme
+        ThemeMode.MONOCHROME -> MonochromeColorScheme
+        ThemeMode.CUSTOM -> customThemeColorScheme(customThemeColors)
     }
 
     val extendedColors = when (effectiveThemeMode) {
@@ -486,6 +530,16 @@ fun FlowTheme(
             border = CreamLightThemeColors.Border,
             success = CreamLightThemeColors.Success
         )
+        ThemeMode.MONOCHROME -> ExtendedColors(
+            textSecondary = Color(0xFFE0E0E0),
+            border = Color(0xFF777777),
+            success = Color(0xFFFFFFFF)
+        )
+        ThemeMode.CUSTOM -> ExtendedColors(
+            textSecondary = Color(customThemeColors.onSurfaceVariant),
+            border = Color(customThemeColors.outline),
+            success = Color(customThemeColors.tertiary)
+        )
         else -> ExtendedColors(
             textSecondary = DarkThemeColors.TextSecondary,
             border = DarkThemeColors.Border,
@@ -496,13 +550,11 @@ fun FlowTheme(
     CompositionLocalProvider(LocalExtendedColors provides extendedColors) {
         MaterialTheme(
             colorScheme = colorScheme,
-            // typography = Typography, // Uncomment this if you have Typography defined in another file
             content = content
         )
     }
 }
 
-// THIS IS THE PART THAT WAS MISSING CAUSING THE ERRORS
 val MaterialTheme.extendedColors: ExtendedColors
     @Composable
     get() = LocalExtendedColors.current

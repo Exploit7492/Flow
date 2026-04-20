@@ -385,10 +385,33 @@
     <string name="appearance_category_all">All</string>
     <string name="appearance_category_light">Light</string>
     <string name="appearance_category_dark">Dark</string>
+    <string name="appearance_category_custom">Custom</string>
     <string name="appearance_category_special">Special</string>
     <string name="appearance_themes_count_all">%1$d themes</string>
     <string name="appearance_themes_count_filtered">%1$d %2$s themes</string>
     <string name="appearance_applied_toast">Applied: %1$s</string>
+    <string name="appearance_customize_theme">Customize Theme</string>
+    <string name="appearance_customizer_title">Custom Theme Editor</string>
+    <string name="appearance_customizer_subtitle">Set every role with hex values and preview instantly</string>
+    <string name="appearance_customizer_format_hint">Hex format: #RRGGBB or #AARRGGBB</string>
+    <string name="appearance_customizer_reset">Reset</string>
+    <string name="appearance_customizer_save">Save Theme</string>
+    <string name="appearance_role_primary">Primary</string>
+    <string name="appearance_role_on_primary">On Primary</string>
+    <string name="appearance_role_secondary">Secondary</string>
+    <string name="appearance_role_on_secondary">On Secondary</string>
+    <string name="appearance_role_tertiary">Tertiary</string>
+    <string name="appearance_role_on_tertiary">On Tertiary</string>
+    <string name="appearance_role_background">Background</string>
+    <string name="appearance_role_on_background">On Background</string>
+    <string name="appearance_role_surface">Surface</string>
+    <string name="appearance_role_on_surface">On Surface</string>
+    <string name="appearance_role_surface_variant">Surface Variant</string>
+    <string name="appearance_role_on_surface_variant">On Surface Variant</string>
+    <string name="appearance_role_error">Error</string>
+    <string name="appearance_role_on_error">On Error</string>
+    <string name="appearance_role_outline">Outline</string>
+    <string name="appearance_role_scrim">Scrim</string>
 
     <!-- App Icon Picker -->
     <string name="app_icon_picker_subtitle">Choose a launcher icon style. The change takes effect immediately and the launcher will briefly refresh.</string>
@@ -449,6 +472,10 @@
     <string name="theme_desc_classic_dark">Easy on the eyes</string>
     <string name="theme_name_true_black">True Black</string>
     <string name="theme_desc_true_black">Pure OLED</string>
+    <string name="theme_name_monochrome">Monochrome</string>
+    <string name="theme_desc_monochrome">Pure black and white clarity</string>
+    <string name="theme_name_custom">Custom</string>
+    <string name="theme_desc_custom">Create your own professional palette</string>
     <string name="theme_name_midnight">Midnight</string>
     <string name="theme_desc_midnight">Deep &amp; focused</string>
     <string name="theme_name_deep_ocean">Deep Ocean</string>

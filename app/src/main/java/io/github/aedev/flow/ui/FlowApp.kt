@@ -38,13 +38,16 @@ import io.github.aedev.flow.ui.components.PlayerSheetValue
 import io.github.aedev.flow.ui.components.rememberPlayerDraggableState
 import io.github.aedev.flow.ui.screens.music.EnhancedMusicPlayerScreen
 import io.github.aedev.flow.ui.screens.player.VideoPlayerViewModel
+import io.github.aedev.flow.ui.theme.CustomThemeColors
 import io.github.aedev.flow.ui.theme.ThemeMode
 
 @UnstableApi
 @Composable
 fun FlowApp(
     currentTheme: ThemeMode,
+    customThemeColors: CustomThemeColors,
     onThemeChange: (ThemeMode) -> Unit,
+    onCustomThemeColorsChange: (CustomThemeColors) -> Unit,
     deeplinkVideoId: String? = null,
     isShort: Boolean = false,
     onDeeplinkConsumed: () -> Unit = {}
@@ -266,7 +269,9 @@ fun FlowApp(
                             playerUiStateResult = playerUiStateResult,
                             playerVisibleState = playerVisibleState,
                             currentTheme = currentTheme,
+                            customThemeColors = customThemeColors,
                             onThemeChange = onThemeChange,
+                            onCustomThemeColorsChange = onCustomThemeColorsChange,
                             disableShortsPlayer = disableShortsPlayer
                         )
                     }

@@ -7,6 +7,7 @@ import androidx.datastore.preferences.preferencesDataStore
 import io.github.aedev.flow.data.model.Channel
 import io.github.aedev.flow.data.model.Playlist
 import io.github.aedev.flow.data.model.Video
+import io.github.aedev.flow.ui.theme.CustomThemeColors
 import io.github.aedev.flow.ui.theme.ThemeMode
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
@@ -42,6 +43,8 @@ class LocalDataManager @Inject constructor(@ApplicationContext private val conte
         
         private val BREAK_REMINDER = androidx.datastore.preferences.core.booleanPreferencesKey("break_reminder")
         private val BREAK_FREQUENCY = androidx.datastore.preferences.core.intPreferencesKey("break_frequency") // Minutes
+
+        private val CUSTOM_THEME_COLORS = stringPreferencesKey("custom_theme_colors")
     }
 
     // Update Settings
@@ -68,6 +71,73 @@ class LocalDataManager @Inject constructor(@ApplicationContext private val conte
         context.dataStore.edit { prefs ->
             prefs[THEME_MODE] = mode.name
         }
+    }
+
+    val customThemeColors: Flow<CustomThemeColors> = context.dataStore.data.map { prefs ->
+        val raw = prefs[CUSTOM_THEME_COLORS]
+        deserializeCustomThemeColors(raw)
+    }
+
+    suspend fun setCustomThemeColors(colors: CustomThemeColors) {
+        context.dataStore.edit { prefs ->
+            prefs[CUSTOM_THEME_COLORS] = serializeCustomThemeColors(colors)
+        }
+    }
+
+    private fun serializeCustomThemeColors(colors: CustomThemeColors): String {
+        return listOf(
+            colors.primary,
+            colors.onPrimary,
+            colors.secondary,
+            colors.onSecondary,
+            colors.tertiary,
+            colors.onTertiary,
+            colors.background,
+            colors.onBackground,
+            colors.surface,
+            colors.onSurface,
+            colors.surfaceVariant,
+            colors.onSurfaceVariant,
+            colors.error,
+            colors.onError,
+            colors.outline,
+            colors.scrim
+        ).joinToString(separator = ",") { it.toString() }
+    }
+
+    private fun deserializeCustomThemeColors(raw: String?): CustomThemeColors {
+        if (raw.isNullOrBlank()) {
+            return CustomThemeColors.default()
+        }
+
+        val parts = raw.split(',')
+        if (parts.size != 16) {
+            return CustomThemeColors.default()
+        }
+
+        val values = parts.map { it.toLongOrNull() }
+        if (values.any { it == null }) {
+            return CustomThemeColors.default()
+        }
+
+        return CustomThemeColors(
+            primary = values[0]!!,
+            onPrimary = values[1]!!,
+            secondary = values[2]!!,
+            onSecondary = values[3]!!,
+            tertiary = values[4]!!,
+            onTertiary = values[5]!!,
+            background = values[6]!!,
+            onBackground = values[7]!!,
+            surface = values[8]!!,
+            onSurface = values[9]!!,
+            surfaceVariant = values[10]!!,
+            onSurfaceVariant = values[11]!!,
+            error = values[12]!!,
+            onError = values[13]!!,
+            outline = values[14]!!,
+            scrim = values[15]!!
+        )
     }
 
     // Subscriptions
@@ -287,7 +357,7 @@ class LocalDataManager @Inject constructor(@ApplicationContext private val conte
 
         prefs.asMap().entries.forEach { (key, value) ->
             val name = key.name
-            if (name == "theme_mode" || name == "accent_color" || 
+            if (name == "theme_mode" || name == "accent_color" || name == "custom_theme_colors" ||
                 name == "bedtime_reminder" || name == "break_reminder" ||
                 name.startsWith("bedtime_") || name == "break_frequency") {
                 
@@ -306,7 +376,7 @@ class LocalDataManager @Inject constructor(@ApplicationContext private val conte
     suspend fun restoreData(backup: SettingsBackup) {
         context.dataStore.edit { prefs ->
             backup.strings.forEach { (k, v) -> 
-                if (k == "theme_mode" || k == "accent_color") {
+                if (k == "theme_mode" || k == "accent_color" || k == "custom_theme_colors") {
                     prefs[stringPreferencesKey(k)] = v 
                 }
             }

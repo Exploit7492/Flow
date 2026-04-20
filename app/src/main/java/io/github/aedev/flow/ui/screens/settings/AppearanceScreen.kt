@@ -1,60 +1,89 @@
-@file:OptIn(ExperimentalMaterial3Api::class)
+@file:OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
+
 package io.github.aedev.flow.ui.screens.settings
 
-import androidx.compose.animation.*
-import androidx.compose.animation.core.*
-import androidx.compose.foundation.Canvas
+import androidx.annotation.StringRes
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.*
-import androidx.compose.material.icons.outlined.*
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.outlined.AutoAwesome
+import androidx.compose.material.icons.outlined.DarkMode
+import androidx.compose.material.icons.outlined.LightMode
+import androidx.compose.material.icons.outlined.Palette
+import androidx.compose.material3.Button
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Slider
+import androidx.compose.material3.SnackbarDuration
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateMapOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
-import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.drawBehind
-import androidx.compose.ui.draw.scale
-import androidx.compose.ui.draw.shadow
-import androidx.compose.ui.geometry.CornerRadius
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Size
-import androidx.compose.ui.graphics.*
-import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
+import io.github.aedev.flow.R
 import io.github.aedev.flow.ui.theme.*
-import io.github.aedev.flow.ui.theme.ThemeMode
-import kotlinx.coroutines.delay
-import kotlin.math.PI
-import kotlin.math.cos
-import kotlin.math.sin
-
-// ============================================================================
-// Data Models
-// ============================================================================
+import kotlin.math.roundToInt
 
 private data class ThemeInfo(
     val mode: ThemeMode,
-    @androidx.annotation.StringRes val displayNameRes: Int,
-    @androidx.annotation.StringRes val subtitleRes: Int,
+    @StringRes val displayNameRes: Int,
+    @StringRes val subtitleRes: Int,
     val category: ThemeCategory,
     val primaryColor: Color,
     val backgroundColor: Color,
@@ -64,292 +93,61 @@ private data class ThemeInfo(
     val surfaceVariantColor: Color = Color.Unspecified
 )
 
-private enum class ThemeCategory(@androidx.annotation.StringRes val labelRes: Int, val icon: @Composable () -> Unit) {
-    LIGHT(io.github.aedev.flow.R.string.appearance_category_light, { Icon(Icons.Outlined.LightMode, null, modifier = Modifier.size(18.dp)) }),
-    DARK(io.github.aedev.flow.R.string.appearance_category_dark, { Icon(Icons.Outlined.DarkMode, null, modifier = Modifier.size(18.dp)) }),
-    SPECIAL(io.github.aedev.flow.R.string.appearance_category_special, { Icon(Icons.Outlined.AutoAwesome, null, modifier = Modifier.size(18.dp)) })
+private enum class ThemeCategory(
+    @StringRes val labelRes: Int,
+    val icon: ImageVector
+) {
+    LIGHT(R.string.appearance_category_light, Icons.Outlined.LightMode),
+    DARK(R.string.appearance_category_dark, Icons.Outlined.DarkMode),
+    CUSTOM(R.string.appearance_category_custom, Icons.Outlined.AutoAwesome)
 }
 
-private val ALL_THEMES = listOf(
-    // System Theme
-    ThemeInfo(
-        ThemeMode.SYSTEM, io.github.aedev.flow.R.string.theme_name_system_default, io.github.aedev.flow.R.string.theme_desc_system_default,
-        ThemeCategory.SPECIAL,
-        primaryColor = YouTubeRed,
-        backgroundColor = Color.DarkGray,
-        surfaceColor = Color.Gray,
-        onSurfaceColor = Color.White,
-        surfaceVariantColor = Color.LightGray
-    ),
-    // Light Themes
-    ThemeInfo(
-        ThemeMode.LIGHT, io.github.aedev.flow.R.string.theme_name_pure_light, io.github.aedev.flow.R.string.theme_desc_pure_light,
-        ThemeCategory.LIGHT,
-        primaryColor = YouTubeRed,
-        backgroundColor = White,
-        surfaceColor = LightSurface,
-        onSurfaceColor = Color(0xFF0F0F0F),
-        surfaceVariantColor = LightSurfaceVariant
-    ),
-    ThemeInfo(
-        ThemeMode.MINT_LIGHT, io.github.aedev.flow.R.string.theme_name_mint_fresh, io.github.aedev.flow.R.string.theme_desc_mint_fresh,
-        ThemeCategory.LIGHT,
-        primaryColor = MintLightThemeColors.Primary,
-        backgroundColor = MintLightThemeColors.Background,
-        surfaceColor = MintLightThemeColors.Surface,
-        onSurfaceColor = MintLightThemeColors.Text,
-        accentColor = MintLightThemeColors.Secondary,
-        surfaceVariantColor = MintLightThemeColors.Border
-    ),
-    ThemeInfo(
-        ThemeMode.ROSE_LIGHT, io.github.aedev.flow.R.string.theme_name_rose_petal, io.github.aedev.flow.R.string.theme_desc_rose_petal,
-        ThemeCategory.LIGHT,
-        primaryColor = RoseLightThemeColors.Primary,
-        backgroundColor = RoseLightThemeColors.Background,
-        surfaceColor = RoseLightThemeColors.Surface,
-        onSurfaceColor = RoseLightThemeColors.Text,
-        accentColor = RoseLightThemeColors.Secondary,
-        surfaceVariantColor = RoseLightThemeColors.Border
-    ),
-    ThemeInfo(
-        ThemeMode.SKY_LIGHT, io.github.aedev.flow.R.string.theme_name_sky_blue, io.github.aedev.flow.R.string.theme_desc_sky_blue,
-        ThemeCategory.LIGHT,
-        primaryColor = SkyLightThemeColors.Primary,
-        backgroundColor = SkyLightThemeColors.Background,
-        surfaceColor = SkyLightThemeColors.Surface,
-        onSurfaceColor = SkyLightThemeColors.Text,
-        accentColor = SkyLightThemeColors.Secondary,
-        surfaceVariantColor = SkyLightThemeColors.Border
-    ),
-    ThemeInfo(
-        ThemeMode.CREAM_LIGHT, io.github.aedev.flow.R.string.theme_name_cream_paper, io.github.aedev.flow.R.string.theme_desc_cream_paper,
-        ThemeCategory.LIGHT,
-        primaryColor = CreamLightThemeColors.Primary,
-        backgroundColor = CreamLightThemeColors.Background,
-        surfaceColor = CreamLightThemeColors.Surface,
-        onSurfaceColor = CreamLightThemeColors.Text,
-        accentColor = CreamLightThemeColors.Secondary,
-        surfaceVariantColor = CreamLightThemeColors.Border
-    ),
-
-    // Dark Themes
-    ThemeInfo(
-        ThemeMode.DARK, io.github.aedev.flow.R.string.theme_name_classic_dark, io.github.aedev.flow.R.string.theme_desc_classic_dark,
-        ThemeCategory.DARK,
-        primaryColor = YouTubeRed,
-        backgroundColor = DarkBackground,
-        surfaceColor = DarkSurface,
-        onSurfaceColor = TextPrimary,
-        surfaceVariantColor = DarkSurfaceVariant
-    ),
-    ThemeInfo(
-        ThemeMode.OLED, io.github.aedev.flow.R.string.theme_name_true_black, io.github.aedev.flow.R.string.theme_desc_true_black,
-        ThemeCategory.DARK,
-        primaryColor = YouTubeRed,
-        backgroundColor = Black,
-        surfaceColor = OLEDThemeColors.Surface,
-        onSurfaceColor = TextPrimary,
-        surfaceVariantColor = OLEDThemeColors.Border
-    ),
-    ThemeInfo(
-        ThemeMode.MIDNIGHT_BLACK, io.github.aedev.flow.R.string.theme_name_midnight, io.github.aedev.flow.R.string.theme_desc_midnight,
-        ThemeCategory.DARK,
-        primaryColor = MidnightBlackThemeColors.Primary,
-        backgroundColor = MidnightBlackThemeColors.Background,
-        surfaceColor = MidnightBlackThemeColors.Surface,
-        onSurfaceColor = MidnightBlackThemeColors.Text,
-        accentColor = MidnightBlackThemeColors.Secondary,
-        surfaceVariantColor = MidnightBlackThemeColors.Border
-    ),
-    ThemeInfo(
-        ThemeMode.OCEAN_BLUE, io.github.aedev.flow.R.string.theme_name_deep_ocean, io.github.aedev.flow.R.string.theme_desc_deep_ocean,
-        ThemeCategory.DARK,
-        primaryColor = OceanBlueThemeColors.Primary,
-        backgroundColor = OceanBlueThemeColors.Background,
-        surfaceColor = OceanBlueThemeColors.Surface,
-        onSurfaceColor = OceanBlueThemeColors.Text,
-        accentColor = OceanBlueThemeColors.Secondary,
-        surfaceVariantColor = OceanBlueThemeColors.Border
-    ),
-    ThemeInfo(
-        ThemeMode.FOREST_GREEN, io.github.aedev.flow.R.string.theme_name_forest, io.github.aedev.flow.R.string.theme_desc_forest,
-        ThemeCategory.DARK,
-        primaryColor = ForestGreenThemeColors.Primary,
-        backgroundColor = ForestGreenThemeColors.Background,
-        surfaceColor = ForestGreenThemeColors.Surface,
-        onSurfaceColor = ForestGreenThemeColors.Text,
-        accentColor = ForestGreenThemeColors.Secondary,
-        surfaceVariantColor = ForestGreenThemeColors.Border
-    ),
-    ThemeInfo(
-        ThemeMode.LAVENDER_MIST, io.github.aedev.flow.R.string.theme_name_lavender, io.github.aedev.flow.R.string.theme_desc_lavender,
-        ThemeCategory.DARK,
-        primaryColor = Color(0xFFB39DDB),
-        backgroundColor = Color(0xFF120F1A),
-        surfaceColor = Color(0xFF1F1A2E),
-        onSurfaceColor = Color(0xFFEDE7F6),
-        accentColor = Color(0xFF9575CD),
-        surfaceVariantColor = Color(0xFF2A2235)
-    ),
-    ThemeInfo(
-        ThemeMode.SUNSET_ORANGE, io.github.aedev.flow.R.string.theme_name_sunset, io.github.aedev.flow.R.string.theme_desc_sunset,
-        ThemeCategory.DARK,
-        primaryColor = SunsetOrangeThemeColors.Primary,
-        backgroundColor = SunsetOrangeThemeColors.Background,
-        surfaceColor = SunsetOrangeThemeColors.Surface,
-        onSurfaceColor = SunsetOrangeThemeColors.Text,
-        accentColor = SunsetOrangeThemeColors.Secondary,
-        surfaceVariantColor = SunsetOrangeThemeColors.Border
-    ),
-    ThemeInfo(
-        ThemeMode.PURPLE_NEBULA, io.github.aedev.flow.R.string.theme_name_nebula, io.github.aedev.flow.R.string.theme_desc_nebula,
-        ThemeCategory.DARK,
-        primaryColor = PurpleNebulaThemeColors.Primary,
-        backgroundColor = PurpleNebulaThemeColors.Background,
-        surfaceColor = PurpleNebulaThemeColors.Surface,
-        onSurfaceColor = PurpleNebulaThemeColors.Text,
-        accentColor = PurpleNebulaThemeColors.Secondary,
-        surfaceVariantColor = PurpleNebulaThemeColors.Border
-    ),
-    ThemeInfo(
-        ThemeMode.ROSE_GOLD, io.github.aedev.flow.R.string.theme_name_rose_gold, io.github.aedev.flow.R.string.theme_desc_rose_gold,
-        ThemeCategory.DARK,
-        primaryColor = RoseGoldThemeColors.Primary,
-        backgroundColor = RoseGoldThemeColors.Background,
-        surfaceColor = RoseGoldThemeColors.Surface,
-        onSurfaceColor = RoseGoldThemeColors.Text,
-        accentColor = RoseGoldThemeColors.Secondary,
-        surfaceVariantColor = RoseGoldThemeColors.Border
-    ),
-    ThemeInfo(
-        ThemeMode.ARCTIC_ICE, io.github.aedev.flow.R.string.theme_name_arctic, io.github.aedev.flow.R.string.theme_desc_arctic,
-        ThemeCategory.DARK,
-        primaryColor = ArcticIceThemeColors.Primary,
-        backgroundColor = ArcticIceThemeColors.Background,
-        surfaceColor = ArcticIceThemeColors.Surface,
-        onSurfaceColor = ArcticIceThemeColors.Text,
-        accentColor = ArcticIceThemeColors.Secondary,
-        surfaceVariantColor = ArcticIceThemeColors.Border
-    ),
-    ThemeInfo(
-        ThemeMode.MINTY_FRESH, io.github.aedev.flow.R.string.theme_name_mint_night, io.github.aedev.flow.R.string.theme_desc_mint_night,
-        ThemeCategory.DARK,
-        primaryColor = Color(0xFF80CBC4),
-        backgroundColor = Color(0xFF0F1A18),
-        surfaceColor = Color(0xFF1A2E2B),
-        onSurfaceColor = Color(0xFFE0F2F1),
-        accentColor = Color(0xFF4DB6AC),
-        surfaceVariantColor = Color(0xFF1E302D)
-    ),
-
-    // Special Themes
-    ThemeInfo(
-        ThemeMode.CRIMSON_RED, io.github.aedev.flow.R.string.theme_name_crimson, io.github.aedev.flow.R.string.theme_desc_crimson,
-        ThemeCategory.SPECIAL,
-        primaryColor = CrimsonRedThemeColors.Primary,
-        backgroundColor = CrimsonRedThemeColors.Background,
-        surfaceColor = CrimsonRedThemeColors.Surface,
-        onSurfaceColor = CrimsonRedThemeColors.Text,
-        accentColor = CrimsonRedThemeColors.Secondary,
-        surfaceVariantColor = CrimsonRedThemeColors.Border
-    ),
-    ThemeInfo(
-        ThemeMode.COSMIC_VOID, io.github.aedev.flow.R.string.theme_name_cosmic_void, io.github.aedev.flow.R.string.theme_desc_cosmic_void,
-        ThemeCategory.SPECIAL,
-        primaryColor = Color(0xFF7C4DFF),
-        backgroundColor = Color(0xFF050505),
-        surfaceColor = Color(0xFF121212),
-        onSurfaceColor = Color(0xFFE0E0E0),
-        accentColor = Color(0xFF651FFF),
-        surfaceVariantColor = Color(0xFF1A1225)
-    ),
-    ThemeInfo(
-        ThemeMode.SOLAR_FLARE, io.github.aedev.flow.R.string.theme_name_solar_flare, io.github.aedev.flow.R.string.theme_desc_solar_flare,
-        ThemeCategory.SPECIAL,
-        primaryColor = Color(0xFFFFD740),
-        backgroundColor = Color(0xFF1A1500),
-        surfaceColor = Color(0xFF2E2600),
-        onSurfaceColor = Color(0xFFFFFDE7),
-        accentColor = Color(0xFFFFAB00),
-        surfaceVariantColor = Color(0xFF352A10)
-    ),
-    ThemeInfo(
-        ThemeMode.CYBERPUNK, io.github.aedev.flow.R.string.theme_name_cyberpunk, io.github.aedev.flow.R.string.theme_desc_cyberpunk,
-        ThemeCategory.SPECIAL,
-        primaryColor = Color(0xFFFF00FF),
-        backgroundColor = Color(0xFF0D001A),
-        surfaceColor = Color(0xFF1F0033),
-        onSurfaceColor = Color(0xFFE0E0E0),
-        accentColor = Color(0xFF00FFFF),
-        surfaceVariantColor = Color(0xFF200F35)
-    ),
-    ThemeInfo(
-        ThemeMode.ROYAL_GOLD, io.github.aedev.flow.R.string.theme_name_royal_gold, io.github.aedev.flow.R.string.theme_desc_royal_gold,
-        ThemeCategory.SPECIAL,
-        primaryColor = RoyalGoldThemeColors.Primary,
-        backgroundColor = RoyalGoldThemeColors.Background,
-        surfaceColor = RoyalGoldThemeColors.Surface,
-        onSurfaceColor = RoyalGoldThemeColors.Text,
-        accentColor = RoyalGoldThemeColors.Secondary,
-        surfaceVariantColor = RoyalGoldThemeColors.Border
-    ),
-    ThemeInfo(
-        ThemeMode.NORDIC_HORIZON, io.github.aedev.flow.R.string.theme_name_nordic, io.github.aedev.flow.R.string.theme_desc_nordic,
-        ThemeCategory.SPECIAL,
-        primaryColor = NordicHorizonThemeColors.Primary,
-        backgroundColor = NordicHorizonThemeColors.Background,
-        surfaceColor = NordicHorizonThemeColors.Surface,
-        onSurfaceColor = NordicHorizonThemeColors.Text,
-        accentColor = NordicHorizonThemeColors.Secondary,
-        surfaceVariantColor = NordicHorizonThemeColors.Border
-    ),
-    ThemeInfo(
-        ThemeMode.ESPRESSO, io.github.aedev.flow.R.string.theme_name_espresso, io.github.aedev.flow.R.string.theme_desc_espresso,
-        ThemeCategory.SPECIAL,
-        primaryColor = EspressoThemeColors.Primary,
-        backgroundColor = EspressoThemeColors.Background,
-        surfaceColor = EspressoThemeColors.Surface,
-        onSurfaceColor = EspressoThemeColors.Text,
-        accentColor = EspressoThemeColors.Secondary,
-        surfaceVariantColor = EspressoThemeColors.Border
-    ),
-    ThemeInfo(
-        ThemeMode.GUNMETAL, io.github.aedev.flow.R.string.theme_name_gunmetal, io.github.aedev.flow.R.string.theme_desc_gunmetal,
-        ThemeCategory.SPECIAL,
-        primaryColor = GunmetalThemeColors.Primary,
-        backgroundColor = GunmetalThemeColors.Background,
-        surfaceColor = GunmetalThemeColors.Surface,
-        onSurfaceColor = GunmetalThemeColors.Text,
-        accentColor = GunmetalThemeColors.Secondary,
-        surfaceVariantColor = GunmetalThemeColors.Border
-    )
-
+private data class CustomRoleField(
+    val role: CustomColorRole,
+    @StringRes val labelRes: Int
 )
 
-// ============================================================================
-// Main Screen
-// ============================================================================
+private val CUSTOM_ROLE_FIELDS = listOf(
+    CustomRoleField(CustomColorRole.PRIMARY, R.string.appearance_role_primary),
+    CustomRoleField(CustomColorRole.ON_PRIMARY, R.string.appearance_role_on_primary),
+    CustomRoleField(CustomColorRole.SECONDARY, R.string.appearance_role_secondary),
+    CustomRoleField(CustomColorRole.ON_SECONDARY, R.string.appearance_role_on_secondary),
+    CustomRoleField(CustomColorRole.TERTIARY, R.string.appearance_role_tertiary),
+    CustomRoleField(CustomColorRole.ON_TERTIARY, R.string.appearance_role_on_tertiary),
+    CustomRoleField(CustomColorRole.BACKGROUND, R.string.appearance_role_background),
+    CustomRoleField(CustomColorRole.ON_BACKGROUND, R.string.appearance_role_on_background),
+    CustomRoleField(CustomColorRole.SURFACE, R.string.appearance_role_surface),
+    CustomRoleField(CustomColorRole.ON_SURFACE, R.string.appearance_role_on_surface),
+    CustomRoleField(CustomColorRole.SURFACE_VARIANT, R.string.appearance_role_surface_variant),
+    CustomRoleField(CustomColorRole.ON_SURFACE_VARIANT, R.string.appearance_role_on_surface_variant),
+    CustomRoleField(CustomColorRole.ERROR, R.string.appearance_role_error),
+    CustomRoleField(CustomColorRole.ON_ERROR, R.string.appearance_role_on_error),
+    CustomRoleField(CustomColorRole.OUTLINE, R.string.appearance_role_outline),
+    CustomRoleField(CustomColorRole.SCRIM, R.string.appearance_role_scrim)
+)
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AppearanceScreen(
     currentTheme: ThemeMode,
+    customThemeColors: CustomThemeColors,
     onThemeChange: (ThemeMode) -> Unit,
+    onCustomThemeColorsChange: (CustomThemeColors) -> Unit,
     onNavigateBack: () -> Unit
 ) {
     val haptic = LocalHapticFeedback.current
-    val context = androidx.compose.ui.platform.LocalContext.current
+    val context = LocalContext.current
+
     var selectedCategory by remember { mutableStateOf<ThemeCategory?>(null) }
+    var showCustomizer by remember { mutableStateOf(false) }
     var showAppliedSnackbar by remember { mutableStateOf(false) }
     var lastAppliedTheme by remember { mutableStateOf("") }
 
-    val filteredThemes = remember(selectedCategory) {
-        if (selectedCategory == null) ALL_THEMES
-        else ALL_THEMES.filter { it.category == selectedCategory }
+    val allThemes = remember(customThemeColors) { buildThemeCatalog(customThemeColors) }
+    val currentThemeInfo = remember(currentTheme, allThemes) {
+        allThemes.firstOrNull { it.mode == currentTheme } ?: allThemes.first()
     }
-
-    val currentThemeInfo = remember(currentTheme) {
-        ALL_THEMES.find { it.mode == currentTheme } ?: ALL_THEMES[0]
+    val filteredThemes = remember(selectedCategory, allThemes) {
+        if (selectedCategory == null) allThemes else allThemes.filter { it.category == selectedCategory }
     }
 
     val snackbarHostState = remember { SnackbarHostState() }
@@ -357,271 +155,198 @@ fun AppearanceScreen(
     LaunchedEffect(showAppliedSnackbar) {
         if (showAppliedSnackbar) {
             snackbarHostState.showSnackbar(
-                message = context.getString(io.github.aedev.flow.R.string.appearance_applied_toast, lastAppliedTheme),
+                message = context.getString(R.string.appearance_applied_toast, lastAppliedTheme),
                 duration = SnackbarDuration.Short
             )
             showAppliedSnackbar = false
         }
     }
 
-    Box(modifier = Modifier.fillMaxSize()) {
-        // Ambient background glow
-        AmbientGlow(currentThemeInfo.primaryColor)
+    if (showCustomizer) {
+        CustomThemeEditorDialog(
+            initialColors = customThemeColors,
+            onDismiss = { showCustomizer = false },
+            onSave = { colors ->
+                onCustomThemeColorsChange(colors)
+                onThemeChange(ThemeMode.CUSTOM)
+                lastAppliedTheme = context.getString(R.string.theme_name_custom)
+                showAppliedSnackbar = true
+                showCustomizer = false
+            }
+        )
+    }
 
-        Scaffold(
-            topBar = {
-                Surface(
-                    modifier = Modifier.fillMaxWidth(),
-                    color = Color.Transparent
-                ) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .statusBarsPadding()
-                            .padding(horizontal = 4.dp, vertical = 8.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        IconButton(onClick = onNavigateBack) {
-                            Icon(Icons.Default.ArrowBack, "Back")
-                        }
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                androidx.compose.ui.res.stringResource(io.github.aedev.flow.R.string.appearance_title),
-                                style = MaterialTheme.typography.titleLarge,
-                                fontWeight = FontWeight.Bold
-                            )
-                            Text(
-                                androidx.compose.ui.res.stringResource(io.github.aedev.flow.R.string.appearance_subtitle),
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = {
+                    Column {
+                        Text(
+                            text = androidx.compose.ui.res.stringResource(R.string.appearance_title),
+                            fontWeight = FontWeight.Bold,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                        Text(
+                            text = androidx.compose.ui.res.stringResource(R.string.appearance_subtitle),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
                     }
-                }
-            },
-            snackbarHost = { SnackbarHost(snackbarHostState) },
-            containerColor = Color.Transparent
-        ) { padding ->
+                },
+                navigationIcon = {
+                    IconButton(onClick = onNavigateBack) {
+                        Icon(Icons.Default.ArrowBack, contentDescription = "Navigate back")
+                    }
+                },
+                actions = {
+                    IconButton(onClick = { showCustomizer = true }) {
+                        Icon(Icons.Outlined.Palette, contentDescription = "Customize theme")
+                    }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.background)
+            )
+        },
+        snackbarHost = { SnackbarHost(snackbarHostState) },
+        containerColor = MaterialTheme.colorScheme.background
+    ) { padding ->
+        LazyVerticalGrid(
+            columns = GridCells.Adaptive(minSize = 176.dp),
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(padding),
+            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
+            horizontalArrangement = Arrangement.spacedBy(14.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp)
+        ) {
+            item(span = { GridItemSpan(maxLineSpan) }) {
+                CurrentThemeHero(
+                    themeInfo = currentThemeInfo,
+                    onCustomize = if (currentThemeInfo.mode == ThemeMode.CUSTOM) ({ showCustomizer = true }) else null
+                )
+            }
 
-            LazyVerticalGrid(
-                columns = GridCells.Fixed(2),
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(padding),
-                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
+            item(span = { GridItemSpan(maxLineSpan) }) {
+                CategoryFilterRow(
+                    selectedCategory = selectedCategory,
+                    onCategorySelected = { selectedCategory = it }
+                )
+            }
 
-                // ── Current Theme Hero ──
-                item(span = { GridItemSpan(2) }) {
-                    CurrentThemeHero(currentThemeInfo)
-                }
-
-                // ── Category Filter Chips ──
-                item(span = { GridItemSpan(2) }) {
-                    CategoryFilterRow(
-                        selectedCategory = selectedCategory,
-                        onCategorySelected = { selectedCategory = it }
+            item(span = { GridItemSpan(maxLineSpan) }) {
+                val countText = if (selectedCategory == null) {
+                    context.getString(R.string.appearance_themes_count_all, allThemes.size)
+                } else {
+                    context.getString(
+                        R.string.appearance_themes_count_filtered,
+                        filteredThemes.size,
+                        context.getString(selectedCategory!!.labelRes).lowercase()
                     )
                 }
+                Text(
+                    text = countText,
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.primary,
+                    fontWeight = FontWeight.Medium,
+                    modifier = Modifier.padding(top = 4.dp)
+                )
+            }
 
-                // ── Section Label ──
-item(span = { GridItemSpan(2) }) {
-                    val countText = if (selectedCategory == null) androidx.compose.ui.res.stringResource(io.github.aedev.flow.R.string.appearance_themes_count_all, ALL_THEMES.size)
-                    else androidx.compose.ui.res.stringResource(io.github.aedev.flow.R.string.appearance_themes_count_filtered, filteredThemes.size, androidx.compose.ui.res.stringResource(selectedCategory!!.labelRes).lowercase())
+            items(
+                items = filteredThemes,
+                key = { it.mode.name }
+            ) { themeInfo ->
+                ThemeCard(
+                    themeInfo = themeInfo,
+                    isSelected = currentTheme == themeInfo.mode,
+                    onClick = {
+                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                        onThemeChange(themeInfo.mode)
+                        lastAppliedTheme = context.getString(themeInfo.displayNameRes)
+                        showAppliedSnackbar = true
+                    },
+                    onCustomize = if (themeInfo.mode == ThemeMode.CUSTOM) ({ showCustomizer = true }) else null
+                )
+            }
 
-                    Text(
-                        text = countText,
-                        style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(top = 4.dp, bottom = 2.dp)
-                    )
-                }
-
-                // ── Theme Cards Grid ──
-                items(
-                    items = filteredThemes,
-                    key = { it.mode.name }
-                ) { themeInfo ->
-                    ThemeCard(
-                        themeInfo = themeInfo,
-                        isSelected = currentTheme == themeInfo.mode,
-                        onClick = {
-                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                            onThemeChange(themeInfo.mode)
-                            lastAppliedTheme = context.getString(themeInfo.displayNameRes)
-                            showAppliedSnackbar = true
-                        }
-                    )
-                }
-
-                // ── Bottom Spacing ──
-                item(span = { GridItemSpan(2) }) {
-                    Spacer(Modifier.height(32.dp))
-                }
+            item(span = { GridItemSpan(maxLineSpan) }) {
+                Spacer(modifier = Modifier.height(56.dp))
             }
         }
     }
 }
 
-// ============================================================================
-// Ambient Background Glow
-// ============================================================================
-
 @Composable
-private fun AmbientGlow(accentColor: Color) {
-    val infiniteTransition = rememberInfiniteTransition(label = "glow")
-
-    val animatedAlpha by infiniteTransition.animateFloat(
-        initialValue = 0.06f,
-        targetValue = 0.12f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(4000, easing = FastOutSlowInEasing),
-            repeatMode = RepeatMode.Reverse
-        ),
-        label = "alpha"
-    )
-
-    val animatedOffset by infiniteTransition.animateFloat(
-        initialValue = 0f,
-        targetValue = 60f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(6000, easing = FastOutSlowInEasing),
-            repeatMode = RepeatMode.Reverse
-        ),
-        label = "offset"
-    )
-
-    Canvas(
-        modifier = Modifier
-            .fillMaxSize()
-            .blur(80.dp)
-    ) {
-        drawCircle(
-            brush = Brush.radialGradient(
-                colors = listOf(accentColor.copy(alpha = animatedAlpha), Color.Transparent),
-                center = Offset(size.width * 0.8f, size.height * 0.1f + animatedOffset),
-                radius = size.width * 0.6f
-            ),
-            center = Offset(size.width * 0.8f, size.height * 0.1f + animatedOffset),
-            radius = size.width * 0.6f
-        )
-
-        drawCircle(
-            brush = Brush.radialGradient(
-                colors = listOf(accentColor.copy(alpha = animatedAlpha * 0.5f), Color.Transparent),
-                center = Offset(size.width * 0.15f, size.height * 0.85f - animatedOffset * 0.5f),
-                radius = size.width * 0.4f
-            ),
-            center = Offset(size.width * 0.15f, size.height * 0.85f - animatedOffset * 0.5f),
-            radius = size.width * 0.4f
-        )
-    }
-}
-
-// ============================================================================
-// Current Theme Hero Card
-// ============================================================================
-
-@Composable
-private fun CurrentThemeHero(themeInfo: ThemeInfo) {
+private fun CurrentThemeHero(
+    themeInfo: ThemeInfo,
+    onCustomize: (() -> Unit)?
+) {
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(24.dp),
-        elevation = CardDefaults.cardElevation(defaultElevation = 6.dp)
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
     ) {
-        Box(
+        Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .background(
-                    brush = Brush.linearGradient(
-                        colors = listOf(
-                            themeInfo.backgroundColor,
-                            themeInfo.surfaceColor
-                        )
-                    )
-                )
-                .border(
-                    width = 1.dp,
-                    brush = Brush.linearGradient(
-                        colors = listOf(
-                            themeInfo.primaryColor.copy(alpha = 0.3f),
-                            themeInfo.primaryColor.copy(alpha = 0.1f)
-                        )
-                    ),
-                    shape = RoundedCornerShape(24.dp)
-                )
+                .padding(18.dp)
         ) {
-            // Decorative circles
-            Canvas(modifier = Modifier.fillMaxSize()) {
-                drawCircle(
-                    color = themeInfo.primaryColor.copy(alpha = 0.08f),
-                    radius = size.width * 0.3f,
-                    center = Offset(size.width * 0.85f, size.height * 0.2f)
-                )
-                drawCircle(
-                    color = (if (themeInfo.accentColor != Color.Unspecified) themeInfo.accentColor
-                    else themeInfo.primaryColor).copy(alpha = 0.05f),
-                    radius = size.width * 0.2f,
-                    center = Offset(size.width * 0.1f, size.height * 0.9f)
-                )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Surface(
+                    color = themeInfo.primaryColor.copy(alpha = 0.16f),
+                    shape = RoundedCornerShape(8.dp)
+                ) {
+                    Text(
+                        text = androidx.compose.ui.res.stringResource(R.string.appearance_current_theme),
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = FontWeight.Bold,
+                        color = themeInfo.primaryColor,
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp)
+                    )
+                }
+
+                if (onCustomize != null) {
+                    TextButton(onClick = onCustomize) {
+                        Icon(Icons.Default.Edit, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text(text = androidx.compose.ui.res.stringResource(R.string.appearance_customize_theme))
+                    }
+                }
             }
 
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(20.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                // Mini device preview
-                MiniDevicePreview(
-                    themeInfo = themeInfo,
-                    modifier = Modifier.size(width = 60.dp, height = 100.dp)
-                )
+            Spacer(modifier = Modifier.height(12.dp))
 
-                Spacer(Modifier.width(20.dp))
+            Text(
+                text = androidx.compose.ui.res.stringResource(themeInfo.displayNameRes),
+                style = MaterialTheme.typography.headlineSmall,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+            Text(
+                text = androidx.compose.ui.res.stringResource(themeInfo.subtitleRes),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
 
-                Column(modifier = Modifier.weight(1f)) {
-                    Surface(
-                        color = themeInfo.primaryColor.copy(alpha = 0.15f),
-                        shape = RoundedCornerShape(6.dp)
-                    ) {
-                        Text(
-                            androidx.compose.ui.res.stringResource(io.github.aedev.flow.R.string.appearance_current_theme),
-                            style = MaterialTheme.typography.labelSmall,
-                            fontWeight = FontWeight.Bold,
-                            color = themeInfo.primaryColor,
-                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
-                        )
-                    }
+            Spacer(modifier = Modifier.height(14.dp))
 
-                    Spacer(Modifier.height(8.dp))
+            MiniThemePreview(themeInfo = themeInfo)
 
-                    Text(
-                        androidx.compose.ui.res.stringResource(themeInfo.displayNameRes),
-                        style = MaterialTheme.typography.headlineSmall,
-                        fontWeight = FontWeight.Bold,
-                        color = themeInfo.onSurfaceColor
-                    )
+            Spacer(modifier = Modifier.height(12.dp))
 
-                    Text(
-                        androidx.compose.ui.res.stringResource(themeInfo.subtitleRes),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = themeInfo.onSurfaceColor.copy(alpha = 0.6f)
-                    )
-
-                    Spacer(Modifier.height(12.dp))
-
-                    // Color palette dots
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        ColorDot(themeInfo.primaryColor, "Primary")
-                        ColorDot(themeInfo.backgroundColor, "BG", border = true)
-                        ColorDot(themeInfo.surfaceColor, "Surface")
-                        if (themeInfo.accentColor != Color.Unspecified) {
-                            ColorDot(themeInfo.accentColor, "Accent")
-                        }
-                    }
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                ColorDot(themeInfo.primaryColor)
+                ColorDot(themeInfo.surfaceColor)
+                ColorDot(themeInfo.backgroundColor)
+                if (themeInfo.accentColor != Color.Unspecified) {
+                    ColorDot(themeInfo.accentColor)
                 }
             }
         }
@@ -629,195 +354,104 @@ private fun CurrentThemeHero(themeInfo: ThemeInfo) {
 }
 
 @Composable
-private fun ColorDot(color: Color, label: String, border: Boolean = false) {
+private fun MiniThemePreview(themeInfo: ThemeInfo) {
+    val surfaceVariant = if (themeInfo.surfaceVariantColor != Color.Unspecified) {
+        themeInfo.surfaceVariantColor
+    } else {
+        themeInfo.surfaceColor.copy(alpha = 0.9f)
+    }
+
     Box(
         modifier = Modifier
-            .size(24.dp)
-            .clip(CircleShape)
-            .background(color)
-            .then(
-                if (border) Modifier.border(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.3f), CircleShape)
-                else Modifier
+            .fillMaxWidth()
+            .height(84.dp)
+            .clip(RoundedCornerShape(14.dp))
+            .background(themeInfo.backgroundColor)
+            .border(1.dp, themeInfo.onSurfaceColor.copy(alpha = 0.16f), RoundedCornerShape(14.dp))
+            .padding(10.dp)
+    ) {
+        Column(modifier = Modifier.fillMaxSize()) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(11.dp)
+                    .clip(RoundedCornerShape(6.dp))
+                    .background(themeInfo.surfaceColor)
             )
-    )
-}
-
-// ============================================================================
-// Mini Device Preview
-// ============================================================================
-
-@Composable
-private fun MiniDevicePreview(
-    themeInfo: ThemeInfo,
-    modifier: Modifier = Modifier
-) {
-    val svColor = if (themeInfo.surfaceVariantColor != Color.Unspecified)
-        themeInfo.surfaceVariantColor else themeInfo.surfaceColor
-
-    Canvas(modifier = modifier) {
-        val w = size.width
-        val h = size.height
-        val cornerRadius = CornerRadius(12f, 12f)
-
-        // Device frame
-        drawRoundRect(
-            color = themeInfo.onSurfaceColor.copy(alpha = 0.2f),
-            size = Size(w, h),
-            cornerRadius = cornerRadius,
-            style = Stroke(width = 2f)
-        )
-
-        // Screen background
-        drawRoundRect(
-            color = themeInfo.backgroundColor,
-            topLeft = Offset(3f, 3f),
-            size = Size(w - 6f, h - 6f),
-            cornerRadius = CornerRadius(10f, 10f)
-        )
-
-        // Status bar
-        drawRoundRect(
-            color = themeInfo.surfaceColor,
-            topLeft = Offset(3f, 3f),
-            size = Size(w - 6f, h * 0.12f),
-            cornerRadius = CornerRadius(10f, 10f)
-        )
-
-        // Top bar accent line
-        drawRoundRect(
-            color = themeInfo.primaryColor,
-            topLeft = Offset(w * 0.1f, h * 0.15f),
-            size = Size(w * 0.35f, 3f),
-            cornerRadius = CornerRadius(2f, 2f)
-        )
-
-        // Content card 1
-        drawRoundRect(
-            color = themeInfo.surfaceColor,
-            topLeft = Offset(w * 0.08f, h * 0.22f),
-            size = Size(w * 0.84f, h * 0.18f),
-            cornerRadius = CornerRadius(6f, 6f)
-        )
-
-        // Thumbnail placeholder inside card
-        drawRoundRect(
-            color = svColor,
-            topLeft = Offset(w * 0.12f, h * 0.25f),
-            size = Size(w * 0.25f, h * 0.12f),
-            cornerRadius = CornerRadius(4f, 4f)
-        )
-
-        // Text lines inside card
-        drawRoundRect(
-            color = themeInfo.onSurfaceColor.copy(alpha = 0.15f),
-            topLeft = Offset(w * 0.42f, h * 0.26f),
-            size = Size(w * 0.45f, 3f),
-            cornerRadius = CornerRadius(2f, 2f)
-        )
-        drawRoundRect(
-            color = themeInfo.onSurfaceColor.copy(alpha = 0.1f),
-            topLeft = Offset(w * 0.42f, h * 0.32f),
-            size = Size(w * 0.3f, 3f),
-            cornerRadius = CornerRadius(2f, 2f)
-        )
-
-        // Content card 2
-        drawRoundRect(
-            color = themeInfo.surfaceColor,
-            topLeft = Offset(w * 0.08f, h * 0.44f),
-            size = Size(w * 0.84f, h * 0.18f),
-            cornerRadius = CornerRadius(6f, 6f)
-        )
-
-        // Thumbnail 2
-        drawRoundRect(
-            color = svColor,
-            topLeft = Offset(w * 0.12f, h * 0.47f),
-            size = Size(w * 0.25f, h * 0.12f),
-            cornerRadius = CornerRadius(4f, 4f)
-        )
-
-        // Text lines 2
-        drawRoundRect(
-            color = themeInfo.onSurfaceColor.copy(alpha = 0.15f),
-            topLeft = Offset(w * 0.42f, h * 0.48f),
-            size = Size(w * 0.4f, 3f),
-            cornerRadius = CornerRadius(2f, 2f)
-        )
-        drawRoundRect(
-            color = themeInfo.onSurfaceColor.copy(alpha = 0.1f),
-            topLeft = Offset(w * 0.42f, h * 0.54f),
-            size = Size(w * 0.25f, 3f),
-            cornerRadius = CornerRadius(2f, 2f)
-        )
-
-        // Bottom nav bar
-        drawRoundRect(
-            color = themeInfo.surfaceColor,
-            topLeft = Offset(3f, h * 0.85f),
-            size = Size(w - 6f, h * 0.15f - 3f),
-            cornerRadius = CornerRadius(0f, 0f)
-        )
-
-        // Nav bar icons
-        val navY = h * 0.91f
-        val navSpacing = w / 5f
-        for (i in 1..4) {
-            val dotColor = if (i == 1) themeInfo.primaryColor
-            else themeInfo.onSurfaceColor.copy(alpha = 0.2f)
-            drawCircle(
-                color = dotColor,
-                radius = 3f,
-                center = Offset(navSpacing * i, navY)
+            Spacer(modifier = Modifier.height(8.dp))
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(22.dp)
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(surfaceVariant)
+            )
+            Spacer(modifier = Modifier.height(6.dp))
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth(0.65f)
+                    .height(7.dp)
+                    .clip(RoundedCornerShape(4.dp))
+                    .background(themeInfo.onSurfaceColor.copy(alpha = 0.24f))
             )
         }
 
-        // FAB
-        drawCircle(
-            color = themeInfo.primaryColor,
-            radius = w * 0.08f,
-            center = Offset(w * 0.85f, h * 0.75f)
+        Box(
+            modifier = Modifier
+                .align(Alignment.BottomEnd)
+                .size(14.dp)
+                .clip(CircleShape)
+                .background(themeInfo.primaryColor)
         )
     }
 }
 
-// ============================================================================
-// Category Filter Row
-// ============================================================================
+@Composable
+private fun ColorDot(color: Color) {
+    Box(
+        modifier = Modifier
+            .size(22.dp)
+            .clip(CircleShape)
+            .background(color)
+            .border(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f), CircleShape)
+    )
+}
 
 @Composable
 private fun CategoryFilterRow(
     selectedCategory: ThemeCategory?,
     onCategorySelected: (ThemeCategory?) -> Unit
 ) {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(8.dp)
-    ) {
-        // "All" chip
-        FilterChip(
-            selected = selectedCategory == null,
-            onClick = { onCategorySelected(null) },
-            label = { Text(androidx.compose.ui.res.stringResource(io.github.aedev.flow.R.string.appearance_category_all)) },
-            leadingIcon = if (selectedCategory == null) {
-                { Icon(Icons.Default.Check, null, modifier = Modifier.size(16.dp)) }
-            } else {
-                { Icon(Icons.Outlined.GridView, null, modifier = Modifier.size(16.dp)) }
-            },
-            shape = RoundedCornerShape(12.dp)
-        )
+    LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        item {
+            FilterChip(
+                selected = selectedCategory == null,
+                onClick = { onCategorySelected(null) },
+                label = { Text(text = androidx.compose.ui.res.stringResource(R.string.appearance_category_all)) },
+                leadingIcon = {
+                    Icon(
+                        imageVector = if (selectedCategory == null) Icons.Default.Check else Icons.Outlined.Palette,
+                        contentDescription = null,
+                        modifier = Modifier.size(16.dp)
+                    )
+                },
+                shape = RoundedCornerShape(12.dp)
+            )
+        }
 
-        ThemeCategory.entries.forEach { category ->
+        items(items = ThemeCategory.entries.toList()) { category ->
             FilterChip(
                 selected = selectedCategory == category,
                 onClick = {
                     onCategorySelected(if (selectedCategory == category) null else category)
                 },
-                label = { Text(androidx.compose.ui.res.stringResource(category.labelRes)) },
-                leadingIcon = if (selectedCategory == category) {
-                    { Icon(Icons.Default.Check, null, modifier = Modifier.size(16.dp)) }
-                } else {
-                    category.icon
+                label = { Text(text = androidx.compose.ui.res.stringResource(category.labelRes)) },
+                leadingIcon = {
+                    Icon(
+                        imageVector = if (selectedCategory == category) Icons.Default.Check else category.icon,
+                        contentDescription = null,
+                        modifier = Modifier.size(16.dp)
+                    )
                 },
                 shape = RoundedCornerShape(12.dp)
             )
@@ -825,155 +459,228 @@ private fun CategoryFilterRow(
     }
 }
 
-// ============================================================================
-// Theme Card (Grid Item)
-// ============================================================================
-
 @Composable
 private fun ThemeCard(
     themeInfo: ThemeInfo,
     isSelected: Boolean,
-    onClick: () -> Unit
+    onClick: () -> Unit,
+    onCustomize: (() -> Unit)?
 ) {
-    val scale by animateFloatAsState(
-        targetValue = if (isSelected) 1f else 1f,
-        animationSpec = spring(dampingRatio = 0.6f),
-        label = "scale"
-    )
-
-    val borderAlpha by animateFloatAsState(
-        targetValue = if (isSelected) 1f else 0f,
-        animationSpec = tween(300),
-        label = "border"
-    )
-
-    val elevation by animateDpAsState(
-        targetValue = if (isSelected) 8.dp else 2.dp,
-        animationSpec = tween(300),
-        label = "elevation"
-    )
+    val selectedBackground = themeInfo.primaryColor.copy(alpha = 0.30f)
 
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .scale(scale)
-            .then(
-                if (isSelected) Modifier.border(
-                    width = 2.dp,
-                    brush = Brush.linearGradient(
-                        colors = listOf(
-                            themeInfo.primaryColor,
-                            (if (themeInfo.accentColor != Color.Unspecified) themeInfo.accentColor
-                            else themeInfo.primaryColor).copy(alpha = 0.6f)
-                        )
-                    ),
-                    shape = RoundedCornerShape(20.dp)
-                ) else Modifier
-            ),
-        shape = RoundedCornerShape(20.dp),
-        elevation = CardDefaults.cardElevation(defaultElevation = elevation),
-        onClick = onClick
+            .clickable(onClick = onClick),
+        shape = RoundedCornerShape(18.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = if (isSelected) selectedBackground else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.26f)
+        ),
+        border = BorderStroke(
+            width = if (isSelected) 2.dp else 1.dp,
+            color = if (isSelected) themeInfo.primaryColor.copy(alpha = 0.9f) else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
+        )
     ) {
-        Box(
+        Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .background(
-                    brush = Brush.verticalGradient(
-                        colors = listOf(
-                            themeInfo.backgroundColor,
-                            themeInfo.surfaceColor
-                        )
+                .padding(14.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    ColorDot(themeInfo.primaryColor)
+                    ColorDot(themeInfo.surfaceColor)
+                }
+                if (isSelected) {
+                    Icon(
+                        imageVector = Icons.Default.Check,
+                        contentDescription = "Selected",
+                        tint = themeInfo.primaryColor,
+                        modifier = Modifier.size(18.dp)
                     )
-                )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(10.dp))
+            MiniThemePreview(themeInfo = themeInfo)
+            Spacer(modifier = Modifier.height(10.dp))
+
+            Text(
+                text = androidx.compose.ui.res.stringResource(themeInfo.displayNameRes),
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.onSurface,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+            Text(
+                text = androidx.compose.ui.res.stringResource(themeInfo.subtitleRes),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+
+            if (onCustomize != null) {
+                Spacer(modifier = Modifier.height(8.dp))
+                TextButton(
+                    onClick = onCustomize,
+                    contentPadding = PaddingValues(horizontal = 2.dp, vertical = 0.dp)
+                ) {
+                    Icon(Icons.Default.Edit, contentDescription = null, modifier = Modifier.size(16.dp))
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text(text = androidx.compose.ui.res.stringResource(R.string.appearance_customize_theme))
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun CustomThemeEditorDialog(
+    initialColors: CustomThemeColors,
+    onDismiss: () -> Unit,
+    onSave: (CustomThemeColors) -> Unit
+) {
+    var draft by remember(initialColors) { mutableStateOf(initialColors) }
+    var activePickerRole by remember { mutableStateOf<CustomColorRole?>(null) }
+    val hexInputs = remember(initialColors) {
+        mutableStateMapOf<CustomColorRole, String>().apply {
+            CUSTOM_ROLE_FIELDS.forEach { field ->
+                this[field.role] = draft.colorOf(field.role).toHexArgbString()
+            }
+        }
+    }
+
+    val activePickerField = activePickerRole?.let { role ->
+        CUSTOM_ROLE_FIELDS.firstOrNull { it.role == role }
+    }
+
+    if (activePickerField != null) {
+        ColorPickerDialog(
+            title = androidx.compose.ui.res.stringResource(activePickerField.labelRes),
+            initialArgb = draft.colorOf(activePickerField.role),
+            onDismiss = { activePickerRole = null },
+            onApply = { argb ->
+                draft = draft.withColor(activePickerField.role, argb)
+                hexInputs[activePickerField.role] = argb.toHexArgbString()
+                activePickerRole = null
+            }
+        )
+    }
+
+    val allValid = CUSTOM_ROLE_FIELDS.all { field ->
+        parseHexColorToArgbLong(hexInputs[field.role].orEmpty()) != null
+    }
+
+    Dialog(onDismissRequest = onDismiss) {
+        Surface(
+            shape = RoundedCornerShape(24.dp),
+            tonalElevation = 6.dp,
+            modifier = Modifier.fillMaxWidth()
         ) {
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(12.dp)
+                    .padding(16.dp)
             ) {
-                // Mini preview at top
-                Box(
+                Text(
+                    text = androidx.compose.ui.res.stringResource(R.string.appearance_customizer_title),
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold
+                )
+                Text(
+                    text = androidx.compose.ui.res.stringResource(R.string.appearance_customizer_subtitle),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                CustomThemePreviewCard(draft)
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                LazyColumn(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .aspectRatio(1.4f)
-                        .clip(RoundedCornerShape(12.dp))
+                        .height(360.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
-                    MiniAppPreview(themeInfo)
+                    items(CUSTOM_ROLE_FIELDS.size) { index ->
+                        val field = CUSTOM_ROLE_FIELDS[index]
+                        val input = hexInputs[field.role].orEmpty()
+                        val parsedColor = parseHexColorToArgbLong(input)
+                        val hasError = input.isNotBlank() && parsedColor == null
 
-                    // Selected badge
-                    if (isSelected) {
-                        Box(
-                            modifier = Modifier
-                                .align(Alignment.TopEnd)
-                                .padding(6.dp)
-                                .size(24.dp)
-                                .shadow(4.dp, CircleShape)
-                                .background(themeInfo.primaryColor, CircleShape),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Icon(
-                                Icons.Default.Check,
-                                null,
-                                tint = if (themeInfo.category == ThemeCategory.LIGHT)
-                                    Color.White else themeInfo.backgroundColor,
-                                modifier = Modifier.size(14.dp)
-                            )
-                        }
+                        OutlinedTextField(
+                            value = input,
+                            onValueChange = { value ->
+                                val sanitized = sanitizeHexInput(value)
+                                hexInputs[field.role] = sanitized
+                                parseHexColorToArgbLong(sanitized)?.let { argb ->
+                                    draft = draft.withColor(field.role, argb)
+                                }
+                            },
+                            singleLine = true,
+                            isError = hasError,
+                            label = { Text(androidx.compose.ui.res.stringResource(field.labelRes)) },
+                            trailingIcon = {
+                                val previewColor = parsedColor?.let { Color(it) } ?: Color.Transparent
+                                Box(
+                                    modifier = Modifier
+                                        .size(20.dp)
+                                        .clip(CircleShape)
+                                        .border(1.dp, MaterialTheme.colorScheme.outlineVariant, CircleShape)
+                                        .background(previewColor, CircleShape)
+                                        .clickable {
+                                            activePickerRole = field.role
+                                        }
+                                )
+                            },
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Ascii),
+                            supportingText = {
+                                if (index == 0) {
+                                    Text(androidx.compose.ui.res.stringResource(R.string.appearance_customizer_format_hint))
+                                }
+                            },
+                            modifier = Modifier.fillMaxWidth()
+                        )
                     }
                 }
 
-                Spacer(Modifier.height(10.dp))
+                Spacer(modifier = Modifier.height(12.dp))
 
-                // Theme name
-                Text(
-                    androidx.compose.ui.res.stringResource(themeInfo.displayNameRes),
-                    style = MaterialTheme.typography.titleSmall,
-                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-                    color = themeInfo.onSurfaceColor,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-
-                // Subtitle
-                Text(
-                    androidx.compose.ui.res.stringResource(themeInfo.subtitleRes),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = themeInfo.onSurfaceColor.copy(alpha = 0.5f),
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    fontSize = 11.sp
-                )
-
-                Spacer(Modifier.height(8.dp))
-
-                // Color palette strip
                 Row(
-                    horizontalArrangement = Arrangement.spacedBy(4.dp),
-                    modifier = Modifier.fillMaxWidth()
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    val colors = buildList {
-                        add(themeInfo.primaryColor)
-                        add(themeInfo.surfaceColor)
-                        add(themeInfo.backgroundColor)
-                        if (themeInfo.accentColor != Color.Unspecified) add(themeInfo.accentColor)
+                    TextButton(
+                        onClick = {
+                            val reset = CustomThemeColors.default()
+                            draft = reset
+                            CUSTOM_ROLE_FIELDS.forEach { field ->
+                                hexInputs[field.role] = reset.colorOf(field.role).toHexArgbString()
+                            }
+                        }
+                    ) {
+                        Text(text = androidx.compose.ui.res.stringResource(R.string.appearance_customizer_reset))
                     }
-                    colors.forEach { color ->
-                        Box(
-                            modifier = Modifier
-                                .weight(1f)
-                                .height(6.dp)
-                                .clip(RoundedCornerShape(3.dp))
-                                .background(color)
-                                .then(
-                                    if (color == themeInfo.backgroundColor)
-                                        Modifier.border(
-                                            0.5.dp,
-                                            themeInfo.onSurfaceColor.copy(alpha = 0.15f),
-                                            RoundedCornerShape(3.dp)
-                                        )
-                                    else Modifier
-                                )
-                        )
+
+                    Spacer(modifier = Modifier.weight(1f))
+
+                    TextButton(onClick = onDismiss) {
+                        Text(text = androidx.compose.ui.res.stringResource(android.R.string.cancel))
+                    }
+                    Button(
+                        onClick = { onSave(draft) },
+                        enabled = allValid
+                    ) {
+                        Text(text = androidx.compose.ui.res.stringResource(R.string.appearance_customizer_save))
                     }
                 }
             }
@@ -981,106 +688,492 @@ private fun ThemeCard(
     }
 }
 
-// ============================================================================
-// Mini App Preview (Inside Theme Card)
-// ============================================================================
-
 @Composable
-private fun MiniAppPreview(themeInfo: ThemeInfo) {
-    val svColor = if (themeInfo.surfaceVariantColor != Color.Unspecified)
-        themeInfo.surfaceVariantColor else themeInfo.surfaceColor
-
-    Canvas(modifier = Modifier.fillMaxSize()) {
-        val w = size.width
-        val h = size.height
-
-        // Background
-        drawRect(color = themeInfo.backgroundColor)
-
-        // Top bar
-        drawRect(
-            color = themeInfo.surfaceColor,
-            topLeft = Offset.Zero,
-            size = Size(w, h * 0.15f)
-        )
-
-        // Search bar in top bar
-        drawRoundRect(
-            color = svColor,
-            topLeft = Offset(w * 0.05f, h * 0.04f),
-            size = Size(w * 0.7f, h * 0.08f),
-            cornerRadius = CornerRadius(8f, 8f)
-        )
-
-        // Avatar circle in top bar
-        drawCircle(
-            color = themeInfo.primaryColor.copy(alpha = 0.4f),
-            radius = h * 0.04f,
-            center = Offset(w * 0.9f, h * 0.08f)
-        )
-
-        // Video thumbnail 1
-        drawRoundRect(
-            color = svColor,
-            topLeft = Offset(w * 0.04f, h * 0.19f),
-            size = Size(w * 0.92f, h * 0.3f),
-            cornerRadius = CornerRadius(8f, 8f)
-        )
-
-        // Play button on thumbnail
-        drawCircle(
-            color = themeInfo.primaryColor.copy(alpha = 0.8f),
-            radius = h * 0.05f,
-            center = Offset(w * 0.5f, h * 0.34f)
-        )
-
-        // Channel avatar
-        drawCircle(
-            color = themeInfo.primaryColor.copy(alpha = 0.3f),
-            radius = h * 0.03f,
-            center = Offset(w * 0.1f, h * 0.55f)
-        )
-
-        // Title lines
-        drawRoundRect(
-            color = themeInfo.onSurfaceColor.copy(alpha = 0.2f),
-            topLeft = Offset(w * 0.18f, h * 0.52f),
-            size = Size(w * 0.7f, 3f),
-            cornerRadius = CornerRadius(2f, 2f)
-        )
-        drawRoundRect(
-            color = themeInfo.onSurfaceColor.copy(alpha = 0.12f),
-            topLeft = Offset(w * 0.18f, h * 0.57f),
-            size = Size(w * 0.45f, 3f),
-            cornerRadius = CornerRadius(2f, 2f)
-        )
-
-        // Video thumbnail 2
-        drawRoundRect(
-            color = svColor,
-            topLeft = Offset(w * 0.04f, h * 0.65f),
-            size = Size(w * 0.92f, h * 0.2f),
-            cornerRadius = CornerRadius(8f, 8f)
-        )
-
-        // Bottom nav bar
-        drawRect(
-            color = themeInfo.surfaceColor,
-            topLeft = Offset(0f, h * 0.88f),
-            size = Size(w, h * 0.12f)
-        )
-
-        // Bottom nav icons
-        val navY = h * 0.94f
-        val spacing = w / 6f
-        for (i in 1..5) {
-            val dotColor = if (i == 1) themeInfo.primaryColor
-            else themeInfo.onSurfaceColor.copy(alpha = 0.15f)
-            drawCircle(
-                color = dotColor,
-                radius = 3.5f,
-                center = Offset(spacing * i, navY)
-            )
+private fun ColorPickerDialog(
+    title: String,
+    initialArgb: Long,
+    onDismiss: () -> Unit,
+    onApply: (Long) -> Unit
+) {
+    val initialColorInt = ((initialArgb and 0xFFFFFFFFL).toInt())
+    val initialHsv = remember(initialArgb) {
+        FloatArray(3).also { hsv ->
+            android.graphics.Color.colorToHSV(initialColorInt, hsv)
         }
     }
+
+    var hue by remember(initialArgb) { mutableStateOf(initialHsv[0]) }
+    var saturation by remember(initialArgb) { mutableStateOf(initialHsv[1]) }
+    var value by remember(initialArgb) { mutableStateOf(initialHsv[2]) }
+    var alpha by remember(initialArgb) {
+        mutableStateOf(android.graphics.Color.alpha(initialColorInt) / 255f)
+    }
+
+    val previewArgb = hsvaToArgbLong(
+        hue = hue,
+        saturation = saturation,
+        value = value,
+        alpha = alpha
+    )
+
+    Dialog(onDismissRequest = onDismiss) {
+        Surface(
+            shape = RoundedCornerShape(20.dp),
+            tonalElevation = 8.dp,
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp)
+            ) {
+                Text(
+                    text = title,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold
+                )
+                Spacer(modifier = Modifier.height(12.dp))
+
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(52.dp)
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(Color(previewArgb))
+                        .border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(12.dp)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = previewArgb.toHexArgbString(),
+                        color = MaterialTheme.colorScheme.onSurface,
+                        style = MaterialTheme.typography.labelLarge,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                Text(text = "Hue", style = MaterialTheme.typography.labelMedium)
+                Slider(value = hue, onValueChange = { hue = it }, valueRange = 0f..360f)
+
+                Text(text = "Saturation", style = MaterialTheme.typography.labelMedium)
+                Slider(value = saturation, onValueChange = { saturation = it }, valueRange = 0f..1f)
+
+                Text(text = "Brightness", style = MaterialTheme.typography.labelMedium)
+                Slider(value = value, onValueChange = { value = it }, valueRange = 0f..1f)
+
+                Text(text = "Alpha", style = MaterialTheme.typography.labelMedium)
+                Slider(value = alpha, onValueChange = { alpha = it }, valueRange = 0f..1f)
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.End
+                ) {
+                    TextButton(onClick = onDismiss) {
+                        Text(text = androidx.compose.ui.res.stringResource(android.R.string.cancel))
+                    }
+                    Button(onClick = { onApply(previewArgb) }) {
+                        Text(text = androidx.compose.ui.res.stringResource(R.string.appearance_customizer_save))
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun CustomThemePreviewCard(colors: CustomThemeColors) {
+    val previewTheme = ThemeInfo(
+        mode = ThemeMode.CUSTOM,
+        displayNameRes = R.string.theme_name_custom,
+        subtitleRes = R.string.theme_desc_custom,
+        category = ThemeCategory.CUSTOM,
+        primaryColor = Color(colors.primary),
+        backgroundColor = Color(colors.background),
+        surfaceColor = Color(colors.surface),
+        onSurfaceColor = Color(colors.onSurface),
+        accentColor = Color(colors.secondary),
+        surfaceVariantColor = Color(colors.surfaceVariant)
+    )
+
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+    ) {
+        Column(modifier = Modifier.padding(12.dp)) {
+            Text(
+                text = androidx.compose.ui.res.stringResource(R.string.appearance_customize_theme),
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+            MiniThemePreview(previewTheme)
+        }
+    }
+}
+
+private fun buildThemeCatalog(customThemeColors: CustomThemeColors): List<ThemeInfo> {
+    return listOf(
+        ThemeInfo(
+            mode = ThemeMode.SYSTEM,
+            displayNameRes = R.string.theme_name_system_default,
+            subtitleRes = R.string.theme_desc_system_default,
+            category = ThemeCategory.CUSTOM,
+            primaryColor = YouTubeRed,
+            backgroundColor = Color(0xFF1C1C1C),
+            surfaceColor = Color(0xFF252525),
+            onSurfaceColor = Color.White,
+            surfaceVariantColor = Color(0xFF333333)
+        ),
+        ThemeInfo(
+            mode = ThemeMode.CUSTOM,
+            displayNameRes = R.string.theme_name_custom,
+            subtitleRes = R.string.theme_desc_custom,
+            category = ThemeCategory.CUSTOM,
+            primaryColor = Color(customThemeColors.primary),
+            backgroundColor = Color(customThemeColors.background),
+            surfaceColor = Color(customThemeColors.surface),
+            onSurfaceColor = Color(customThemeColors.onSurface),
+            accentColor = Color(customThemeColors.secondary),
+            surfaceVariantColor = Color(customThemeColors.surfaceVariant)
+        ),
+
+        ThemeInfo(
+            mode = ThemeMode.LIGHT,
+            displayNameRes = R.string.theme_name_pure_light,
+            subtitleRes = R.string.theme_desc_pure_light,
+            category = ThemeCategory.LIGHT,
+            primaryColor = YouTubeRed,
+            backgroundColor = White,
+            surfaceColor = LightSurface,
+            onSurfaceColor = Color(0xFF0F0F0F),
+            surfaceVariantColor = LightSurfaceVariant
+        ),
+        ThemeInfo(
+            mode = ThemeMode.MINT_LIGHT,
+            displayNameRes = R.string.theme_name_mint_fresh,
+            subtitleRes = R.string.theme_desc_mint_fresh,
+            category = ThemeCategory.LIGHT,
+            primaryColor = MintLightThemeColors.Primary,
+            backgroundColor = MintLightThemeColors.Background,
+            surfaceColor = MintLightThemeColors.Surface,
+            onSurfaceColor = MintLightThemeColors.Text,
+            accentColor = MintLightThemeColors.Secondary,
+            surfaceVariantColor = MintLightThemeColors.Border
+        ),
+        ThemeInfo(
+            mode = ThemeMode.ROSE_LIGHT,
+            displayNameRes = R.string.theme_name_rose_petal,
+            subtitleRes = R.string.theme_desc_rose_petal,
+            category = ThemeCategory.LIGHT,
+            primaryColor = RoseLightThemeColors.Primary,
+            backgroundColor = RoseLightThemeColors.Background,
+            surfaceColor = RoseLightThemeColors.Surface,
+            onSurfaceColor = RoseLightThemeColors.Text,
+            accentColor = RoseLightThemeColors.Secondary,
+            surfaceVariantColor = RoseLightThemeColors.Border
+        ),
+        ThemeInfo(
+            mode = ThemeMode.SKY_LIGHT,
+            displayNameRes = R.string.theme_name_sky_blue,
+            subtitleRes = R.string.theme_desc_sky_blue,
+            category = ThemeCategory.LIGHT,
+            primaryColor = SkyLightThemeColors.Primary,
+            backgroundColor = SkyLightThemeColors.Background,
+            surfaceColor = SkyLightThemeColors.Surface,
+            onSurfaceColor = SkyLightThemeColors.Text,
+            accentColor = SkyLightThemeColors.Secondary,
+            surfaceVariantColor = SkyLightThemeColors.Border
+        ),
+        ThemeInfo(
+            mode = ThemeMode.CREAM_LIGHT,
+            displayNameRes = R.string.theme_name_cream_paper,
+            subtitleRes = R.string.theme_desc_cream_paper,
+            category = ThemeCategory.LIGHT,
+            primaryColor = CreamLightThemeColors.Primary,
+            backgroundColor = CreamLightThemeColors.Background,
+            surfaceColor = CreamLightThemeColors.Surface,
+            onSurfaceColor = CreamLightThemeColors.Text,
+            accentColor = CreamLightThemeColors.Secondary,
+            surfaceVariantColor = CreamLightThemeColors.Border
+        ),
+
+        ThemeInfo(
+            mode = ThemeMode.DARK,
+            displayNameRes = R.string.theme_name_classic_dark,
+            subtitleRes = R.string.theme_desc_classic_dark,
+            category = ThemeCategory.DARK,
+            primaryColor = YouTubeRed,
+            backgroundColor = DarkBackground,
+            surfaceColor = DarkSurface,
+            onSurfaceColor = TextPrimary,
+            surfaceVariantColor = DarkSurfaceVariant
+        ),
+        ThemeInfo(
+            mode = ThemeMode.OLED,
+            displayNameRes = R.string.theme_name_true_black,
+            subtitleRes = R.string.theme_desc_true_black,
+            category = ThemeCategory.DARK,
+            primaryColor = YouTubeRed,
+            backgroundColor = Black,
+            surfaceColor = OLEDThemeColors.Surface,
+            onSurfaceColor = TextPrimary,
+            surfaceVariantColor = OLEDThemeColors.Border
+        ),
+        ThemeInfo(
+            mode = ThemeMode.MONOCHROME,
+            displayNameRes = R.string.theme_name_monochrome,
+            subtitleRes = R.string.theme_desc_monochrome,
+            category = ThemeCategory.DARK,
+            primaryColor = Color.White,
+            backgroundColor = Color.Black,
+            surfaceColor = Color.Black,
+            onSurfaceColor = Color.White,
+            accentColor = Color(0xFF777777),
+            surfaceVariantColor = Color(0xFF111111)
+        ),
+        ThemeInfo(
+            mode = ThemeMode.MIDNIGHT_BLACK,
+            displayNameRes = R.string.theme_name_midnight,
+            subtitleRes = R.string.theme_desc_midnight,
+            category = ThemeCategory.DARK,
+            primaryColor = MidnightBlackThemeColors.Primary,
+            backgroundColor = MidnightBlackThemeColors.Background,
+            surfaceColor = MidnightBlackThemeColors.Surface,
+            onSurfaceColor = MidnightBlackThemeColors.Text,
+            accentColor = MidnightBlackThemeColors.Secondary,
+            surfaceVariantColor = MidnightBlackThemeColors.Border
+        ),
+        ThemeInfo(
+            mode = ThemeMode.OCEAN_BLUE,
+            displayNameRes = R.string.theme_name_deep_ocean,
+            subtitleRes = R.string.theme_desc_deep_ocean,
+            category = ThemeCategory.DARK,
+            primaryColor = OceanBlueThemeColors.Primary,
+            backgroundColor = OceanBlueThemeColors.Background,
+            surfaceColor = OceanBlueThemeColors.Surface,
+            onSurfaceColor = OceanBlueThemeColors.Text,
+            accentColor = OceanBlueThemeColors.Secondary,
+            surfaceVariantColor = OceanBlueThemeColors.Border
+        ),
+        ThemeInfo(
+            mode = ThemeMode.FOREST_GREEN,
+            displayNameRes = R.string.theme_name_forest,
+            subtitleRes = R.string.theme_desc_forest,
+            category = ThemeCategory.DARK,
+            primaryColor = ForestGreenThemeColors.Primary,
+            backgroundColor = ForestGreenThemeColors.Background,
+            surfaceColor = ForestGreenThemeColors.Surface,
+            onSurfaceColor = ForestGreenThemeColors.Text,
+            accentColor = ForestGreenThemeColors.Secondary,
+            surfaceVariantColor = ForestGreenThemeColors.Border
+        ),
+        ThemeInfo(
+            mode = ThemeMode.LAVENDER_MIST,
+            displayNameRes = R.string.theme_name_lavender,
+            subtitleRes = R.string.theme_desc_lavender,
+            category = ThemeCategory.DARK,
+            primaryColor = Color(0xFFB39DDB),
+            backgroundColor = Color(0xFF120F1A),
+            surfaceColor = Color(0xFF1F1A2E),
+            onSurfaceColor = Color(0xFFEDE7F6),
+            accentColor = Color(0xFF9575CD),
+            surfaceVariantColor = Color(0xFF2A2235)
+        ),
+        ThemeInfo(
+            mode = ThemeMode.SUNSET_ORANGE,
+            displayNameRes = R.string.theme_name_sunset,
+            subtitleRes = R.string.theme_desc_sunset,
+            category = ThemeCategory.DARK,
+            primaryColor = SunsetOrangeThemeColors.Primary,
+            backgroundColor = SunsetOrangeThemeColors.Background,
+            surfaceColor = SunsetOrangeThemeColors.Surface,
+            onSurfaceColor = SunsetOrangeThemeColors.Text,
+            accentColor = SunsetOrangeThemeColors.Secondary,
+            surfaceVariantColor = SunsetOrangeThemeColors.Border
+        ),
+        ThemeInfo(
+            mode = ThemeMode.PURPLE_NEBULA,
+            displayNameRes = R.string.theme_name_nebula,
+            subtitleRes = R.string.theme_desc_nebula,
+            category = ThemeCategory.DARK,
+            primaryColor = PurpleNebulaThemeColors.Primary,
+            backgroundColor = PurpleNebulaThemeColors.Background,
+            surfaceColor = PurpleNebulaThemeColors.Surface,
+            onSurfaceColor = PurpleNebulaThemeColors.Text,
+            accentColor = PurpleNebulaThemeColors.Secondary,
+            surfaceVariantColor = PurpleNebulaThemeColors.Border
+        ),
+        ThemeInfo(
+            mode = ThemeMode.ROSE_GOLD,
+            displayNameRes = R.string.theme_name_rose_gold,
+            subtitleRes = R.string.theme_desc_rose_gold,
+            category = ThemeCategory.DARK,
+            primaryColor = RoseGoldThemeColors.Primary,
+            backgroundColor = RoseGoldThemeColors.Background,
+            surfaceColor = RoseGoldThemeColors.Surface,
+            onSurfaceColor = RoseGoldThemeColors.Text,
+            accentColor = RoseGoldThemeColors.Secondary,
+            surfaceVariantColor = RoseGoldThemeColors.Border
+        ),
+        ThemeInfo(
+            mode = ThemeMode.ARCTIC_ICE,
+            displayNameRes = R.string.theme_name_arctic,
+            subtitleRes = R.string.theme_desc_arctic,
+            category = ThemeCategory.DARK,
+            primaryColor = ArcticIceThemeColors.Primary,
+            backgroundColor = ArcticIceThemeColors.Background,
+            surfaceColor = ArcticIceThemeColors.Surface,
+            onSurfaceColor = ArcticIceThemeColors.Text,
+            accentColor = ArcticIceThemeColors.Secondary,
+            surfaceVariantColor = ArcticIceThemeColors.Border
+        ),
+        ThemeInfo(
+            mode = ThemeMode.MINTY_FRESH,
+            displayNameRes = R.string.theme_name_mint_night,
+            subtitleRes = R.string.theme_desc_mint_night,
+            category = ThemeCategory.DARK,
+            primaryColor = Color(0xFF80CBC4),
+            backgroundColor = Color(0xFF0F1A18),
+            surfaceColor = Color(0xFF1A2E2B),
+            onSurfaceColor = Color(0xFFE0F2F1),
+            accentColor = Color(0xFF4DB6AC),
+            surfaceVariantColor = Color(0xFF1E302D)
+        ),
+
+        ThemeInfo(
+            mode = ThemeMode.CRIMSON_RED,
+            displayNameRes = R.string.theme_name_crimson,
+            subtitleRes = R.string.theme_desc_crimson,
+            category = ThemeCategory.CUSTOM,
+            primaryColor = CrimsonRedThemeColors.Primary,
+            backgroundColor = CrimsonRedThemeColors.Background,
+            surfaceColor = CrimsonRedThemeColors.Surface,
+            onSurfaceColor = CrimsonRedThemeColors.Text,
+            accentColor = CrimsonRedThemeColors.Secondary,
+            surfaceVariantColor = CrimsonRedThemeColors.Border
+        ),
+        ThemeInfo(
+            mode = ThemeMode.COSMIC_VOID,
+            displayNameRes = R.string.theme_name_cosmic_void,
+            subtitleRes = R.string.theme_desc_cosmic_void,
+            category = ThemeCategory.CUSTOM,
+            primaryColor = Color(0xFF7C4DFF),
+            backgroundColor = Color(0xFF050505),
+            surfaceColor = Color(0xFF121212),
+            onSurfaceColor = Color(0xFFE0E0E0),
+            accentColor = Color(0xFF651FFF),
+            surfaceVariantColor = Color(0xFF1A1225)
+        ),
+        ThemeInfo(
+            mode = ThemeMode.SOLAR_FLARE,
+            displayNameRes = R.string.theme_name_solar_flare,
+            subtitleRes = R.string.theme_desc_solar_flare,
+            category = ThemeCategory.CUSTOM,
+            primaryColor = Color(0xFFFFD740),
+            backgroundColor = Color(0xFF1A1500),
+            surfaceColor = Color(0xFF2E2600),
+            onSurfaceColor = Color(0xFFFFFDE7),
+            accentColor = Color(0xFFFFAB00),
+            surfaceVariantColor = Color(0xFF352A10)
+        ),
+        ThemeInfo(
+            mode = ThemeMode.CYBERPUNK,
+            displayNameRes = R.string.theme_name_cyberpunk,
+            subtitleRes = R.string.theme_desc_cyberpunk,
+            category = ThemeCategory.CUSTOM,
+            primaryColor = Color(0xFFFF00FF),
+            backgroundColor = Color(0xFF0D001A),
+            surfaceColor = Color(0xFF1F0033),
+            onSurfaceColor = Color(0xFFE0E0E0),
+            accentColor = Color(0xFF00FFFF),
+            surfaceVariantColor = Color(0xFF200F35)
+        ),
+        ThemeInfo(
+            mode = ThemeMode.ROYAL_GOLD,
+            displayNameRes = R.string.theme_name_royal_gold,
+            subtitleRes = R.string.theme_desc_royal_gold,
+            category = ThemeCategory.CUSTOM,
+            primaryColor = RoyalGoldThemeColors.Primary,
+            backgroundColor = RoyalGoldThemeColors.Background,
+            surfaceColor = RoyalGoldThemeColors.Surface,
+            onSurfaceColor = RoyalGoldThemeColors.Text,
+            accentColor = RoyalGoldThemeColors.Secondary,
+            surfaceVariantColor = RoyalGoldThemeColors.Border
+        ),
+        ThemeInfo(
+            mode = ThemeMode.NORDIC_HORIZON,
+            displayNameRes = R.string.theme_name_nordic,
+            subtitleRes = R.string.theme_desc_nordic,
+            category = ThemeCategory.CUSTOM,
+            primaryColor = NordicHorizonThemeColors.Primary,
+            backgroundColor = NordicHorizonThemeColors.Background,
+            surfaceColor = NordicHorizonThemeColors.Surface,
+            onSurfaceColor = NordicHorizonThemeColors.Text,
+            accentColor = NordicHorizonThemeColors.Secondary,
+            surfaceVariantColor = NordicHorizonThemeColors.Border
+        ),
+        ThemeInfo(
+            mode = ThemeMode.ESPRESSO,
+            displayNameRes = R.string.theme_name_espresso,
+            subtitleRes = R.string.theme_desc_espresso,
+            category = ThemeCategory.CUSTOM,
+            primaryColor = EspressoThemeColors.Primary,
+            backgroundColor = EspressoThemeColors.Background,
+            surfaceColor = EspressoThemeColors.Surface,
+            onSurfaceColor = EspressoThemeColors.Text,
+            accentColor = EspressoThemeColors.Secondary,
+            surfaceVariantColor = EspressoThemeColors.Border
+        ),
+        ThemeInfo(
+            mode = ThemeMode.GUNMETAL,
+            displayNameRes = R.string.theme_name_gunmetal,
+            subtitleRes = R.string.theme_desc_gunmetal,
+            category = ThemeCategory.CUSTOM,
+            primaryColor = GunmetalThemeColors.Primary,
+            backgroundColor = GunmetalThemeColors.Background,
+            surfaceColor = GunmetalThemeColors.Surface,
+            onSurfaceColor = GunmetalThemeColors.Text,
+            accentColor = GunmetalThemeColors.Secondary,
+            surfaceVariantColor = GunmetalThemeColors.Border
+        )
+    )
+}
+
+private fun sanitizeHexInput(raw: String): String {
+    val trimmed = raw.trim().uppercase()
+    val withHash = if (trimmed.startsWith("#")) trimmed else "#$trimmed"
+    val filteredBody = withHash.drop(1).filter { it.isDigit() || it in 'A'..'F' }
+    return "#${filteredBody.take(8)}"
+}
+
+private fun parseHexColorToArgbLong(input: String): Long? {
+    val body = input.trim().removePrefix("#")
+    val normalized = when (body.length) {
+        6 -> "FF$body"
+        8 -> body
+        else -> return null
+    }
+    return normalized.toLongOrNull(16)
+}
+
+private fun hsvaToArgbLong(
+    hue: Float,
+    saturation: Float,
+    value: Float,
+    alpha: Float
+): Long {
+    val argbInt = android.graphics.Color.HSVToColor(
+        (alpha * 255f).roundToInt().coerceIn(0, 255),
+        floatArrayOf(hue.coerceIn(0f, 360f), saturation.coerceIn(0f, 1f), value.coerceIn(0f, 1f))
+    )
+    return argbInt.toLong() and 0xFFFFFFFFL
+}
+
+private fun Long.toHexArgbString(): String {
+    return "#%08X".format(this and 0xFFFFFFFFL)
 }

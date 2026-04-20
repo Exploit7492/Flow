@@ -923,6 +923,8 @@ private fun getThemeNameRes(theme: ThemeMode): Int {
         ThemeMode.ESPRESSO -> io.github.aedev.flow.R.string.theme_name_espresso
         ThemeMode.GUNMETAL -> io.github.aedev.flow.R.string.theme_name_gunmetal
         ThemeMode.SYSTEM -> io.github.aedev.flow.R.string.theme_name_system_default
+        ThemeMode.MONOCHROME -> io.github.aedev.flow.R.string.theme_name_monochrome
+        ThemeMode.CUSTOM -> io.github.aedev.flow.R.string.theme_name_custom
     }
 }
 

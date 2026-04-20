@@ -107,7 +107,10 @@ object RssSubscriptionService {
     /** Merge regular and shorts lists with independent caps, sorted by date. */
     private fun buildFeed(regular: List<Video>, shorts: List<Video>): List<Video> {
         val r = regular.sortedByDescending { it.timestamp }.take(MAX_REGULAR_VIDEOS)
-        val s = shorts.sortedByDescending { it.timestamp }.take(MAX_SHORTS)
+        val s = shorts
+            .sortedByDescending { it.timestamp }
+            .distinctBy { it.channelId } 
+            .take(MAX_SHORTS)
         return (r + s).sortedByDescending { it.timestamp }
     }
 

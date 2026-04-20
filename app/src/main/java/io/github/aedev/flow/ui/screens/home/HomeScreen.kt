@@ -1,6 +1,7 @@
 package io.github.aedev.flow.ui.screens.home
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -31,11 +32,11 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.graphics.vector.PathParser
 import androidx.hilt.navigation.compose.hiltViewModel
 import io.github.aedev.flow.data.model.Video
 import io.github.aedev.flow.ui.components.*
 import io.github.aedev.flow.ui.screens.notifications.NotificationViewModel
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import io.github.aedev.flow.R
 
@@ -182,12 +183,7 @@ fun HomeScreen(
                         horizontalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
                         if (showAppLogoIcon) {
-                            Icon(
-                                painter = painterResource(id = R.drawable.ic_flow_logo),
-                                contentDescription = null,
-                                tint = Color.Unspecified,
-                                modifier = Modifier.size(28.dp)
-                            )
+                            FlowHeaderLogoIcon(modifier = Modifier.size(32.dp))
                         }
                         Text(
                             stringResource(R.string.app_name_uppercase),
@@ -554,5 +550,31 @@ private fun ErrorState(
                 Text(androidx.compose.ui.res.stringResource(R.string.retry))
             }
         }
+    }
+}
+
+private const val FLOW_LOGO_BG_PATH = "M21.58 7.16C21.33 6.22 20.59 5.48 19.65 5.23C17.96 4.77 12 4.77 12 4.77C12 4.77 6.04 4.77 4.35 5.23C3.41 5.48 2.67 6.22 2.42 7.16C1.96 8.85 1.96 12.38 1.96 12.38C1.96 12.38 1.96 15.91 2.42 17.6C2.67 18.54 3.41 19.28 4.35 19.53C6.04 19.99 12 19.99 12 19.99C12 19.99 17.96 19.99 19.65 19.53C20.59 19.28 21.33 18.54 21.58 17.6C22.04 15.91 22.04 12.38 22.04 12.38C22.04 12.38 22.04 8.85 21.58 7.16Z"
+private const val FLOW_LOGO_GLYPH_PATH = "M10 7L18 7L17.2 9.5H12.8L12.2 11.5H16L15.2 14H11.5L10.5 17H7.5L10 7Z"
+
+@Composable
+private fun FlowHeaderLogoIcon(modifier: Modifier = Modifier) {
+    val primaryColor = MaterialTheme.colorScheme.primary
+    val onPrimaryColor = MaterialTheme.colorScheme.onPrimary
+
+    val bgPath = remember {
+        PathParser().parsePathString(FLOW_LOGO_BG_PATH).toPath()
+    }
+    val glyphPath = remember {
+        PathParser().parsePathString(FLOW_LOGO_GLYPH_PATH).toPath()
+    }
+
+    Canvas(modifier = modifier) {
+        val sx = size.width / 24f
+        val sy = size.height / 24f
+        drawContext.canvas.save()
+        drawContext.canvas.scale(sx, sy)
+        drawPath(path = bgPath, color = primaryColor)
+        drawPath(path = glyphPath, color = onPrimaryColor)
+        drawContext.canvas.restore()
     }
 }
