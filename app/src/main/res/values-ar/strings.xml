@@ -1192,4 +1192,9 @@
     <string name="player_settings_shorts_background_play_subtitle">استمر في تشغيل الفيديوهات القصيرة عندما يكون التطبيق في الخلفية</string>
     <string name="content_settings_show_app_logo_title">إظهار أيقونة شعار التطبيق</string>
     <string name="content_settings_show_app_logo_subtitle">إعرض أيقونة شعار Flow بجوار اسم التطبيق في الشريط العلوي للشاشة الرئيسية</string>
+    <string name="player_settings_shorts_playback_mode_title">وضع مشغل الفيديوهات القصيرة</string>
+    <string name="player_settings_shorts_playback_mode_loop">Loop (تكرار الفيديو القصير الحالي)</string>
+    <string name="player_settings_shorts_playback_mode_auto_next">التشغيل التلقائي للتالي (الإنتقال إلي الفيديو القصير التالي)</string>
+    <string name="player_settings_shorts_playback_mode_dialog_title">وضع مشغل الفيديوهات القصيرة</string>
+    <string name="player_settings_shorts_playback_mode_dialog_body">اختر كيف يتصرف الفيديو القصير عند ما ينتهي الفيديو القصير الحالي من التشغيل:</string>
 </resources>
