@@ -7,6 +7,7 @@ import android.net.Uri
 import android.os.Build
 import android.os.Environment
 import android.provider.DocumentsContract
+import android.provider.Settings
 import android.util.Log
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -22,8 +23,10 @@ import androidx.compose.material.icons.outlined.Download
 import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material.icons.outlined.FolderOpen
 import androidx.compose.material.icons.outlined.HighQuality
+import androidx.compose.material.icons.outlined.MusicNote
 import androidx.compose.material.icons.outlined.RocketLaunch
 import androidx.compose.material.icons.outlined.Speed
+import androidx.compose.material.icons.outlined.VideoLibrary
 import androidx.compose.material.icons.outlined.Wifi
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -32,11 +35,14 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
 import io.github.aedev.flow.R
 import io.github.aedev.flow.data.local.PlayerPreferences
 import io.github.aedev.flow.data.local.VideoQuality
@@ -62,6 +68,74 @@ fun DownloadSettingsScreen(
     var showThreadDialog by remember { mutableStateOf(false) }
     var showQualityDialog by remember { mutableStateOf(false) }
     var showLocationDialog by remember { mutableStateOf(false) }
+
+    // Permission states (Android 11+ only)
+    var hasAllFilesAccess by remember {
+        mutableStateOf(
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R)
+                Environment.isExternalStorageManager()
+            else true
+        )
+    }
+    var mediaVideoGranted by remember {
+        mutableStateOf(
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU)
+                ContextCompat.checkSelfPermission(context, Manifest.permission.READ_MEDIA_VIDEO) == PackageManager.PERMISSION_GRANTED
+            else true
+        )
+    }
+    var mediaAudioGranted by remember {
+        mutableStateOf(
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU)
+                ContextCompat.checkSelfPermission(context, Manifest.permission.READ_MEDIA_AUDIO) == PackageManager.PERMISSION_GRANTED
+            else true
+        )
+    }
+
+    // Re-check permission states when returning from system settings
+    val lifecycleOwner = LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                    hasAllFilesAccess = Environment.isExternalStorageManager()
+                }
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                    mediaVideoGranted = ContextCompat.checkSelfPermission(
+                        context, Manifest.permission.READ_MEDIA_VIDEO
+                    ) == PackageManager.PERMISSION_GRANTED
+                    mediaAudioGranted = ContextCompat.checkSelfPermission(
+                        context, Manifest.permission.READ_MEDIA_AUDIO
+                    ) == PackageManager.PERMISSION_GRANTED
+                }
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
+
+    // Launcher for MANAGE_EXTERNAL_STORAGE (opens system settings page)
+    val allFilesLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.StartActivityForResult()
+    ) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            hasAllFilesAccess = Environment.isExternalStorageManager()
+        }
+    }
+
+    // Launcher for READ_MEDIA_VIDEO
+    val mediaVideoLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        mediaVideoGranted = granted
+    }
+
+    // Launcher for READ_MEDIA_AUDIO
+    val mediaAudioLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        mediaAudioGranted = granted
+    }
 
     // Runtime permission launcher
     val permissionLauncher = rememberLauncherForActivityResult(
@@ -188,6 +262,78 @@ fun DownloadSettingsScreen(
             contentPadding = PaddingValues(16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
+
+            // ==================== PERMISSIONS (Android 11+) ====================
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                item {
+                    Text(
+                        stringResource(R.string.permissions_header),
+                        style = MaterialTheme.typography.titleMedium,
+                        color = MaterialTheme.colorScheme.primary,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.padding(start = 16.dp)
+                    )
+                }
+
+                item {
+                    SettingsGroup {
+                        SettingsItem(
+                            icon = Icons.Outlined.FolderOpen,
+                            title = stringResource(R.string.files_access_title),
+                            subtitle = if (hasAllFilesAccess)
+                                stringResource(R.string.files_access_granted_subtitle)
+                            else
+                                stringResource(R.string.files_access_denied_subtitle),
+                            onClick = {
+                                if (!hasAllFilesAccess) {
+                                    try {
+                                        val intent = Intent(Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION).apply {
+                                            data = Uri.parse("package:${context.packageName}")
+                                        }
+                                        allFilesLauncher.launch(intent)
+                                    } catch (_: Exception) {
+                                        try {
+                                            allFilesLauncher.launch(
+                                                Intent(Settings.ACTION_MANAGE_ALL_FILES_ACCESS_PERMISSION)
+                                            )
+                                        } catch (_: Exception) {}
+                                    }
+                                }
+                            }
+                        )
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                            HorizontalDivider(Modifier.padding(horizontal = 16.dp))
+                            SettingsItem(
+                                icon = Icons.Outlined.VideoLibrary,
+                                title = stringResource(R.string.media_access_title),
+                                subtitle = if (mediaVideoGranted)
+                                    stringResource(R.string.media_access_granted_subtitle)
+                                else
+                                    stringResource(R.string.media_access_denied_subtitle),
+                                onClick = {
+                                    if (!mediaVideoGranted) {
+                                        mediaVideoLauncher.launch(Manifest.permission.READ_MEDIA_VIDEO)
+                                    }
+                                }
+                            )
+                            HorizontalDivider(Modifier.padding(horizontal = 16.dp))
+                            SettingsItem(
+                                icon = Icons.Outlined.MusicNote,
+                                title = stringResource(R.string.audio_access_title),
+                                subtitle = if (mediaAudioGranted)
+                                    stringResource(R.string.audio_access_granted_subtitle)
+                                else
+                                    stringResource(R.string.audio_access_denied_subtitle),
+                                onClick = {
+                                    if (!mediaAudioGranted) {
+                                        mediaAudioLauncher.launch(Manifest.permission.READ_MEDIA_AUDIO)
+                                    }
+                                }
+                            )
+                        }
+                    }
+                }
+            }
 
             // ==================== STORAGE ====================
             item {

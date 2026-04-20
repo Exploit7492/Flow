@@ -908,6 +908,16 @@
 
     <!-- Download Settings Screen -->
     <string name="download_settings_title">Download Settings</string>
+    <string name="permissions_header">Permissions</string>
+    <string name="files_access_title">Files access</string>
+    <string name="files_access_granted_subtitle">Granted — downloads appear immediately</string>
+    <string name="files_access_denied_subtitle">Not granted — tap to enable for full download listing</string>
+    <string name="media_access_title">Photos &amp; videos access</string>
+    <string name="media_access_granted_subtitle">Granted</string>
+    <string name="media_access_denied_subtitle">Not granted — tap to enable</string>
+    <string name="audio_access_title">Music &amp; audio access</string>
+    <string name="audio_access_granted_subtitle">Granted</string>
+    <string name="audio_access_denied_subtitle">Not granted — tap to enable</string>
     <string name="storage_header">Storage</string>
     <string name="internal_storage_label">Internal Storage</string>
     <string name="free_space_template">%1$s free</string>

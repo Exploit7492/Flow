@@ -37,6 +37,7 @@ import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.util.VelocityTracker
 import androidx.compose.ui.input.pointer.util.addPointerInputChange
@@ -124,6 +125,9 @@ fun EnhancedMusicPlayerScreen(
         animationSpec = tween(1000),
         label = "accentColor"
     )
+    val adaptiveOnSheetColor = remember(animatedSheetColor) {
+        if (animatedSheetColor.luminance() < 0.45f) Color.White else Color(0xFF161616)
+    }
     var showMoreOptions by remember { mutableStateOf(false) }
     var showAudioSettings by remember { mutableStateOf(false) }
     var showInfoDialog by remember { mutableStateOf(false) }
@@ -614,6 +618,7 @@ fun EnhancedMusicPlayerScreen(
             UnifiedPlayerSheet(
                 sheetBackgroundColor = animatedSheetColor,
                 accentColor = animatedAccentColor,
+                onSheetColor = adaptiveOnSheetColor,
                 currentTab = currentTab,
                 onTabSelect = { currentTab = it },
                 isExpanded = queueFraction > 0.5f,

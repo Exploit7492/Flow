@@ -18,6 +18,7 @@ import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -32,11 +33,13 @@ enum class PlayerTab {
 /** Provided by [UnifiedPlayerSheet] so nested content can theme itself. */
 val LocalPlayerAccentColor = compositionLocalOf<Color?> { null }
 val LocalPlayerOnAccentColor = compositionLocalOf<Color?> { null }
+val LocalPlayerOnSheetColor = compositionLocalOf<Color?> { null }
 
 @Composable
 fun UnifiedPlayerSheet(
     sheetBackgroundColor: Color = MaterialTheme.colorScheme.surface,
     accentColor: Color = MaterialTheme.colorScheme.primary,
+    onSheetColor: Color = Color.Unspecified,
     currentTab: PlayerTab,
     onTabSelect: (PlayerTab) -> Unit,
     isExpanded: Boolean,
@@ -64,10 +67,26 @@ fun UnifiedPlayerSheet(
     onRelatedTrackClick: (MusicTrack) -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val resolvedOnSheetColor = remember(sheetBackgroundColor, onSheetColor) {
+        if (onSheetColor != Color.Unspecified) {
+            onSheetColor
+        } else {
+            if (sheetBackgroundColor.luminance() < 0.45f) Color.White else Color(0xFF161616)
+        }
+    }
+
     val onAccentColor = remember(accentColor) {
         val lum = 0.299f * accentColor.red + 0.587f * accentColor.green + 0.114f * accentColor.blue
         if (lum < 0.55f) Color.White else Color(0xFF1A1A1A)
     }
+
+    val adaptiveSheetColors = MaterialTheme.colorScheme.copy(
+        surface = sheetBackgroundColor,
+        onSurface = resolvedOnSheetColor,
+        onSurfaceVariant = resolvedOnSheetColor.copy(alpha = 0.72f),
+        surfaceVariant = resolvedOnSheetColor.copy(alpha = 0.12f),
+        outline = resolvedOnSheetColor.copy(alpha = 0.32f)
+    )
 
     Surface(
         modifier = modifier.fillMaxSize(),
@@ -78,117 +97,120 @@ fun UnifiedPlayerSheet(
     ) {
         CompositionLocalProvider(
             LocalPlayerAccentColor provides accentColor,
-            LocalPlayerOnAccentColor provides onAccentColor
+            LocalPlayerOnAccentColor provides onAccentColor,
+            LocalPlayerOnSheetColor provides resolvedOnSheetColor
         ) {
-        Box(
-            modifier = Modifier.fillMaxSize()
-        ) {
-            Column(modifier = Modifier.fillMaxSize()) {
+            MaterialTheme(colorScheme = adaptiveSheetColors) {
                 Box(
-                    modifier = Modifier
-                        .padding(top = 16.dp, bottom = 4.dp)
-                        .width(36.dp)
-                        .height(4.dp)
-                        .background(
-                            color = accentColor.copy(alpha = 0.55f),
-                            shape = CircleShape
-                        )
-                        .align(Alignment.CenterHorizontally)
-                )
-
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 24.dp)
-                        .height(48.dp)
-                        .background(
-                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.05f),
-                            shape = CircleShape
-                        )
+                    modifier = Modifier.fillMaxSize()
                 ) {
-                    Row(
-                        modifier = Modifier.fillMaxSize(),
-                        horizontalArrangement = Arrangement.SpaceEvenly,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        PlayerTab.values().forEach { tab ->
-                            val isSelected = isExpanded && tab == currentTab
-                            val title = when(tab) {
-                                PlayerTab.UP_NEXT -> stringResource(R.string.up_next)
-                                PlayerTab.LYRICS -> stringResource(R.string.lyrics)
-                                PlayerTab.RELATED -> stringResource(R.string.related)
-                            }
-                            
-                            Box(
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .fillMaxHeight()
-                                    .padding(4.dp)
-                                    .clip(CircleShape)
-                                    .background(
-                                        if (isSelected) accentColor else Color.Transparent
-                                    )
-                                    .clickable(
-                                        interactionSource = remember { MutableInteractionSource() },
-                                        indication = null
-                                    ) { 
-                                        if (!isSelected) {
-                                            onTabSelect(tab)
-                                            onExpand()
-                                        }
-                                    },
-                                contentAlignment = Alignment.Center
+                    Column(modifier = Modifier.fillMaxSize()) {
+                        Box(
+                            modifier = Modifier
+                                .padding(top = 16.dp, bottom = 4.dp)
+                                .width(36.dp)
+                                .height(4.dp)
+                                .background(
+                                    color = accentColor.copy(alpha = 0.55f),
+                                    shape = CircleShape
+                                )
+                                .align(Alignment.CenterHorizontally)
+                        )
+
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 24.dp)
+                                .height(48.dp)
+                                .background(
+                                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f),
+                                    shape = CircleShape
+                                )
+                        ) {
+                            Row(
+                                modifier = Modifier.fillMaxSize(),
+                                horizontalArrangement = Arrangement.SpaceEvenly,
+                                verticalAlignment = Alignment.CenterVertically
                             ) {
-                                Text(
-                                    text = title,
-                                    style = MaterialTheme.typography.labelLarge,
-                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-                                    color = if (isSelected) onAccentColor else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.75f)
+                                PlayerTab.values().forEach { tab ->
+                                    val isSelected = isExpanded && tab == currentTab
+                                    val title = when(tab) {
+                                        PlayerTab.UP_NEXT -> stringResource(R.string.up_next)
+                                        PlayerTab.LYRICS -> stringResource(R.string.lyrics)
+                                        PlayerTab.RELATED -> stringResource(R.string.related)
+                                    }
+
+                                    Box(
+                                        modifier = Modifier
+                                            .weight(1f)
+                                            .fillMaxHeight()
+                                            .padding(4.dp)
+                                            .clip(CircleShape)
+                                            .background(
+                                                if (isSelected) accentColor else Color.Transparent
+                                            )
+                                            .clickable(
+                                                interactionSource = remember { MutableInteractionSource() },
+                                                indication = null
+                                            ) {
+                                                if (!isSelected) {
+                                                    onTabSelect(tab)
+                                                    onExpand()
+                                                }
+                                            },
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Text(
+                                            text = title,
+                                            style = MaterialTheme.typography.labelLarge,
+                                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                                            color = if (isSelected) onAccentColor else MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    }
+                                }
+                            }
+                        }
+
+                        HorizontalDivider(
+                            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
+                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f)
+                        )
+
+                        // Content
+                        Box(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .clip(RoundedCornerShape(topStart = sheetCornerRadius, topEnd = sheetCornerRadius))
+                        ) {
+                            when (currentTab) {
+                                PlayerTab.UP_NEXT -> UpNextContent(
+                                    queue = queue,
+                                    currentIndex = currentIndex,
+                                    playingFrom = playingFrom,
+                                    autoplayEnabled = autoplayEnabled,
+                                    selectedFilter = selectedFilter,
+                                    onTrackClick = onTrackClick,
+                                    onToggleAutoplay = onToggleAutoplay,
+                                    onFilterSelect = onFilterSelect,
+                                    onMoveTrack = onMoveTrack
+                                )
+                                PlayerTab.LYRICS -> LyricsContent(
+                                    lyrics = lyrics,
+                                    syncedLyrics = syncedLyrics,
+                                    currentPosition = currentPosition,
+                                    isLoading = isLyricsLoading,
+                                    onSeekTo = onSeekTo
+                                )
+                                PlayerTab.RELATED -> RelatedContent(
+                                    relatedTracks = relatedTracks,
+                                    isLoading = isRelatedLoading,
+                                    onTrackClick = onRelatedTrackClick
                                 )
                             }
                         }
                     }
                 }
-                
-                HorizontalDivider(
-                    modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
-                    color = accentColor.copy(alpha = 0.12f)
-                )
-                
-                // Content
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .clip(RoundedCornerShape(topStart = sheetCornerRadius, topEnd = sheetCornerRadius))
-                ) {
-                    when (currentTab) {
-                        PlayerTab.UP_NEXT -> UpNextContent(
-                            queue = queue,
-                            currentIndex = currentIndex,
-                            playingFrom = playingFrom,
-                            autoplayEnabled = autoplayEnabled,
-                            selectedFilter = selectedFilter,
-                            onTrackClick = onTrackClick,
-                            onToggleAutoplay = onToggleAutoplay,
-                            onFilterSelect = onFilterSelect,
-                            onMoveTrack = onMoveTrack
-                        )
-                        PlayerTab.LYRICS -> LyricsContent(
-                            lyrics = lyrics,
-                            syncedLyrics = syncedLyrics,
-                            currentPosition = currentPosition,
-                            isLoading = isLyricsLoading,
-                            onSeekTo = onSeekTo
-                        )
-                        PlayerTab.RELATED -> RelatedContent(
-                            relatedTracks = relatedTracks,
-                            isLoading = isRelatedLoading,
-                            onTrackClick = onRelatedTrackClick
-                        )
-                    }
-                }
             }
-        }
         } 
     }
 }

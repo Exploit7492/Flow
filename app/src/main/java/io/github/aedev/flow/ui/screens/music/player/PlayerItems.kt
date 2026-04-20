@@ -181,6 +181,7 @@ fun RelatedTrackItem(
     onClick: () -> Unit
 ) {
     var showMoreOptions by remember { mutableStateOf(false) }
+    val onSheetColor = LocalPlayerOnSheetColor.current ?: MaterialTheme.colorScheme.onSurface
     
     Row(
         modifier = Modifier
@@ -207,14 +208,14 @@ fun RelatedTrackItem(
             Text(
                 text = track.title,
                 style = MaterialTheme.typography.bodyLarge,
-                color = Color.White,
+                color = onSheetColor,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
             Text(
                 text = track.artist,
                 style = MaterialTheme.typography.bodyMedium,
-                color = Color.White.copy(alpha = 0.6f),
+                color = onSheetColor.copy(alpha = 0.62f),
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
@@ -224,7 +225,7 @@ fun RelatedTrackItem(
             Icon(
                 Icons.Outlined.MoreVert,
                 contentDescription = stringResource(R.string.more_options),
-                tint = Color.White.copy(alpha = 0.6f)
+                tint = onSheetColor.copy(alpha = 0.62f)
             )
         }
     }

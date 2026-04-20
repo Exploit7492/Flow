@@ -71,20 +71,23 @@ fun DownloadsScreen(
 
     val context = LocalContext.current
 
-    val storagePermission = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU)
-        Manifest.permission.READ_MEDIA_VIDEO
+    val permissionsToRequest = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU)
+        arrayOf(Manifest.permission.READ_MEDIA_VIDEO, Manifest.permission.READ_MEDIA_AUDIO)
     else
-        Manifest.permission.READ_EXTERNAL_STORAGE
+        arrayOf(Manifest.permission.READ_EXTERNAL_STORAGE)
 
     val permissionLauncher = rememberLauncherForActivityResult(
-        ActivityResultContracts.RequestPermission()
-    ) {  }
+        ActivityResultContracts.RequestMultiplePermissions()
+    ) { results ->
+        if (results.values.any { it }) viewModel.rescan()
+    }
 
     LaunchedEffect(Unit) {
-        val alreadyGranted = ContextCompat.checkSelfPermission(context, storagePermission) ==
-            PackageManager.PERMISSION_GRANTED
-        if (!alreadyGranted) {
-            permissionLauncher.launch(storagePermission)
+        val anyMissing = permissionsToRequest.any { perm ->
+            ContextCompat.checkSelfPermission(context, perm) != PackageManager.PERMISSION_GRANTED
+        }
+        if (anyMissing) {
+            permissionLauncher.launch(permissionsToRequest)
         }
     }
 
