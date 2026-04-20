@@ -252,4 +252,21 @@
     <string name="settings_item_app_icon">Значок програми</string>
     <string name="settings_item_app_icon_subtitle">Налаштуйте значок запускача</string>
     <string name="settings_item_content_prefs">Налаштування контенту</string>
+    <string name="library_music_playlists_label">Музичний плейлист</string>
+    <string name="empty_description">Опис відсутній</string>
+    <string name="like">Лайк</string>
+    <string name="previous">Минулий</string>
+    <string name="play">Грати</string>
+    <string name="next">Наступний</string>
+    <string name="repeat">Повторити</string>
+    <string name="playing_from">Грає з</string>
+    <string name="move_up">Перемістити вгору</string>
+    <string name="move_down">Перемістити вниз</string>
+    <string name="lyrics_not_available">Текст пісні не знайдено</string>
+    <string name="playing">Грає</string>
+    <string name="remove">Прибрати</string>
+    <string name="hz">Гц</string>
+    <string name="filter_discover">Дослідити</string>
+    <string name="filter_popular">Популярне</string>
+    <string name="filter_workout">Тренування</string>
 </resources>
