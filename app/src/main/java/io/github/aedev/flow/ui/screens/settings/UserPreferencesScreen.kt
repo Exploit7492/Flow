@@ -166,8 +166,8 @@ fun UserPreferencesScreen(
                                 icon = Icons.Outlined.TipsAndUpdates,
                                 title = stringResource(R.string.your_interests_title),
                                 description = stringResource(R.string.your_interests_desc),
-                                containerColor = MaterialTheme.colorScheme.primaryContainer,
-                                iconTint = MaterialTheme.colorScheme.onPrimaryContainer
+                                containerColor = MaterialTheme.colorScheme.primary,
+                                iconTint = MaterialTheme.colorScheme.onPrimary
                             )
                         }
                         
@@ -649,12 +649,12 @@ private fun SelectableTopicChip(
     onClick: () -> Unit
 ) {
     val backgroundColor by animateColorAsState(
-        if (isSelected) MaterialTheme.colorScheme.primaryContainer 
+        if (isSelected) MaterialTheme.colorScheme.primary 
         else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
         label = "bg"
     )
     val contentColor by animateColorAsState(
-        if (isSelected) MaterialTheme.colorScheme.onPrimaryContainer 
+        if (isSelected) MaterialTheme.colorScheme.onPrimary
         else MaterialTheme.colorScheme.onSurfaceVariant,
         label = "content"
     )

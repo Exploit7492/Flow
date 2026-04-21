@@ -196,7 +196,7 @@ class SubscriptionsViewModel : ViewModel() {
         // ── Watched IDs (fetched once, shared by both filters) ────────────
         val watchedIds: Set<String> = if (hideWatched) {
             try {
-                watchHistoryDao.getAllWatchedVideoIds().toHashSet()
+                watchHistoryDao.getWatchedVideoIdsAboveThreshold(minPercent = 10f).toHashSet()
             } catch (e: Exception) {
                 Log.w(TAG, "Could not read watch history for watched filter", e)
                 emptySet()

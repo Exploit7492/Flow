@@ -1052,7 +1052,7 @@ private fun ShortsAudioTrackSheet(
                     val isSelected = index == selectedIndex
                     Surface(
                         onClick = { onTrackSelected(index) },
-                        color = if (isSelected) MaterialTheme.colorScheme.primaryContainer else Color.Transparent,
+                        color = if (isSelected) MaterialTheme.colorScheme.primary else Color.Transparent,
                         modifier = Modifier.fillMaxWidth()
                     ) {
                         Row(
@@ -1120,7 +1120,7 @@ private fun ShortsQualitySheet(
                     val formatLabel = stream.format?.name?.uppercase() ?: ""
                     Surface(
                         onClick = { onQualitySelected(stream) },
-                        color = if (isSelected) MaterialTheme.colorScheme.primaryContainer else Color.Transparent,
+                        color = if (isSelected) MaterialTheme.colorScheme.primary else Color.Transparent,
                         modifier = Modifier.fillMaxWidth()
                     ) {
                         Row(

@@ -62,6 +62,19 @@ interface WatchHistoryDao {
     suspend fun getAllWatchedVideoIds(): List<String>
 
     /**
+     * Returns video IDs where the user has watched at least [minPercent]% of the video.
+     * Used for the hide-watched filter so that merely opening a video (0% progress)
+     * does not cause it to be hidden.
+     */
+    @Query("""
+        SELECT videoId FROM watch_history
+        WHERE isMusic = 0
+        AND duration > 0
+        AND (CAST(position AS REAL) / CAST(duration AS REAL)) * 100 >= :minPercent
+    """)
+    suspend fun getWatchedVideoIdsAboveThreshold(minPercent: Float = 10f): List<String>
+
+    /**
      * Returns the most recently watched non-music video **only if that specific video
      * is still in progress**.  By restricting to the maximum timestamp we avoid the
      * "stack fallback" problem where finishing one video causes the previous unfinished

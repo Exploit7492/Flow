@@ -342,7 +342,7 @@ private fun WatchLaterVideoItem(
     var showMenu by remember { mutableStateOf(false) }
 
     val selectionBg = if (isSelected)
-        MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.35f)
+        MaterialTheme.colorScheme.primary.copy(alpha = 0.35f)
     else Color.Transparent
 
     Row(

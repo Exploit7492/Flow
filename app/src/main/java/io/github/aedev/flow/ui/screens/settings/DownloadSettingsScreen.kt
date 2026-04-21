@@ -676,7 +676,7 @@ fun DownloadSettingsScreen(
                                                     text = stringResource(R.string.location_badge_recommended),
                                                     style = MaterialTheme.typography.labelSmall,
                                                     modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
-                                                    color = MaterialTheme.colorScheme.onPrimaryContainer,
+                                                    color = MaterialTheme.colorScheme.onPrimary,
                                                     maxLines = 1
                                                 )
                                             }

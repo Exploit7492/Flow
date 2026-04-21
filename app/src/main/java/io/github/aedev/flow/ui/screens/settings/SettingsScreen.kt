@@ -395,7 +395,7 @@ item {
                         brush = Brush.linearGradient(
                             colors = listOf(
                                 MaterialTheme.colorScheme.primary,
-                                MaterialTheme.colorScheme.primaryContainer
+                                MaterialTheme.colorScheme.primary
                             )
                         )
                     )

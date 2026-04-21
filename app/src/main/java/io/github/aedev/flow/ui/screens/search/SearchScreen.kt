@@ -713,7 +713,7 @@ private fun SearchFiltersBar(
                 .size(36.dp)
                 .clip(CircleShape)
                 .background(
-                    if (isGridMode) MaterialTheme.colorScheme.primaryContainer
+                    if (isGridMode) MaterialTheme.colorScheme.primary
                     else Color.Transparent
                 )
                 .clickable(onClick = onToggleGridMode),
@@ -722,7 +722,7 @@ private fun SearchFiltersBar(
             Icon(
                 if (isGridMode) Icons.Outlined.ViewList else Icons.Outlined.GridView,
                 contentDescription = "Toggle view mode",
-                tint = if (isGridMode) MaterialTheme.colorScheme.onPrimaryContainer
+                tint = if (isGridMode) MaterialTheme.colorScheme.onPrimary
                        else MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.size(20.dp)
             )

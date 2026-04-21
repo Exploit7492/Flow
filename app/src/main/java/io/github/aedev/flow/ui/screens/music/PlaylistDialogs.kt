@@ -123,7 +123,7 @@ fun AddToPlaylistDialog(
                             onCreateNew()
                         },
                         shape = RoundedCornerShape(12.dp),
-                        color = MaterialTheme.colorScheme.primaryContainer,
+                        color = MaterialTheme.colorScheme.primary,
                         modifier = Modifier.fillMaxWidth()
                     ) {
                         Row(

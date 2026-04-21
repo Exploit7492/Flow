@@ -423,8 +423,12 @@ class StreamProxyServer private constructor() {
         val audioExtractor = MediaExtractor()
 
         try {
-            videoExtractor.setDataSource(entry.videoUrl)
-            audioExtractor.setDataSource(entry.audioUrl)
+            val extractorHeaders = mapOf(
+                "User-Agent" to
+                    "Mozilla/5.0 (Linux; Android ${Build.VERSION.RELEASE}) AppleWebKit/537.36"
+            )
+            videoExtractor.setDataSource(entry.videoUrl, extractorHeaders)
+            audioExtractor.setDataSource(entry.audioUrl, extractorHeaders)
 
             val vTrack = (0 until videoExtractor.trackCount).firstOrNull {
                 videoExtractor.getTrackFormat(it).getString(MediaFormat.KEY_MIME)
@@ -525,13 +529,14 @@ class StreamProxyServer private constructor() {
             }
 
         } catch (e: Exception) {
-            Log.e(TAG, "handleMuxedGet error: ${e.message}")
-            try { sendError(output, 502, "Mux Error") } catch (_: Exception) {}
-            // Release extractors only if the mux thread never took ownership
+            Log.e(TAG, "handleMuxedGet failed (${e.javaClass.simpleName}): ${e.message}" +
+                " — falling back to video-only relay")
+            // Release resources that the mux thread never took ownership of
             videoExtractor.release()
             audioExtractor.release()
             try { writeFd.close() } catch (_: Exception) {}
             try { readFd.close() } catch (_: Exception) {}
+            handleGet(output, StreamEntry(entry.videoUrl, "video/mp4"), null)
         }
     }
 

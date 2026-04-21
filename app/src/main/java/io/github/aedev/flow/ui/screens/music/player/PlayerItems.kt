@@ -107,7 +107,7 @@ fun QueueTrackItem(
     Surface(
         modifier = Modifier.fillMaxWidth(),
         color = if (isCurrentlyPlaying)
-            MaterialTheme.colorScheme.primaryContainer
+            MaterialTheme.colorScheme.primary
         else
             MaterialTheme.colorScheme.surface,
         shape = RoundedCornerShape(12.dp),
@@ -140,7 +140,7 @@ fun QueueTrackItem(
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                     color = if (isCurrentlyPlaying)
-                        MaterialTheme.colorScheme.onPrimaryContainer
+                        MaterialTheme.colorScheme.onPrimary
                     else
                         MaterialTheme.colorScheme.onSurface
                 )
@@ -148,7 +148,7 @@ fun QueueTrackItem(
                     text = track.artist,
                     style = MaterialTheme.typography.bodySmall,
                     color = if (isCurrentlyPlaying)
-                        MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f)
+                        MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.7f)
                     else
                         MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 1,

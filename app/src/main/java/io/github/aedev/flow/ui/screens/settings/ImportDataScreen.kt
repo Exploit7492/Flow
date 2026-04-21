@@ -232,8 +232,8 @@ fun ImportDataScreen(
                     icon = Icons.Outlined.FileDownload,
                     title = stringResource(R.string.import_data_title),
                     description = "Migrate your subscriptions and history from other platforms to Flow seamlessly.",
-                    containerColor = MaterialTheme.colorScheme.primaryContainer,
-                    iconTint = MaterialTheme.colorScheme.onPrimaryContainer
+                    containerColor = MaterialTheme.colorScheme.primary,
+                    iconTint = MaterialTheme.colorScheme.onPrimary
                 )
             }
 
@@ -460,7 +460,7 @@ fun ImportOptionCard(
     description: String,
     icon: ImageVector? = null,
     painter: Painter? = null,
-    containerColor: Color = MaterialTheme.colorScheme.primaryContainer,
+    containerColor: Color = MaterialTheme.colorScheme.primary,
     enabled: Boolean = true,
     onClick: () -> Unit
 ) {
@@ -541,7 +541,7 @@ internal fun ImportProgressBanner(state: ImportViewModel.State) {
         Surface(
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(16.dp),
-            color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.25f),
+            color = MaterialTheme.colorScheme.primary.copy(alpha = 0.25f),
             border = androidx.compose.foundation.BorderStroke(
                 1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.25f)
             )

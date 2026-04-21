@@ -187,7 +187,9 @@ class VideoPlayerService : Service() {
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && intent != null) {
             try {
-                startForeground(NOTIFICATION_ID, createPlaceholderNotification())
+                val title = intent.getStringExtra(EXTRA_VIDEO_TITLE)
+                val channel = intent.getStringExtra(EXTRA_VIDEO_CHANNEL)
+                startForeground(NOTIFICATION_ID, createPlaceholderNotification(title, channel))
             } catch (e: Exception) {
                 Log.w("VideoPlayerService", "Immediate foreground start failed", e)
             }
@@ -503,10 +505,11 @@ class VideoPlayerService : Service() {
         startForeground(NOTIFICATION_ID, notification)
     }
 
-    private fun createPlaceholderNotification(): Notification {
+    private fun createPlaceholderNotification(title: String? = null, channel: String? = null): Notification {
         return NotificationCompat.Builder(this, CHANNEL_ID)
-            .setContentTitle("Flow Player")
-            .setContentText("Loading...")
+            .setContentTitle(title?.takeIf { it.isNotEmpty() } ?: "Flow Player")
+            .setContentText(channel?.takeIf { it.isNotEmpty() } ?: "Preparing playback...")
+            .setSubText("Flow Player")
             .setSmallIcon(R.drawable.ic_play)
             .setPriority(NotificationCompat.PRIORITY_LOW)
             .setOngoing(true)

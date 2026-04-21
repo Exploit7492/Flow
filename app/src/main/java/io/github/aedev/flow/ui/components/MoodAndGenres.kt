@@ -83,14 +83,13 @@ fun MoodChip(
     isSelected: Boolean = false
 ) {
     val backgroundColor = if (isSelected) {
-        MaterialTheme.colorScheme.primaryContainer
+        MaterialTheme.colorScheme.primary
     } else {
-        // FIXED: Using surfaceVariant instead of surfaceContainerHigh
         MaterialTheme.colorScheme.surfaceVariant
     }
 
     val contentColor = if (isSelected) {
-        MaterialTheme.colorScheme.onPrimaryContainer
+        MaterialTheme.colorScheme.onPrimary
     } else {
         MaterialTheme.colorScheme.onSurfaceVariant
     }

@@ -88,6 +88,8 @@ fun DownloadsScreen(
         }
         if (anyMissing) {
             permissionLauncher.launch(permissionsToRequest)
+        } else {
+            viewModel.rescan()
         }
     }
 
@@ -880,9 +882,9 @@ private fun EmptyDownloadsState(
                     .height(48.dp),
                 colors = ButtonDefaults.filledTonalButtonColors(
                     containerColor = MaterialTheme.colorScheme
-                        .primaryContainer,
+                        .primary,
                     contentColor = MaterialTheme.colorScheme
-                        .onPrimaryContainer
+                        .onPrimary
                 )
             ) {
                 Text(

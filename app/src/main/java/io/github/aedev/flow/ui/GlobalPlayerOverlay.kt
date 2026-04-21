@@ -827,7 +827,7 @@ fun GlobalPlayerOverlay(
                             ?.filter { it.height > 0 }
                             ?.maxByOrNull { it.height }
 
-                        if (bestMuxed != null && bestMuxed.height >= 480) {
+                        if (bestMuxed != null) {
                             streamUrl = bestMuxed.content ?: bestMuxed.url ?: ""
                         } else {
                             val bestVideoOnly = (streamInfo.videoOnlyStreams ?: emptyList())
@@ -835,15 +835,12 @@ fun GlobalPlayerOverlay(
                                 .filter { it.format?.mimeType?.contains("mp4") == true }
                                 .maxByOrNull { it.height }
 
-                            if (bestVideoOnly != null &&
-                                bestVideoOnly.height > (bestMuxed?.height ?: 0)) {
+                            if (bestVideoOnly != null) {
                                 streamUrl = bestVideoOnly.content ?: bestVideoOnly.url ?: ""
                                 castAudioUrl = streamInfo.audioStreams
                                     ?.filter { it.format?.mimeType?.contains("mp4") == true }
                                     ?.maxByOrNull { it.bitrate }
                                     ?.url
-                            } else if (bestMuxed != null) {
-                                streamUrl = bestMuxed.content ?: bestMuxed.url ?: ""
                             }
                         }
                     }

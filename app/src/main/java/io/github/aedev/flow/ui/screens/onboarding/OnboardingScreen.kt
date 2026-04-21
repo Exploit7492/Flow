@@ -699,8 +699,8 @@ private fun ChannelResultRow(
                     modifier = Modifier.height(36.dp),
                     contentPadding = PaddingValues(horizontal = 12.dp),
                     colors = ButtonDefaults.filledTonalButtonColors(
-                        containerColor = MaterialTheme.colorScheme.primaryContainer,
-                        contentColor = MaterialTheme.colorScheme.onPrimaryContainer
+                        containerColor = MaterialTheme.colorScheme.primary,
+                        contentColor = MaterialTheme.colorScheme.onPrimary
                     )
                 ) {
                     Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(14.dp))
@@ -1013,13 +1013,13 @@ private fun TopicChip(
     onClick: () -> Unit
 ) {
     val containerColor by animateColorAsState(
-        targetValue = if (isSelected) MaterialTheme.colorScheme.primaryContainer
+        targetValue = if (isSelected) MaterialTheme.colorScheme.primary
         else MaterialTheme.colorScheme.surfaceContainerHighest,
         animationSpec = tween(180),
         label = "chip_bg"
     )
     val contentColor by animateColorAsState(
-        targetValue = if (isSelected) MaterialTheme.colorScheme.onPrimaryContainer
+        targetValue = if (isSelected) MaterialTheme.colorScheme.onPrimary
         else MaterialTheme.colorScheme.onSurfaceVariant,
         animationSpec = tween(180),
         label = "chip_fg"

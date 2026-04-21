@@ -99,7 +99,7 @@ fun UpdateDialog(
                         modifier = Modifier
                             .size(72.dp)
                             .clip(RoundedCornerShape(20.dp))
-                            .background(MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.2f))
+                            .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.2f))
                     ) {
                         Icon(
                             painter = painterResource(id = R.drawable.ic_notification_logo),

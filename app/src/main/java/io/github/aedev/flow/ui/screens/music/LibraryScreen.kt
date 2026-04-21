@@ -162,7 +162,7 @@ private fun PlaylistsTab(
             Surface(
                 onClick = onCreatePlaylist,
                 shape = RoundedCornerShape(16.dp),
-                color = MaterialTheme.colorScheme.primaryContainer,
+                color = MaterialTheme.colorScheme.primary,
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Row(
@@ -188,12 +188,12 @@ private fun PlaylistsTab(
                             stringResource(R.string.create_new_playlist),
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onPrimaryContainer
+                            color = MaterialTheme.colorScheme.onPrimary
                         )
                         Text(
                             stringResource(R.string.create_playlist_subtitle),
                             style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f)
+                            color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.7f)
                         )
                     }
                 }
@@ -527,7 +527,7 @@ private fun DownloadStatsCard(downloads: List<io.github.aedev.flow.data.music.Do
     
     Surface(
         shape = RoundedCornerShape(16.dp),
-        color = MaterialTheme.colorScheme.primaryContainer,
+        color = MaterialTheme.colorScheme.primary,
         modifier = Modifier.fillMaxWidth()
     ) {
         Row(
@@ -539,12 +539,12 @@ private fun DownloadStatsCard(downloads: List<io.github.aedev.flow.data.music.Do
                     "${downloads.size}",
                     style = MaterialTheme.typography.headlineMedium,
                     fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onPrimaryContainer
+                    color = MaterialTheme.colorScheme.onPrimary
                 )
                 Text(
                     stringResource(R.string.downloads_title),
                     style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f)
+                    color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.7f)
                 )
             }
             
@@ -553,12 +553,12 @@ private fun DownloadStatsCard(downloads: List<io.github.aedev.flow.data.music.Do
                     formatFileSize(totalSize),
                     style = MaterialTheme.typography.headlineMedium,
                     fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onPrimaryContainer
+                    color = MaterialTheme.colorScheme.onPrimary
                 )
                 Text(
                     stringResource(R.string.total_size),
                     style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f)
+                    color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.7f)
                 )
             }
         }

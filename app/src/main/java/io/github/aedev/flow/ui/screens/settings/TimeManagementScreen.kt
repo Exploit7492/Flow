@@ -268,7 +268,7 @@ private fun StatsHeroCard(uiState: TimeManagementState) {
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(24.dp),
         colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f)
+            containerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.3f)
         )
     ) {
         Column(
@@ -414,7 +414,7 @@ private fun WeeklyChartCard(data: List<DailyStat>) {
                 val maxVal = data.maxOf { it.durationH }.coerceAtLeast(0.5f)
                 val yMax = maxVal * 1.2f
                 val primaryColor = MaterialTheme.colorScheme.primary
-                val containerColor = MaterialTheme.colorScheme.primaryContainer
+                val containerColor = MaterialTheme.colorScheme.primary
                 val gridColor = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f)
                 val textColor = MaterialTheme.colorScheme.onSurfaceVariant
 
@@ -779,7 +779,7 @@ private fun TimeSlotRow(
         )
 
         Surface(
-            color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f),
+            color = MaterialTheme.colorScheme.primary.copy(alpha = 0.5f),
             shape = RoundedCornerShape(10.dp),
             onClick = onClick
         ) {
@@ -806,7 +806,7 @@ private fun BedtimeScheduleIndicator(
     endMinute: Int
 ) {
     val primaryColor = MaterialTheme.colorScheme.primary
-    val containerColor = MaterialTheme.colorScheme.primaryContainer
+    val containerColor = MaterialTheme.colorScheme.primary
 
     val startTotal = startHour * 60 + startMinute
     val endTotal = endHour * 60 + endMinute
@@ -881,7 +881,7 @@ private fun FrequencySelector(
         }
 
         Surface(
-            color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f),
+            color = MaterialTheme.colorScheme.primary.copy(alpha = 0.5f),
             shape = RoundedCornerShape(10.dp),
             onClick = onClick
         ) {
@@ -984,7 +984,7 @@ private fun FrequencyPickerDialog(
                     Surface(
                         modifier = Modifier.fillMaxWidth(),
                         color = if (isSelected)
-                            MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f)
+                            MaterialTheme.colorScheme.primary.copy(alpha = 0.5f)
                         else Color.Transparent,
                         shape = RoundedCornerShape(12.dp),
                         onClick = { onConfirm(minutes) }
