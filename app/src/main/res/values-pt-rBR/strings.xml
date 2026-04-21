@@ -65,4 +65,20 @@
     <string name="title_label">Título</string>
     <string name="artist_label">Artista</string>
     <string name="album_label">Álbum</string>
+    <string name="library_music_playlists_subtitle">Suas coleções de música</string>
+    <string name="clear_all">Limpar Tudo</string>
+    <string name="empty_watch_history">Sem Histórico de Exibição</string>
+    <string name="liked">"Gostei "</string>
+    <string name="related_videos">Vídeos Relacionados</string>
+    <string name="quality_auto">Automático</string>
+    <string name="quality_auto_template">Automático (%1$dp)</string>
+    <string name="failed_to_load_channel">Não foi possível carregar o canal</string>
+    <string name="stats">Status</string>
+    <string name="library_playlists_label">Playlists</string>
+    <string name="downloaded">Baixado(s)</string>
+    <string name="up_next">A SEGUIR</string>
+    <string name="related">RELACIONADOS</string>
+    <string name="shuffle">Aleatório</string>
+    <string name="play">Reproduzir</string>
+    <string name="autoplay">Autoplay</string>
 </resources>
