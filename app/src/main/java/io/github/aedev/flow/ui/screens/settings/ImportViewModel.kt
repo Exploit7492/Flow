@@ -85,7 +85,7 @@ class ImportViewModel @Inject constructor(
 
     /**
      * Watch-history import processes the file in 64 KB chunks so individual item progress
-     * is not available. We show an indeterminate spinner until it completes.
+     * is not available.
      */
     fun importYouTubeWatchHistory(uri: Uri) {
         if (isRunning) return

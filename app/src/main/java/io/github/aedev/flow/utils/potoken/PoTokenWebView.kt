@@ -48,7 +48,6 @@ class PoTokenWebView private constructor(
     //region Initialization
     init {
         val webViewSettings = webView.settings
-        //noinspection SetJavaScriptEnabled we want to use JavaScript!
         webViewSettings.javaScriptEnabled = true
         webViewSettings.userAgentString = USER_AGENT
         webViewSettings.blockNetworkLoads = true 
@@ -159,7 +158,6 @@ class PoTokenWebView private constructor(
                 expirationInstant = Instant.now().plusSeconds(expirationTimeInSeconds).minus(10, ChronoUnit.MINUTES)
 
                 // Store integrityToken and create the minter callback ONCE
-                // NOTE: createPoTokenMinter is now async, so we use .then()
                 Log.d(TAG, "Evaluating createPoTokenMinter JavaScript...")
                 webView.evaluateJavascript(
                     """try {
@@ -201,7 +199,6 @@ class PoTokenWebView private constructor(
             suspendCancellableCoroutine { cont ->
                 Log.d(TAG, "generatePoToken() called with identifier $identifier")
                 addPoTokenEmitter(identifier, cont)
-                // NOTE: obtainPoToken is now async, so we use .then()
                 webView.evaluateJavascript(
                     """try {
                         identifier = "$identifier"

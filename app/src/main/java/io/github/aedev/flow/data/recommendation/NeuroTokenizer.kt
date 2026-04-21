@@ -1139,7 +1139,7 @@ internal class NeuroTokenizer {
             }
         }
 
-        // Only tag if we have clear signal: best > 0 and best clearly wins over second
+        // Only tag if there's clear signal: best > 0 and best clearly wins over second
         return if (bestDomain != null &&
             bestScore >= 1 &&
             (secondBestScore == 0 || bestScore >= secondBestScore * 1.5 + 1)

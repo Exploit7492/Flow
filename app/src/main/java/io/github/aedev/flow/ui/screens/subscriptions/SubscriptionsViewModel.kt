@@ -373,7 +373,7 @@ class SubscriptionsViewModel : ViewModel() {
     }
 
     /**
-     * Get a single subscription snapshot (suspend) - useful before removing so we can undo
+     * Get a single subscription snapshot (suspend)
      */
     suspend fun getSubscriptionOnce(channelId: String): ChannelSubscription? {
         return subscriptionRepository.getSubscription(channelId).firstOrNull()

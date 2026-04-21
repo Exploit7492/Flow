@@ -50,8 +50,6 @@ fun BufferSettingsScreen(
             tempPlaybackBuffer = currentBufferProfile.playbackBuffer.toFloat()
             tempRebuffer = currentBufferProfile.rebufferBuffer.toFloat()
         } else {
-            // Only update from prefs if we are already in custom logic, usually to sync initial state
-            // But we want to avoid overwriting user dragging, so assume prefs source of truth on load
             if (minBufferMs.toFloat() != tempMinBuffer) tempMinBuffer = minBufferMs.toFloat()
             if (maxBufferMs.toFloat() != tempMaxBuffer) tempMaxBuffer = maxBufferMs.toFloat()
             if (bufferForPlaybackMs.toFloat() != tempPlaybackBuffer) tempPlaybackBuffer = bufferForPlaybackMs.toFloat()

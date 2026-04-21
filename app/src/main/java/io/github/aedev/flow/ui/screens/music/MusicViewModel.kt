@@ -133,14 +133,11 @@ class MusicViewModel @Inject constructor(
                 processHomeSections(homeSections)
                 _uiState.update { it.copy(homeContinuation = homeContinuation) }
             } else if (_uiState.value.forYouTracks.isEmpty() && _uiState.value.dynamicSections.isEmpty()) {
-                 // Fallback if we have nothing (Cache empty + Network failed)
-                 // Try to get recommendations via fallback (internal engine)
                  val recs = musicRecommendationAlgorithm.getRecommendations(20)
                  if (recs.isNotEmpty()) {
                      _uiState.update { it.copy(forYouTracks = recs) }
                  }
             }
-            // Ensure loading is off if we have *something*
             if (_uiState.value.trendingSongs.isNotEmpty() || homeSections.isNotEmpty()) {
                 _uiState.update { it.copy(isLoading = false) }
             }

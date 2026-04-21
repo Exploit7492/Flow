@@ -327,7 +327,6 @@ fun FullscreenEffect(
             } else {
                 // Return to unspecified mode when exiting fullscreen
                 act.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
-                // We don't clear KEEP_SCREEN_ON here because the generic effect handles it based on playing state
                 
                 // Reset screen brightness to default when exiting fullscreen
                 val layoutParams = act.window.attributes
@@ -634,8 +633,6 @@ fun OrientationListenerEffect(
     val currentEnter by rememberUpdatedState(onEnterFullscreen)
     val currentExit by rememberUpdatedState(onExitFullscreen)
 
-        // We still need to keep this disposable effect to detect physical orientation changes when auto rotate is ON.
-        // BUT we should also just rely on Configuration changes inside GlobalPlayerOverlay for a more robust fallback.
     DisposableEffect(context) {
         val listener = object : OrientationEventListener(context) {
             override fun onOrientationChanged(orientation: Int) {

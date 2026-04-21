@@ -15,9 +15,7 @@ fun TrackInfoDialog(
     track: MusicTrack,
     onDismiss: () -> Unit
 ) {
-    // Media3 Player interface doesn't expose audioFormat directly nicely like ExoPlayer did
-    // We can iterate tracks to find audio format if needed, or just show null/unknown for now.
-    
+
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text(stringResource(R.string.track_details)) },

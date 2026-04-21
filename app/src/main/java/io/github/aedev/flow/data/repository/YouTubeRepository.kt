@@ -362,7 +362,6 @@ class YouTubeRepository @Inject constructor(
                 else -> null
             }
 
-            // If we have a channelId (starts with UC) we can use the uploads playlist which is more reliable
             if (channelId != null && channelId.startsWith("UC")) {
                 val uploadsId = "UU" + channelId.removePrefix("UC")
                 val playlistUrl = "https://www.youtube.com/playlist?list=$uploadsId"

@@ -13,8 +13,6 @@ class SubscriptionRepositoryTest {
 
     @Before
     fun setup() {
-        // We mock the context but since we only test internal logic via reflection, 
-        // it shouldn't hit the DataStore extension property if we avoid calling live methods.
         repository = SubscriptionRepository.getInstance(mockk(relaxed = true))
     }
 

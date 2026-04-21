@@ -674,7 +674,7 @@ class VideoDownloadManager @Inject constructor(
 
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
                 scanViaMediaStore(videoExtensions, audioExtensions)
-            }
+            } else Unit
         } catch (e: Exception) {
             Log.e(TAG, "scanAndRecoverDownloads failed", e)
         }

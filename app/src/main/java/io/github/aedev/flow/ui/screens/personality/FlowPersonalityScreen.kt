@@ -13,8 +13,10 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -24,6 +26,7 @@ import androidx.compose.material.icons.filled.*
 import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
@@ -37,12 +40,13 @@ import io.github.aedev.flow.R
 import androidx.compose.ui.graphics.*
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.drawText
+import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
@@ -53,8 +57,6 @@ import io.github.aedev.flow.data.recommendation.UserBrain
 import io.github.aedev.flow.data.recommendation.FlowPersona
 import io.github.aedev.flow.data.recommendation.ContentVector
 import io.github.aedev.flow.data.recommendation.TimeBucket
-import kotlinx.coroutines.async
-import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
@@ -65,7 +67,7 @@ import kotlin.math.*
 import kotlin.random.Random
 
 // ============================================================================
-// 🧠 FLOW NEURO CONTROL CENTER - Premium Redesign
+// 🧠 FLOW NEURO CONTROL CENTER
 // ============================================================================
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -81,37 +83,6 @@ fun FlowPersonalityScreen(
     var isLoaded by remember { mutableStateOf(false) }
 
     val cachedChannelNames = remember { androidx.compose.runtime.mutableStateMapOf<String, String>() }
-
-    LaunchedEffect(userBrain) {
-        val brain = userBrain ?: return@LaunchedEffect
-        delay(800)
-        val allChannels = (brain.blockedChannels + brain.channelScores.keys).distinct()
-        val toFetch = allChannels.filter { !cachedChannelNames.containsKey(it) }
-        
-        if (toFetch.isNotEmpty()) {
-            val repository = io.github.aedev.flow.data.repository.YouTubeRepository.getInstance()
-            kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
-                kotlinx.coroutines.coroutineScope {
-                    toFetch.chunked(15).forEach { chunk ->
-                        chunk.map { channelId ->
-                            async {
-                                try {
-                                    val info = repository.getChannelInfo(channelId)
-                                    if (info?.name != null) {
-                                        channelId to info.name!!
-                                    } else null
-                                } catch (e: Exception) {
-                                    null
-                                }
-                            }
-                        }.awaitAll().filterNotNull().forEach { (id, name) ->
-                            cachedChannelNames[id] = name
-                        }
-                    }
-                }
-            }
-        }
-    }
 
     // SAF launcher: create a file to export brain JSON into
     val exportLauncher = rememberLauncherForActivityResult(
@@ -214,115 +185,149 @@ fun FlowPersonalityScreen(
                     }
                 }
             } else {
+                val brain = userBrain!!
                 AnimatedVisibility(
                     visible = isLoaded,
                     enter = fadeIn() + slideInVertically { it / 3 }
                 ) {
-                    Column(
+                    LazyColumn(
+                        state = rememberLazyListState(),
                         modifier = Modifier
                             .fillMaxSize()
                             .padding(padding)
-                            .verticalScroll(rememberScrollState())
                             .padding(horizontal = 16.dp),
-                        verticalArrangement = Arrangement.spacedBy(20.dp)
+                        verticalArrangement = Arrangement.spacedBy(20.dp),
+                        contentPadding = PaddingValues(top = 8.dp, bottom = 40.dp)
                     ) {
-                        Spacer(Modifier.height(8.dp))
-
                         // 1. PERSONA HERO CARD
-                        PersonaHeroCard(brain = userBrain!!, persona = persona)
+                        item(key = "persona") {
+                            PersonaHeroCard(brain = brain, persona = persona)
+                        }
 
                         // 2. QUICK STATS ROW
-                        QuickStatsRow(brain = userBrain!!)
+                        item(key = "stats") {
+                            QuickStatsRow(brain = brain)
+                        }
 
                         // 3. NEURAL BUBBLE CLOUD (Animated Canvas)
-                        SectionHeader(
-                            icon = Icons.Outlined.AutoAwesome,
-                            title = stringResource(R.string.interests_tab),
-                            subtitle = stringResource(R.string.neural_interest_map_subtitle)
-                        )
-                        NeuralBubbleCloud(brain = userBrain!!)
+                        item(key = "bubbles_header") {
+                            SectionHeader(
+                                icon = Icons.Outlined.AutoAwesome,
+                                title = stringResource(R.string.interests_tab),
+                                subtitle = stringResource(R.string.neural_interest_map_subtitle)
+                            )
+                        }
+                        item(key = "bubbles") {
+                            NeuralBubbleCloud(brain = brain)
+                        }
 
                         // 4. SPIDER/RADAR CHART
-                        SectionHeader(
-                            icon = Icons.Outlined.TrackChanges,
-                            title = stringResource(R.string.cognitive_fingerprint),
-                            subtitle = stringResource(R.string.content_dna_subtitle)
-                        )
-                        AdvancedRadarChart(brain = userBrain!!)
+                        item(key = "radar_header") {
+                            SectionHeader(
+                                icon = Icons.Outlined.TrackChanges,
+                                title = stringResource(R.string.cognitive_fingerprint),
+                                subtitle = stringResource(R.string.content_dna_subtitle)
+                            )
+                        }
+                        item(key = "radar") {
+                            AdvancedRadarChart(brain = brain)
+                        }
 
                         // 5. TOPIC STRENGTH BARS
-                        SectionHeader(
-                            icon = Icons.Outlined.Equalizer,
-                            title = stringResource(R.string.topic_weights),
-                            subtitle = stringResource(R.string.topic_weights_subtitle)
-                        )
-                        TopicStrengthChart(brain = userBrain!!)
+                        item(key = "topics_header") {
+                            SectionHeader(
+                                icon = Icons.Outlined.Equalizer,
+                                title = stringResource(R.string.topic_weights),
+                                subtitle = stringResource(R.string.topic_weights_subtitle)
+                            )
+                        }
+                        item(key = "topics") {
+                            TopicStrengthChart(brain = brain)
+                        }
 
                         // 6. TIME CONTEXT CARDS
-                        SectionHeader(
-                            icon = Icons.Outlined.Schedule,
-                            title = stringResource(R.string.temporal_patterns),
-                            subtitle = stringResource(R.string.temporal_patterns_subtitle)
-                        )
-                        TimeContextCards(brain = userBrain!!)
+                        item(key = "time_header") {
+                            SectionHeader(
+                                icon = Icons.Outlined.Schedule,
+                                title = stringResource(R.string.temporal_patterns),
+                                subtitle = stringResource(R.string.temporal_patterns_subtitle)
+                            )
+                        }
+                        item(key = "time") {
+                            TimeContextCards(brain = brain)
+                        }
 
                         // 7. CHANNEL AFFINITY
-                        SectionHeader(
-                            icon = Icons.Outlined.Subscriptions,
-                            title = stringResource(R.string.channel_memory),
-                            subtitle = stringResource(R.string.channel_memory_subtitle)
-                        )
-                        ChannelAffinitySection(brain = userBrain!!, channelNames = cachedChannelNames)
+                        item(key = "channels_header") {
+                            SectionHeader(
+                                icon = Icons.Outlined.Subscriptions,
+                                title = stringResource(R.string.channel_memory),
+                                subtitle = stringResource(R.string.channel_memory_subtitle)
+                            )
+                        }
+                        item(key = "channels") {
+                            ChannelAffinitySection(brain = brain, channelNames = cachedChannelNames)
+                        }
 
                         // 8. ALGORITHM TRANSPARENCY
-                        SectionHeader(
-                            icon = Icons.Outlined.Code,
-                            title = stringResource(R.string.algorithm_insights),
-                            subtitle = stringResource(R.string.algorithm_insights_subtitle)
-                        )
-                        AlgorithmInsightsCard(brain = userBrain!!)
-                        
-                        // 8.5 ENGAGEMENT INDICATOR (Boredom Meter)
-                        EngagementIndicator(brain = userBrain!!)
-                        
-                        // 9. BLOCKED CONTENT (Filters)
-                        if (userBrain!!.blockedTopics.isNotEmpty() || userBrain!!.blockedChannels.isNotEmpty()) {
+                        item(key = "algo_header") {
                             SectionHeader(
-                                icon = Icons.Outlined.Block,
-                                title = stringResource(R.string.filters_title),
-                                subtitle = stringResource(R.string.blocked_topics_channels_subtitle)
+                                icon = Icons.Outlined.Code,
+                                title = stringResource(R.string.algorithm_insights),
+                                subtitle = stringResource(R.string.algorithm_insights_subtitle)
                             )
-                            BlockedContentSection(
-                                brain = userBrain!!,
-                                channelNames = cachedChannelNames,
-                                onUnblockTopic = { topic ->
-                                    scope.launch {
-                                        FlowNeuroEngine.removeBlockedTopic(context, topic)
-                                        userBrain = FlowNeuroEngine.getBrainSnapshot()
+                        }
+                        item(key = "algo") {
+                            AlgorithmInsightsCard(brain = brain)
+                        }
+
+                        // 8.5 ENGAGEMENT INDICATOR (Boredom Meter)
+                        item(key = "engagement") {
+                            EngagementIndicator(brain = brain)
+                        }
+
+                        // 9. BLOCKED CONTENT (Filters)
+                        if (brain.blockedTopics.isNotEmpty() || brain.blockedChannels.isNotEmpty()) {
+                            item(key = "blocked_header") {
+                                SectionHeader(
+                                    icon = Icons.Outlined.Block,
+                                    title = stringResource(R.string.filters_title),
+                                    subtitle = stringResource(R.string.blocked_topics_channels_subtitle)
+                                )
+                            }
+                            item(key = "blocked") {
+                                BlockedContentSection(
+                                    brain = brain,
+                                    channelNames = cachedChannelNames,
+                                    onUnblockTopic = { topic ->
+                                        scope.launch {
+                                            FlowNeuroEngine.removeBlockedTopic(context, topic)
+                                            userBrain = FlowNeuroEngine.getBrainSnapshot()
+                                        }
+                                    },
+                                    onUnblockChannel = { channelId ->
+                                        scope.launch {
+                                            FlowNeuroEngine.unblockChannel(context, channelId)
+                                            userBrain = FlowNeuroEngine.getBrainSnapshot()
+                                        }
                                     }
-                                },
-                                onUnblockChannel = { channelId ->
-                                    scope.launch {
-                                        FlowNeuroEngine.unblockChannel(context, channelId)
-                                        userBrain = FlowNeuroEngine.getBrainSnapshot()
-                                    }
-                                }
-                            )
+                                )
+                            }
                         }
 
                         // 10. MAINTENANCE
-                        MaintenanceSection(
-                            onReset = { showResetDialog = true },
-                            onExport = {
-                                val timestamp = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(Date())
-                                exportLauncher.launch("flow_brain_$timestamp.json")
-                            },
-                            onImport = {
-                                importLauncher.launch(arrayOf("application/json", "text/plain"))
-                            }
-                        )
-
-                        Spacer(Modifier.height(40.dp))
+                        item(key = "maintenance") {
+                            MaintenanceSection(
+                                onReset = { showResetDialog = true },
+                                onExport = {
+                                    val timestamp = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(Date())
+                                    exportLauncher.launch("flow_brain_$timestamp.json")
+                                },
+                                onImport = {
+                                    importLauncher.launch(arrayOf("application/json", "text/plain"))
+                                }
+                            )
+                        }
                     }
                 }
             }
@@ -430,16 +435,6 @@ private fun SectionHeader(
 private fun NeuralNetworkBackground() {
     val infiniteTransition = rememberInfiniteTransition(label = "neural")
     
-    val rotation by infiniteTransition.animateFloat(
-        initialValue = 0f,
-        targetValue = 360f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(60000, easing = LinearEasing),
-            repeatMode = RepeatMode.Restart
-        ),
-        label = "rotation"
-    )
-    
     val pulse by infiniteTransition.animateFloat(
         initialValue = 0.3f,
         targetValue = 0.6f,
@@ -458,30 +453,27 @@ private fun NeuralNetworkBackground() {
             .fillMaxSize()
             .alpha(0.15f)
     ) {
-        val center = Offset(size.width * 0.7f, size.height * 0.2f)
-        
-        rotate(rotation, center) {
-            // Gradient orbs
-            drawCircle(
-                brush = Brush.radialGradient(
-                    colors = listOf(primaryColor.copy(alpha = pulse), Color.Transparent),
-                    center = center,
-                    radius = size.width * 0.5f
-                ),
-                center = center,
+        val center1 = Offset(size.width * 0.7f, size.height * 0.2f)
+
+        drawCircle(
+            brush = Brush.radialGradient(
+                colors = listOf(primaryColor.copy(alpha = pulse), Color.Transparent),
+                center = center1,
                 radius = size.width * 0.5f
-            )
-            
-            drawCircle(
-                brush = Brush.radialGradient(
-                    colors = listOf(tertiaryColor.copy(alpha = pulse * 0.7f), Color.Transparent),
-                    center = Offset(size.width * 0.2f, size.height * 0.8f),
-                    radius = size.width * 0.4f
-                ),
+            ),
+            center = center1,
+            radius = size.width * 0.5f
+        )
+
+        drawCircle(
+            brush = Brush.radialGradient(
+                colors = listOf(tertiaryColor.copy(alpha = pulse * 0.7f), Color.Transparent),
                 center = Offset(size.width * 0.2f, size.height * 0.8f),
                 radius = size.width * 0.4f
-            )
-        }
+            ),
+            center = Offset(size.width * 0.2f, size.height * 0.8f),
+            radius = size.width * 0.4f
+        )
     }
 }
 
@@ -689,64 +681,54 @@ private fun QuickStatCard(
 // 4. NEURAL BUBBLE CLOUD (Animated Canvas with Physics)
 // ============================================================================
 
-private class BubbleState(
+private data class BubbleData(
     val topic: String,
     val score: Double,
-    x: Float,
-    y: Float,
     val radius: Float,
     val color: Color
-) {
-    var x by mutableStateOf(x)
-    var y by mutableStateOf(y)
-    var velocityX: Float = 0f
-    var velocityY: Float = 0f
-}
+)
 
 @Composable
 private fun NeuralBubbleCloud(brain: UserBrain) {
     val topics = brain.globalVector.topics.entries
         .sortedByDescending { it.value }
         .take(12)
-    
+
     if (topics.isEmpty()) {
         EmptyStateCard(stringResource(R.string.empty_bubble_cloud_message))
         return
     }
-    
+
     val primaryColor = MaterialTheme.colorScheme.primary
     val secondaryColor = MaterialTheme.colorScheme.secondary
     val tertiaryColor = MaterialTheme.colorScheme.tertiary
     val density = LocalDensity.current
-    
-    // Initialize bubbles with random positions
-    // Radius is stored in pixels so Canvas drawing and physics stay in the same
-    // coordinate space. We convert the dp values to px here using the current
-    // display density, which ensures correct physical sizes on every resolution
-    // (including 1440p high-density displays).
-    val bubbles = remember(topics, density) {
+
+    val bubbleData = remember(topics, density) {
         topics.mapIndexed { index, entry ->
-            val colorIndex = index % 3
-            val color = when (colorIndex) {
+            val color = when (index % 3) {
                 0 -> primaryColor
                 1 -> secondaryColor
                 else -> tertiaryColor
             }
-            // 40dp base + up to 80dp bonus based on score, converted to pixels
             val baseRadiusDp = 40f + (entry.value.toFloat() * 80f)
-            val baseRadius = with(density) { baseRadiusDp.dp.toPx() }
-            
-            BubbleState(
+            BubbleData(
                 topic = entry.key,
                 score = entry.value,
-                x = 0f, // Will be set in layout
-                y = 0f,
-                radius = baseRadius,
+                radius = with(density) { baseRadiusDp.dp.toPx() },
                 color = color
             )
         }
     }
-    
+
+    var positionsSnapshot by remember { mutableStateOf(FloatArray(bubbleData.size * 4)) }
+
+    val textMeasurer = rememberTextMeasurer()
+    val labelStyle = MaterialTheme.typography.labelSmall.copy(
+        fontWeight = FontWeight.Bold,
+        color = Color.White
+    )
+
     Card(
         modifier = Modifier
             .fillMaxWidth()
@@ -761,201 +743,146 @@ private fun NeuralBubbleCloud(brain: UserBrain) {
             val height = constraints.maxHeight.toFloat()
             val centerX = width / 2f
             val centerY = height / 2f
-            
-            // Initialize positions centered if first run
+
             LaunchedEffect(width, height) {
-                bubbles.forEach { bubble ->
-                    if (bubble.x == 0f) {
-                        bubble.x = centerX + Random.nextFloat() * 100f - 50f
-                        bubble.y = centerY + Random.nextFloat() * 100f - 50f
-                    }
+                val workArr = FloatArray(bubbleData.size * 4)
+                bubbleData.forEachIndexed { i, _ ->
+                    workArr[i * 4 + 0] = centerX + Random.nextFloat() * 100f - 50f
+                    workArr[i * 4 + 1] = centerY + Random.nextFloat() * 100f - 50f
                 }
-            }
-            
-            // Physics Engine with Settling Detection (Performance Optimization)
-            LaunchedEffect(Unit) {
+                positionsSnapshot = workArr.copyOf()
+
                 delay(400)
                 var settleCounter = 0
-                while (true) {
-                    // If settled for ~1 second, switch to idle mode (10fps) to save battery
-                    val isSettled = settleCounter > 60
-                    if (isSettled) {
-                        delay(100) // 10fps idle mode
-                    }
-                    
+                var frameCount = 0
+                val damping = 0.95f
+                val maxSpeed = 3f
+                val centerPull = 0.002f
+
+                while (settleCounter < 30 && frameCount < 300) {
                     withFrameNanos {
-                        // Physics Constants
-                        val repulsionStrength = 1500f
-                        val centerPullStrength = 0.02f
-                        val damping = 0.95f
-                        val maxSpeed = 3f
-                        
-                        // 1. Apply Forces
-                        for (i in bubbles.indices) {
-                            val b1 = bubbles[i]
-                            
-                            // Center Pull (Gravity)
-                            val dxCenter = centerX - b1.x
-                            val dyCenter = centerY - b1.y
-                            b1.velocityX += dxCenter * centerPullStrength * 0.1f
-                            b1.velocityY += dyCenter * centerPullStrength * 0.1f
-                            
-                            // Repulsion from other bubbles
-                            for (j in bubbles.indices) {
+                        for (i in bubbleData.indices) {
+                            val ix = i * 4
+                            val bx = workArr[ix]
+                            val by = workArr[ix + 1]
+                            val r1 = bubbleData[i].radius
+
+                            workArr[ix + 2] += (centerX - bx) * centerPull
+                            workArr[ix + 3] += (centerY - by) * centerPull
+
+                            for (j in bubbleData.indices) {
                                 if (i == j) continue
-                                val b2 = bubbles[j]
-                                val dx = b1.x - b2.x
-                                val dy = b1.y - b2.y
-                                val distSq = dx*dx + dy*dy
-                                val minDist = b1.radius + b2.radius + 10f // 10f padding
-                                
+                                val jx = j * 4
+                                val dx = bx - workArr[jx]
+                                val dy = by - workArr[jx + 1]
+                                val distSq = dx * dx + dy * dy
+                                val minDist = r1 + bubbleData[j].radius + 10f
                                 if (distSq < minDist * minDist && distSq > 0.1f) {
                                     val dist = sqrt(distSq)
-                                    val overlap = minDist - dist
-                                    val force = overlap * 0.5f // Spring force
-                                    
-                                    val fx = (dx / dist) * force
-                                    val fy = (dy / dist) * force
-                                    
-                                    b1.velocityX += fx
-                                    b1.velocityY += fy
+                                    val force = (minDist - dist) * 0.5f
+                                    workArr[ix + 2] += (dx / dist) * force
+                                    workArr[ix + 3] += (dy / dist) * force
                                 }
                             }
                         }
-                        
-                        // 2. Update Positions & Calculate Total Velocity for Settling Detection
+
                         var totalVelocity = 0f
-                        bubbles.forEach { b ->
-                            // Apply damping
-                            b.velocityX *= damping
-                            b.velocityY *= damping
-                            
-                            // Limit speed
-                            b.velocityX = b.velocityX.coerceIn(-maxSpeed, maxSpeed)
-                            b.velocityY = b.velocityY.coerceIn(-maxSpeed, maxSpeed)
-                            
-                            b.x += b.velocityX
-                            b.y += b.velocityY
-                            
-                            // Boundary checks (keep inside box with padding)
-                            val padding = b.radius
-                            if (b.x < padding) { b.x = padding; b.velocityX *= -0.5f }
-                            if (b.x > width - padding) { b.x = width - padding; b.velocityX *= -0.5f }
-                            if (b.y < padding) { b.y = padding; b.velocityY *= -0.5f }
-                            if (b.y > height - padding) { b.y = height - padding; b.velocityY *= -0.5f }
-                            
-                            // Track total velocity for settling detection
-                            totalVelocity += abs(b.velocityX) + abs(b.velocityY)
+                        for (i in bubbleData.indices) {
+                            val ix = i * 4
+                            val r = bubbleData[i].radius
+                            workArr[ix + 2] = (workArr[ix + 2] * damping).coerceIn(-maxSpeed, maxSpeed)
+                            workArr[ix + 3] = (workArr[ix + 3] * damping).coerceIn(-maxSpeed, maxSpeed)
+                            workArr[ix] += workArr[ix + 2]
+                            workArr[ix + 1] += workArr[ix + 3]
+                            if (workArr[ix] < r) { workArr[ix] = r; workArr[ix + 2] *= -0.5f }
+                            if (workArr[ix] > width - r) { workArr[ix] = width - r; workArr[ix + 2] *= -0.5f }
+                            if (workArr[ix + 1] < r) { workArr[ix + 1] = r; workArr[ix + 3] *= -0.5f }
+                            if (workArr[ix + 1] > height - r) { workArr[ix + 1] = height - r; workArr[ix + 3] *= -0.5f }
+                            totalVelocity += abs(workArr[ix + 2]) + abs(workArr[ix + 3])
                         }
-                        
-                        // Update settle counter based on total movement
-                        if (totalVelocity < 0.5f) {
-                            settleCounter++
-                        } else {
-                            settleCounter = 0
-                        }
+
+                        settleCounter = if (totalVelocity < 0.5f) settleCounter + 1 else 0
+                        frameCount++
+                        positionsSnapshot = workArr.copyOf()
                     }
                 }
             }
-            
-            val connectionThresholdPx = remember(density) { with(density) { 200.dp.toPx() } }
 
-            // Generate accessibility description for screen readers
-            val accessibilityDescription = remember(bubbles) {
-                val topTopics = bubbles.sortedByDescending { it.score }.take(5)
-                "Interest bubble visualization showing ${bubbles.size} topics. " +
-                    "Top interests: ${topTopics.joinToString(", ") { it.topic }}"
+            val connectionThresholdPx = remember(density) { with(density) { 200.dp.toPx() } }
+            val minLabelRadiusPx = remember(density) { with(density) { 40.dp.toPx() } }
+
+            val accessibilityDescription = remember(bubbleData) {
+                "Interest bubble visualization showing ${bubbleData.size} topics. " +
+                    "Top interests: ${bubbleData.take(5).joinToString(", ") { it.topic }}"
             }
-            
-            // Draw
+
+            val positions = positionsSnapshot
+
             Canvas(
                 modifier = Modifier
                     .fillMaxSize()
                     .semantics { contentDescription = accessibilityDescription }
             ) {
-                bubbles.forEach { bubble ->
-                    // Draw glow
-                    drawCircle(
-                        color = bubble.color.copy(alpha = 0.2f),
-                        radius = bubble.radius * 1.2f,
-                        center = Offset(bubble.x, bubble.y)
-                    )
-                    
-                    // Draw bubble body
+                // Bubbles
+                for (i in bubbleData.indices) {
+                    val ix = i * 4
+                    if (ix + 1 >= positions.size) break
+                    val bx = positions[ix]
+                    val by = positions[ix + 1]
+                    val bubble = bubbleData[i]
+                    val center = Offset(bx, by)
+
+                    drawCircle(color = bubble.color.copy(alpha = 0.2f), radius = bubble.radius * 1.2f, center = center)
                     drawCircle(
                         brush = Brush.radialGradient(
-                            colors = listOf(
-                                bubble.color.copy(alpha = 0.8f),
-                                bubble.color.copy(alpha = 0.4f)
-                            ),
-                            center = Offset(bubble.x - bubble.radius * 0.3f, bubble.y - bubble.radius * 0.3f),
+                            colors = listOf(bubble.color.copy(alpha = 0.8f), bubble.color.copy(alpha = 0.4f)),
+                            center = Offset(bx - bubble.radius * 0.3f, by - bubble.radius * 0.3f),
                             radius = bubble.radius * 1.5f
                         ),
                         radius = bubble.radius,
-                        center = Offset(bubble.x, bubble.y)
+                        center = center
                     )
-                    
-                    // Draw highlight
                     drawCircle(
                         color = Color.White.copy(alpha = 0.3f),
                         radius = bubble.radius * 0.3f,
-                        center = Offset(bubble.x - bubble.radius * 0.3f, bubble.y - bubble.radius * 0.3f)
+                        center = Offset(bx - bubble.radius * 0.3f, by - bubble.radius * 0.3f)
                     )
                 }
-                
-                // Draw connections
-                for (i in bubbles.indices) {
-                    for (j in i + 1 until bubbles.size) {
-                        val b1 = bubbles[i]
-                        val b2 = bubbles[j]
-                        val dx = b1.x - b2.x
-                        val dy = b1.y - b2.y
-                        val dist = sqrt(dx*dx + dy*dy)
-                        
+
+                for (i in bubbleData.indices) {
+                    for (j in i + 1 until bubbleData.size) {
+                        val ix = i * 4; val jx = j * 4
+                        if (ix + 1 >= positions.size || jx + 1 >= positions.size) break
+                        val dx = positions[ix] - positions[jx]
+                        val dy = positions[ix + 1] - positions[jx + 1]
+                        val dist = sqrt(dx * dx + dy * dy)
                         if (dist < connectionThresholdPx) {
-                            val alpha = (1f - dist / connectionThresholdPx) * 0.15f
                             drawLine(
-                                color = b1.color.copy(alpha = alpha),
-                                start = Offset(b1.x, b1.y),
-                                end = Offset(b2.x, b2.y),
+                                color = bubbleData[i].color.copy(alpha = (1f - dist / connectionThresholdPx) * 0.15f),
+                                start = Offset(positions[ix], positions[ix + 1]),
+                                end = Offset(positions[jx], positions[jx + 1]),
                                 strokeWidth = 1f
                             )
                         }
                     }
                 }
-            }
-            
-            // Labels (Overlay Composable for text crispness)
-            bubbles.forEach { bubble ->
-                Box(
-                    modifier = Modifier
-                        .offset(
-                            x = with(density) { (bubble.x - bubble.radius).toDp() },
-                            y = with(density) { (bubble.y - bubble.radius).toDp() }
-                        )
-                        .size(with(density) { (bubble.radius * 2).toDp() }),
-                    contentAlignment = Alignment.Center
-                ) {
-                    val minRadiusPx = with(density) { 40.dp.toPx() }
-                if (bubble.radius > minRadiusPx) {
-                        Text(
-                            bubble.topic.replaceFirstChar { it.uppercase() },
-                            style = MaterialTheme.typography.labelSmall.copy(
-                                fontWeight = FontWeight.Bold,
-                                fontSize = (10 + (bubble.score * 4)).sp,
-                                shadow = Shadow(
-                                    color = Color.Black.copy(alpha = 0.5f),
-                                    offset = Offset(0f, 2f),
-                                    blurRadius = 4f
-                                )
-                            ),
-                            color = Color.White,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                            textAlign = TextAlign.Center,
-                            modifier = Modifier.padding(4.dp)
-                        )
-                    }
+
+                for (i in bubbleData.indices) {
+                    val ix = i * 4
+                    if (ix + 1 >= positions.size) break
+                    val bubble = bubbleData[i]
+                    if (bubble.radius <= minLabelRadiusPx) continue
+                    val bx = positions[ix]
+                    val by = positions[ix + 1]
+                    val fontSize = (10 + (bubble.score * 4)).toFloat()
+                    val measured = textMeasurer.measure(
+                        bubble.topic.replaceFirstChar { it.uppercase() },
+                        style = labelStyle.copy(fontSize = fontSize.sp)
+                    )
+                    drawText(
+                        textLayoutResult = measured,
+                        topLeft = Offset(bx - measured.size.width / 2f, by - measured.size.height / 2f)
+                    )
                 }
             }
         }
@@ -1224,6 +1151,13 @@ private fun TopicStrengthChart(brain: UserBrain) {
         )
     ) {
         Column(modifier = Modifier.padding(20.dp)) {
+            var animationTriggered by rememberSaveable { mutableStateOf(false) }
+            val animationProgress by animateFloatAsState(
+                targetValue = if (animationTriggered) 1f else 0f,
+                animationSpec = if (animationTriggered) tween(durationMillis = 1200, easing = LinearEasing) else snap(),
+                label = "bars"
+            )
+            LaunchedEffect(Unit) { animationTriggered = true }
             topics.forEachIndexed { index, entry ->
                 val normalizedValue = (entry.value / maxScore).toFloat()
                 val barColor = when {
@@ -1231,13 +1165,10 @@ private fun TopicStrengthChart(brain: UserBrain) {
                     index < 7 -> MaterialTheme.colorScheme.secondary
                     else -> MaterialTheme.colorScheme.tertiary
                 }
-                
-                val animatedWidth by animateFloatAsState(
-                    targetValue = normalizedValue,
-                    animationSpec = tween(800, delayMillis = index * 50),
-                    label = "bar$index"
-                )
-                
+                val delayFraction = index * 50f / 1500f
+                val barProgress = ((animationProgress - delayFraction) / (800f / 1500f)).coerceIn(0f, 1f)
+                val animatedWidth = barProgress * normalizedValue
+
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -1418,12 +1349,27 @@ private fun TimeContextCards(brain: UserBrain) {
 @Composable
 private fun ChannelAffinitySection(
     brain: UserBrain,
-    channelNames: Map<String, String> = emptyMap() // channelId -> displayName (for future integration)
+    channelNames: MutableMap<String, String>
 ) {
     val channels = brain.channelScores.entries
         .sortedByDescending { it.value }
         .take(10)
-    
+
+    LaunchedEffect(brain.channelScores.size) {
+        val toFetch = channels.map { it.key }.filter { !channelNames.containsKey(it) }
+        if (toFetch.isNotEmpty()) {
+            val repository = io.github.aedev.flow.data.repository.YouTubeRepository.getInstance()
+            kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                toFetch.forEach { channelId ->
+                    try {
+                        val info = repository.getChannelInfo(channelId)
+                        if (info?.name != null) channelNames[channelId] = info.name!!
+                    } catch (e: Exception) { /* ignore */ }
+                }
+            }
+        }
+    }
+
     if (channels.isEmpty()) {
         EmptyStateCard("Channel preferences will appear as you watch videos.")
         return
@@ -1494,9 +1440,7 @@ private fun ChannelAffinitySection(
 private fun AlgorithmInsightsCard(brain: UserBrain) {
     val context = LocalContext.current
     var discoveryQueries by remember { mutableStateOf<List<String>>(emptyList()) }
-    
-    LaunchedEffect(brain) {
-        delay(300)
+    LaunchedEffect(Unit) {
         discoveryQueries = FlowNeuroEngine.generateDiscoveryQueries()
     }
     
@@ -1523,6 +1467,7 @@ private fun AlgorithmInsightsCard(brain: UserBrain) {
             Spacer(Modifier.height(12.dp))
             
             LazyRow(
+                modifier = Modifier.height(36.dp),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 items(discoveryQueries) { query ->
@@ -1752,12 +1697,27 @@ private fun MaintenanceSection(
 @Composable
 private fun BlockedContentSection(
     brain: UserBrain,
-    channelNames: Map<String, String>,
+    channelNames: MutableMap<String, String>,
     onUnblockTopic: (String) -> Unit,
     onUnblockChannel: (String) -> Unit
 ) {
     val blockedTopics = brain.blockedTopics
     val blockedChannels = brain.blockedChannels
+
+    LaunchedEffect(blockedChannels.size) {
+        val toFetch = blockedChannels.filter { !channelNames.containsKey(it) }
+        if (toFetch.isNotEmpty()) {
+            val repository = io.github.aedev.flow.data.repository.YouTubeRepository.getInstance()
+            kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                toFetch.forEach { channelId ->
+                    try {
+                        val info = repository.getChannelInfo(channelId)
+                        if (info?.name != null) channelNames[channelId] = info.name!!
+                    } catch (e: Exception) { /* ignore */ }
+                }
+            }
+        }
+    }
     
     Card(
         modifier = Modifier.fillMaxWidth(),

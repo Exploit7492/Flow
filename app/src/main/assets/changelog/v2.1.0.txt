@@ -1,6 +1,6 @@
 FLOW CHANGE LOG
 VERSION: 2.1.0
-DATE: 2026-04-20
+DATE: 2026-04-21
 
 LIBRARIES
 - Bump NewpipeExtractor to latest version (v0.26.1)
@@ -54,6 +54,7 @@ IMPROVEMENTS
 - Add new permission section in download settings #279
 - Improve watched videos hiding logic #305
 - Improve media playback notification handling #304
+- Improve Personality screen performance
 
 FIXES AND STABILITY
 - Fix video player playback speed issue #232

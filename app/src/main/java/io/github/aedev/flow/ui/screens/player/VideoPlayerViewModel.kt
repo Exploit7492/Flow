@@ -423,7 +423,6 @@ class VideoPlayerViewModel @Inject constructor(
 
         // Track history
         if (navigationHistory.isEmpty() || navigationHistory[currentHistoryIndex] != videoId) {
-            // If we are not at the end of history, clear the forward history
             if (currentHistoryIndex < navigationHistory.size - 1) {
                 val toRemove = navigationHistory.size - 1 - currentHistoryIndex
                 repeat(toRemove) { navigationHistory.removeAt(navigationHistory.size - 1) }
@@ -885,7 +884,6 @@ class VideoPlayerViewModel @Inject constructor(
     private fun saveHistoryEntry(video: Video) {
         if (video.id.startsWith("recovered_")) return
         viewModelScope.launch {
-            // Use touchHistoryEntry so we never overwrite an already-saved playback position.
             viewHistory.touchHistoryEntry(
                 videoId     = video.id,
                 duration    = if (video.duration > 0) video.duration * 1000L else 0L,

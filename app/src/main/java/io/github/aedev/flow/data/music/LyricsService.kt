@@ -30,7 +30,6 @@ object LyricsService {
             val result = tryFetch(qArtist, qTitle, duration)
             if (result?.syncedLyrics != null) return@withContext result
             
-            // If we have plain lyrics, we'll keep them as fallback if we don't find synced ones later
             if (result != null && result.plainLyrics != null) {
                 // Continue searching for synced ones, but keep this one as a potential return
                 val searchResult = trySearch(qArtist, qTitle, duration)

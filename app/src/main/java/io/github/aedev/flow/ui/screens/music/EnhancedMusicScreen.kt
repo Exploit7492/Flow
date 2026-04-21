@@ -347,9 +347,6 @@ fun EnhancedMusicScreen(
                                                     if (section.isArtistSeed) {
                                                         onArtistClick(section.seedId)
                                                     } else {
-                                                        // For non-artist seeds, we could navigate to details/album
-                                                        // For now we only enable navigation for artists specifically 
-                                                        // if that's what's supported reliably
                                                     }
                                                 }
                                             } else null

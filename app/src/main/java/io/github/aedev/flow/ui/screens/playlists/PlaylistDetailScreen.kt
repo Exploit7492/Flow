@@ -1042,8 +1042,6 @@ class PlaylistDetailViewModel @Inject constructor(
     fun updatePlaylist(name: String, description: String) {
         viewModelScope.launch {
             val currentInfo = repository.getPlaylistInfo(playlistId) ?: return@launch
-            // We need to update the playlist info
-            // For now, delete and recreate
             val videos = _uiState.value.videos
             repository.deletePlaylist(playlistId)
             repository.createPlaylist(playlistId, name, description, _uiState.value.isPrivate)
