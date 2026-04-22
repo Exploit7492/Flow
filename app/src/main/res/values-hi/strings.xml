@@ -33,4 +33,5 @@
     <string name="share">शेयर</string>
     <string name="shorts">शॉर्ट</string>
     <string name="clear_watch_history_alert_body">यह आपके वॉच इतिहास के सभी वीडियो को हटा देगा। यह कार्रवाई नहीं की जा सकती है।।</string>
+    <string name="library_settings_data_header"><![CDATA[सेटिंग्स और डेटा]]></string>
 </resources>
