@@ -16,6 +16,7 @@ package io.github.aedev.flow.data.recommendation
 
 import android.content.Context
 import android.util.Log
+import io.github.aedev.flow.data.local.PlayerPreferences
 import io.github.aedev.flow.data.model.Video
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -1256,6 +1257,9 @@ class FlowNeuroEngine(private val appContext: Context) {
         interactionType: InteractionType,
         percentWatched: Float = 0f
     ) {
+        // Deep Flow mode: freeze vector learning while active and not yet expired
+        if (PlayerPreferences(appContext).isDeepFlowCurrentlyActive()) return
+
         val idfSnapshot = brainMutex.withLock { takeIdfSnapshot() }
         val videoVector = getOrExtractFeatures(video, idfSnapshot)
 

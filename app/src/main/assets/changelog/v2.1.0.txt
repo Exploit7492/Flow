@@ -28,6 +28,7 @@ FEATURES
 - Add new shorts playback behavior toggle
 - Add new Themes : Monochrome and Custom themes #293
 - Add new automated Backup and master backup features #290
+- Add new Deep Flow (Incognito mode) #282
 
 IMPROVEMENTS
 - New miniplayer secondary action buttons layout #225

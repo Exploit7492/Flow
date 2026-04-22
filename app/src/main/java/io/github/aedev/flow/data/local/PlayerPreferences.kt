@@ -169,6 +169,11 @@ class PlayerPreferences(private val context: Context) {
 
         // Show app logo icon in home screen top bar
         val SHOW_APP_LOGO_ICON = booleanPreferencesKey("show_app_logo_icon")
+
+        // Deep Flow (Incognito / No-Engine) mode
+        val DEEP_FLOW_ACTIVE = booleanPreferencesKey("deep_flow_active")
+        val DEEP_FLOW_ACTIVATED_AT = longPreferencesKey("deep_flow_activated_at")
+        val DEEP_FLOW_EXPIRE_HOURS = intPreferencesKey("deep_flow_expire_hours")
     }
     
     // Grid item size preference
@@ -1191,6 +1196,44 @@ class PlayerPreferences(private val context: Context) {
         context.playerPreferencesDataStore.edit { preferences ->
             preferences[Keys.MINI_PLAYER_SHOW_NEXT_PREV_CONTROLS] = show
         }
+    }
+
+    // DEEP FLOW (INCOGNITO / NO-ENGINE) MODE
+
+    val deepFlowActive: Flow<Boolean> = context.playerPreferencesDataStore.data
+        .map { preferences -> preferences[Keys.DEEP_FLOW_ACTIVE] ?: false }
+
+    val deepFlowActivatedAt: Flow<Long> = context.playerPreferencesDataStore.data
+        .map { preferences -> preferences[Keys.DEEP_FLOW_ACTIVATED_AT] ?: 0L }
+
+    val deepFlowExpireHours: Flow<Int> = context.playerPreferencesDataStore.data
+        .map { preferences -> preferences[Keys.DEEP_FLOW_EXPIRE_HOURS] ?: 4 }
+
+    suspend fun setDeepFlowActive(enabled: Boolean) {
+        context.playerPreferencesDataStore.edit { preferences ->
+            preferences[Keys.DEEP_FLOW_ACTIVE] = enabled
+            if (enabled) {
+                preferences[Keys.DEEP_FLOW_ACTIVATED_AT] = System.currentTimeMillis()
+            }
+        }
+    }
+
+    suspend fun setDeepFlowExpireHours(hours: Int) {
+        context.playerPreferencesDataStore.edit { preferences ->
+            preferences[Keys.DEEP_FLOW_EXPIRE_HOURS] = hours
+        }
+    }
+
+    
+    // Returns true if Deep Flow is active AND not yet expired.
+    suspend fun isDeepFlowCurrentlyActive(): Boolean {
+        val prefs = context.playerPreferencesDataStore.data.first()
+        val active = prefs[Keys.DEEP_FLOW_ACTIVE] ?: false
+        if (!active) return false
+        val activatedAt = prefs[Keys.DEEP_FLOW_ACTIVATED_AT] ?: 0L
+        val expireHours = prefs[Keys.DEEP_FLOW_EXPIRE_HOURS] ?: 4
+        val elapsedHours = (System.currentTimeMillis() - activatedAt) / 3_600_000.0
+        return elapsedHours < expireHours
     }
 
     suspend fun getExportData(): SettingsBackup {

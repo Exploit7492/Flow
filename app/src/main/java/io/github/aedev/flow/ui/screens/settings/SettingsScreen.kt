@@ -106,6 +106,21 @@ fun SettingsScreen(
     // Player preferences states
     val currentRegion by playerPreferences.trendingRegion.collectAsState(initial = "US")
 
+    // Deep Flow state
+    val deepFlowActive by playerPreferences.deepFlowActive.collectAsState(initial = false)
+    val deepFlowActivatedAt by playerPreferences.deepFlowActivatedAt.collectAsState(initial = 0L)
+    val deepFlowExpireHours by playerPreferences.deepFlowExpireHours.collectAsState(initial = 4)
+    var showDeepFlowDurationDialog by remember { mutableStateOf(false) }
+
+    val deepFlowRemainingLabel: String? = remember(deepFlowActive, deepFlowActivatedAt, deepFlowExpireHours) {
+        if (!deepFlowActive || deepFlowActivatedAt == 0L) return@remember null
+        val expiresAt = deepFlowActivatedAt + deepFlowExpireHours * 3_600_000L
+        val remainingMs = expiresAt - System.currentTimeMillis()
+        if (remainingMs <= 0) return@remember null
+        val remainingMins = remainingMs / 60_000
+        if (remainingMins < 60) "${remainingMins}m" else "${remainingMins / 60}h ${remainingMins % 60}m"
+    }
+
     // Optimize Region Dialog: compute list only once
     val regionList = remember { REGION_NAMES.toList() }
 
@@ -493,6 +508,118 @@ item {
         }
     }
 }
+            // DEEP FLOW MODE
+            item {
+                Spacer(Modifier.height(12.dp))
+                SettingsGroup {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable {
+                                coroutineScope.launch {
+                                    playerPreferences.setDeepFlowActive(!deepFlowActive)
+                                }
+                            }
+                            .padding(16.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            imageVector = Icons.Outlined.VisibilityOff,
+                            contentDescription = null,
+                            tint = if (deepFlowActive)
+                                MaterialTheme.colorScheme.primary
+                            else
+                                MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Spacer(Modifier.width(16.dp))
+                        Column(modifier = Modifier.weight(1f)) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text(
+                                    text = androidx.compose.ui.res.stringResource(io.github.aedev.flow.R.string.deep_flow_mode_title),
+                                    style = MaterialTheme.typography.bodyLarge
+                                )
+                                if (deepFlowActive && deepFlowRemainingLabel != null) {
+                                    Spacer(Modifier.width(8.dp))
+                                    Surface(
+                                        color = MaterialTheme.colorScheme.primary.copy(alpha = 0.15f),
+                                        shape = RoundedCornerShape(6.dp)
+                                    ) {
+                                        Text(
+                                            text = androidx.compose.ui.res.stringResource(
+                                                io.github.aedev.flow.R.string.deep_flow_learning_paused
+                                            ),
+                                            style = MaterialTheme.typography.labelSmall,
+                                            color = MaterialTheme.colorScheme.primary,
+                                            fontWeight = FontWeight.Bold,
+                                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 3.dp)
+                                        )
+                                    }
+                                }
+                            }
+                            Text(
+                                text = if (deepFlowActive && deepFlowRemainingLabel != null)
+                                    androidx.compose.ui.res.stringResource(
+                                        io.github.aedev.flow.R.string.deep_flow_expires_in,
+                                        deepFlowRemainingLabel
+                                    )
+                                else
+                                    androidx.compose.ui.res.stringResource(io.github.aedev.flow.R.string.deep_flow_mode_subtitle),
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                        Switch(
+                            checked = deepFlowActive,
+                            onCheckedChange = { enabled ->
+                                coroutineScope.launch {
+                                    playerPreferences.setDeepFlowActive(enabled)
+                                }
+                            }
+                        )
+                    }
+
+                    HorizontalDivider(
+                        Modifier.padding(start = 56.dp),
+                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+                    )
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { showDeepFlowDurationDialog = true }
+                            .padding(16.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            imageVector = Icons.Outlined.Timer,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Spacer(Modifier.width(16.dp))
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = androidx.compose.ui.res.stringResource(io.github.aedev.flow.R.string.deep_flow_expire_duration_title),
+                                style = MaterialTheme.typography.bodyLarge
+                            )
+                            Text(
+                                text = androidx.compose.ui.res.stringResource(
+                                    io.github.aedev.flow.R.string.deep_flow_expire_duration_subtitle,
+                                    deepFlowExpireHours.let { h ->
+                                        if (h == 1) "1 hour" else "$h hours"
+                                    }
+                                ),
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                        Icon(
+                            imageVector = Icons.Default.ChevronRight,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+                Spacer(Modifier.height(8.dp))
+            }
 
             // =================================================
             // APPEARANCE
@@ -692,7 +819,56 @@ item {
         }
     }
 
-    // Reset Brain Dialog
+    if (showDeepFlowDurationDialog) {
+        val durationOptions = listOf(1 to "1 hour", 2 to "2 hours", 4 to "4 hours", 6 to "6 hours", 8 to "8 hours", 12 to "12 hours", 24 to "24 hours")
+        AlertDialog(
+            onDismissRequest = { showDeepFlowDurationDialog = false },
+            icon = { Icon(Icons.Outlined.Timer, null, tint = MaterialTheme.colorScheme.primary) },
+            title = { Text(androidx.compose.ui.res.stringResource(io.github.aedev.flow.R.string.deep_flow_dialog_title)) },
+            text = {
+                Column {
+                    Text(
+                        text = androidx.compose.ui.res.stringResource(io.github.aedev.flow.R.string.deep_flow_dialog_body),
+                        style = MaterialTheme.typography.bodyMedium,
+                        modifier = Modifier.padding(bottom = 12.dp)
+                    )
+                    durationOptions.forEach { (hours, label) ->
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable {
+                                    coroutineScope.launch {
+                                        playerPreferences.setDeepFlowExpireHours(hours)
+                                    }
+                                    showDeepFlowDurationDialog = false
+                                }
+                                .padding(vertical = 10.dp, horizontal = 4.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            RadioButton(
+                                selected = deepFlowExpireHours == hours,
+                                onClick = {
+                                    coroutineScope.launch {
+                                        playerPreferences.setDeepFlowExpireHours(hours)
+                                    }
+                                    showDeepFlowDurationDialog = false
+                                }
+                            )
+                            Spacer(Modifier.width(8.dp))
+                            Text(text = label, style = MaterialTheme.typography.bodyMedium)
+                        }
+                    }
+                }
+            },
+            confirmButton = {},
+            dismissButton = {
+                TextButton(onClick = { showDeepFlowDurationDialog = false }) {
+                    Text(androidx.compose.ui.res.stringResource(io.github.aedev.flow.R.string.cancel))
+                }
+            }
+        )
+    }
+
     if (showResetBrainDialog) {
         AlertDialog(
             onDismissRequest = { showResetBrainDialog = false },

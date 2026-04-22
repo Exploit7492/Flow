@@ -310,6 +310,24 @@
     <string name="settings_reset_everything">Reset Everything</string>
     <string name="settings_analyzing_interactions">Analyzing your interactions...</string>
     <string name="settings_view_analytics">View Analytics</string>
+
+    <!-- Deep Flow Mode -->
+    <string name="deep_flow_mode_title">Deep Flow Mode</string>
+    <string name="deep_flow_mode_subtitle">Pause learning — browse without influencing your profile</string>
+    <string name="deep_flow_learning_paused">LEARNING PAUSED</string>
+    <string name="deep_flow_expires_in">Expires in %s</string>
+    <string name="deep_flow_expire_duration_title">Auto-disable after</string>
+    <string name="deep_flow_expire_duration_subtitle">Learning resumes automatically after %s</string>
+    <string name="deep_flow_dialog_title">Pause Duration</string>
+    <string name="deep_flow_dialog_body">How long should learning stay paused?</string>
+    <string name="deep_flow_duration_1h">1 hour</string>
+    <string name="deep_flow_duration_2h">2 hours</string>
+    <string name="deep_flow_duration_4h">4 hours</string>
+    <string name="deep_flow_duration_6h">6 hours</string>
+    <string name="deep_flow_duration_8h">8 hours</string>
+    <string name="deep_flow_duration_12h">12 hours</string>
+    <string name="deep_flow_duration_24h">24 hours</string>
+
     <string name="settings_header_appearance">Appearance</string>
     <string name="settings_header_content_playback">Content &amp; Playback</string>
     <string name="settings_header_data_management">Data Management</string>
