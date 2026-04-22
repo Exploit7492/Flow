@@ -11,6 +11,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Restore
+import androidx.compose.material.icons.outlined.Archive
 import androidx.compose.material.icons.outlined.FileDownload
 import androidx.compose.material.icons.outlined.History
 import androidx.compose.material.icons.outlined.PlaylistPlay
@@ -192,6 +193,23 @@ fun ImportDataScreen(
         }
     )
 
+    val importMasterLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenDocument(),
+        onResult = { uri ->
+            uri?.let {
+                scope.launch {
+                    val result = backupRepo.importMasterBackup(it)
+                    snackbarHostState.showSnackbar(
+                        context.getString(
+                            if (result.isSuccess) R.string.import_master_backup_success
+                            else R.string.import_master_backup_failed
+                        )
+                    )
+                }
+            }
+        }
+    )
+
     Scaffold(
         topBar = {
             TopAppBar(
@@ -251,6 +269,16 @@ fun ImportDataScreen(
                     icon = Icons.Default.Restore,
                     containerColor = MaterialTheme.colorScheme.secondaryContainer,
                     onClick = { flowImportLauncher.launch(arrayOf("application/json")) }
+                )
+            }
+
+            item {
+                ImportOptionCard(
+                    title = stringResource(R.string.import_master_backup_title),
+                    description = stringResource(R.string.import_master_backup_desc),
+                    icon = Icons.Outlined.Archive,
+                    containerColor = MaterialTheme.colorScheme.tertiaryContainer,
+                    onClick = { importMasterLauncher.launch(arrayOf("application/zip", "application/octet-stream")) }
                 )
             }
             

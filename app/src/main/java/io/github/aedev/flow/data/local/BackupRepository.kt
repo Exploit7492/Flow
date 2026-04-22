@@ -4,6 +4,7 @@ import android.content.ComponentName
 import android.content.Context
 import android.content.pm.PackageManager
 import android.net.Uri
+import android.provider.DocumentsContract
 import android.provider.OpenableColumns
 import io.github.aedev.flow.data.local.entity.PlaylistEntity
 import io.github.aedev.flow.data.local.entity.PlaylistVideoCrossRef
@@ -17,8 +18,13 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withContext
 import java.io.BufferedReader
+import java.io.ByteArrayOutputStream
 import java.io.InputStreamReader
+import java.io.OutputStream
 import java.io.OutputStreamWriter
+import java.util.zip.ZipEntry
+import java.util.zip.ZipInputStream
+import java.util.zip.ZipOutputStream
 import org.schabi.newpipe.extractor.NewPipe
 import org.schabi.newpipe.extractor.ServiceList
 import org.schabi.newpipe.extractor.channel.ChannelInfo
@@ -135,66 +141,7 @@ class BackupRepository(private val context: Context) {
             val backupData = parseBackupJson(json)
                 ?: return@withContext Result.failure(Exception("Invalid backup file"))
 
-            // Import View History (bulk-insert for performance with large backups)
-            backupData.viewHistory?.let { entries ->
-                if (entries.isNotEmpty()) viewHistory.bulkSaveHistoryEntries(entries)
-            }
-
-            // Import Liked Videos
-            backupData.likedVideos?.forEach { info ->
-                likedVideosRepo.likeVideo(info)
-            }
-
-            // Import Search History
-            backupData.searchHistory?.forEach { item ->
-                searchHistoryRepo.saveSearchQuery(item.query, item.type)
-            }
-
-            // Import Subscriptions
-            backupData.subscriptions?.let { subs ->
-                subs.forEach { sub ->
-                    subscriptionRepo.subscribe(sub)
-                }
-                // V9.2: Seed recommendation engine from imported subscriptions
-                val channelNames = subs.map { it.channelName }.filter { it.isNotEmpty() }
-                if (channelNames.isNotEmpty()) {
-                    try {
-                        FlowNeuroEngine.bootstrapFromSubscriptions(context, channelNames)
-                    } catch (e: Exception) {
-                    }
-                }
-            }
-
-            // Import Room Data
-            database.withTransaction {
-                // We merge (insert with ignore so existing richer data is not overwritten)
-                backupData.videos?.forEach { database.videoDao().insertVideoOrIgnore(it) }
-                backupData.playlists?.forEach { database.playlistDao().insertPlaylist(it) }
-                backupData.playlistVideos?.forEach { database.playlistDao().insertPlaylistVideoCrossRef(it) }
-            }
-
-            // Import Settings Data
-            backupData.settings?.let { settings ->
-                playerPreferences.restoreData(settings)
-                localDataManager.restoreData(settings)
-
-                val savedIconSuffix = settings.strings["app_icon_suffix"]
-                if (!savedIconSuffix.isNullOrEmpty()) {
-                    withContext(Dispatchers.Main) {
-                        val pm = context.packageManager
-                        val pkg = context.packageName
-                        val allSuffixes = listOf(".IconFlowRed", ".IconAmoled", ".IconMonochrome", ".IconGhost", ".IconDynamic")
-                        for (suffix in allSuffixes) {
-                            val cn = ComponentName(pkg, "io.github.aedev.flow$suffix")
-                            val want = if (suffix == savedIconSuffix)
-                                PackageManager.COMPONENT_ENABLED_STATE_ENABLED
-                            else
-                                PackageManager.COMPONENT_ENABLED_STATE_DISABLED
-                            pm.setComponentEnabledSetting(cn, want, PackageManager.DONT_KILL_APP)
-                        }
-                    }
-                }
-            }
+            importBackupData(backupData)
 
             Result.success(Unit)
         } catch (e: Exception) {
@@ -806,6 +753,278 @@ class BackupRepository(private val context: Context) {
             Result.failure(e)
         } finally {
             tempDb.delete()
+        }
+    }
+
+    // ── Master Backup (app data + engine brain in one ZIP) ──
+
+    suspend fun exportMasterBackup(uri: Uri): Result<Unit> = withContext(Dispatchers.IO) {
+        try {
+            val playerSettings = playerPreferences.getExportData()
+            val localSettings = localDataManager.getExportData()
+            val activeIconSuffix = detectActiveIconSuffix()
+            val exportedStrings = if (activeIconSuffix != null)
+                playerSettings.strings + mapOf("app_icon_suffix" to activeIconSuffix) + localSettings.strings
+            else
+                playerSettings.strings + localSettings.strings
+            val mergedSettings = SettingsBackup(
+                strings = exportedStrings,
+                booleans = playerSettings.booleans + localSettings.booleans,
+                ints = playerSettings.ints + localSettings.ints,
+                floats = playerSettings.floats + localSettings.floats,
+                longs = playerSettings.longs + localSettings.longs
+            )
+            val backupData = BackupData(
+                viewHistory = viewHistory.getAllHistory().first(),
+                searchHistory = searchHistoryRepo.getSearchHistoryFlow().first(),
+                subscriptions = subscriptionRepo.getAllSubscriptions().first(),
+                playlists = database.playlistDao().getAllPlaylists().first(),
+                playlistVideos = database.playlistDao().getAllPlaylistVideoCrossRefs(),
+                videos = database.videoDao().getAllVideos(),
+                likedVideos = likedVideosRepo.getAllLikedVideos().first(),
+                settings = mergedSettings
+            )
+            val appDataJson = gson.toJson(backupData)
+
+            val brainBytes = ByteArrayOutputStream().also { bos ->
+                FlowNeuroEngine.exportBrainToStream(bos)
+            }.toByteArray()
+
+            context.contentResolver.openOutputStream(uri)?.use { out ->
+                ZipOutputStream(out).use { zip ->
+                    zip.putNextEntry(ZipEntry("app_data.json"))
+                    zip.write(appDataJson.toByteArray(Charsets.UTF_8))
+                    zip.closeEntry()
+
+                    zip.putNextEntry(ZipEntry("engine_brain.json"))
+                    zip.write(brainBytes)
+                    zip.closeEntry()
+                }
+            } ?: return@withContext Result.failure(Exception("Could not open output stream"))
+
+            Result.success(Unit)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    suspend fun importMasterBackup(uri: Uri): Result<Unit> = withContext(Dispatchers.IO) {
+        try {
+            var appDataJson: String? = null
+            var brainBytes: ByteArray? = null
+
+            context.contentResolver.openInputStream(uri)?.use { raw ->
+                ZipInputStream(raw).use { zip ->
+                    var entry = zip.nextEntry
+                    while (entry != null) {
+                        when (entry.name) {
+                            "app_data.json" -> appDataJson = zip.readBytes().toString(Charsets.UTF_8)
+                            "engine_brain.json" -> brainBytes = zip.readBytes()
+                        }
+                        zip.closeEntry()
+                        entry = zip.nextEntry
+                    }
+                }
+            } ?: return@withContext Result.failure(Exception("Could not read file"))
+
+            if (appDataJson == null && brainBytes == null) {
+                return@withContext Result.failure(Exception("Invalid master backup file"))
+            }
+
+            appDataJson?.let { json ->
+                val backupData = parseBackupJson(json)
+                    ?: return@withContext Result.failure(Exception("Invalid app data in backup"))
+                importBackupData(backupData)
+            }
+
+            brainBytes?.let { bytes ->
+                FlowNeuroEngine.importBrainFromStream(context, bytes.inputStream())
+            }
+
+            Result.success(Unit)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    private suspend fun importBackupData(backupData: BackupData) {
+        backupData.viewHistory?.let { entries ->
+            if (entries.isNotEmpty()) viewHistory.bulkSaveHistoryEntries(entries)
+        }
+        backupData.likedVideos?.forEach { info -> likedVideosRepo.likeVideo(info) }
+        backupData.searchHistory?.forEach { item ->
+            searchHistoryRepo.saveSearchQuery(item.query, item.type)
+        }
+        backupData.subscriptions?.let { subs ->
+            subs.forEach { subscriptionRepo.subscribe(it) }
+            val channelNames = subs.map { it.channelName }.filter { it.isNotEmpty() }
+            if (channelNames.isNotEmpty()) {
+                try { FlowNeuroEngine.bootstrapFromSubscriptions(context, channelNames) } catch (_: Exception) {}
+            }
+        }
+        database.withTransaction {
+            backupData.videos?.forEach { database.videoDao().insertVideoOrIgnore(it) }
+            backupData.playlists?.forEach { database.playlistDao().insertPlaylist(it) }
+            backupData.playlistVideos?.forEach { database.playlistDao().insertPlaylistVideoCrossRef(it) }
+        }
+        backupData.settings?.let { settings ->
+            playerPreferences.restoreData(settings)
+            localDataManager.restoreData(settings)
+            val savedIconSuffix = settings.strings["app_icon_suffix"]
+            if (!savedIconSuffix.isNullOrEmpty()) {
+                withContext(Dispatchers.Main) {
+                    val pm = context.packageManager
+                    val pkg = context.packageName
+                    val allSuffixes = listOf(".IconFlowRed", ".IconAmoled", ".IconMonochrome", ".IconGhost", ".IconDynamic")
+                    for (suffix in allSuffixes) {
+                        val cn = ComponentName(pkg, "io.github.aedev.flow$suffix")
+                        val want = if (suffix == savedIconSuffix)
+                            PackageManager.COMPONENT_ENABLED_STATE_ENABLED
+                        else
+                            PackageManager.COMPONENT_ENABLED_STATE_DISABLED
+                        pm.setComponentEnabledSetting(cn, want, PackageManager.DONT_KILL_APP)
+                    }
+                }
+            }
+        }
+    }
+
+    private suspend fun writeToFolder(
+        folderUri: Uri,
+        filename: String,
+        mimeType: String,
+        write: (OutputStream) -> Unit
+    ): Result<Unit> = withContext(Dispatchers.IO) {
+        try {
+            val treeDocId = DocumentsContract.getTreeDocumentId(folderUri)
+            val treeUri = DocumentsContract.buildDocumentUriUsingTree(folderUri, treeDocId)
+            val childrenUri = DocumentsContract.buildChildDocumentsUriUsingTree(folderUri, treeDocId)
+
+            val existingDocId = context.contentResolver.query(
+                childrenUri,
+                arrayOf(DocumentsContract.Document.COLUMN_DOCUMENT_ID, DocumentsContract.Document.COLUMN_DISPLAY_NAME),
+                null, null, null
+            )?.use { cursor ->
+                val nameCol = cursor.getColumnIndexOrThrow(DocumentsContract.Document.COLUMN_DISPLAY_NAME)
+                val idCol = cursor.getColumnIndexOrThrow(DocumentsContract.Document.COLUMN_DOCUMENT_ID)
+                var found: String? = null
+                while (cursor.moveToNext()) {
+                    if (cursor.getString(nameCol) == filename) {
+                        found = cursor.getString(idCol)
+                        break
+                    }
+                }
+                found
+            }
+
+            val targetUri = if (existingDocId != null) {
+                DocumentsContract.buildDocumentUriUsingTree(folderUri, existingDocId)
+            } else {
+                DocumentsContract.createDocument(context.contentResolver, treeUri, mimeType, filename)
+                    ?: return@withContext Result.failure(Exception("Failed to create document: $filename"))
+            }
+
+            context.contentResolver.openOutputStream(targetUri, "wt")?.use { outputStream ->
+                write(outputStream)
+            } ?: return@withContext Result.failure(Exception("Could not open output stream for $filename"))
+
+            Result.success(Unit)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    suspend fun exportDataToFolder(folderUri: Uri): Result<Unit> = withContext(Dispatchers.IO) {
+        try {
+            val playerSettings = playerPreferences.getExportData()
+            val localSettings = localDataManager.getExportData()
+            val activeIconSuffix = detectActiveIconSuffix()
+            val exportedStrings = if (activeIconSuffix != null)
+                playerSettings.strings + mapOf("app_icon_suffix" to activeIconSuffix) + localSettings.strings
+            else
+                playerSettings.strings + localSettings.strings
+            val mergedSettings = SettingsBackup(
+                strings = exportedStrings,
+                booleans = playerSettings.booleans + localSettings.booleans,
+                ints = playerSettings.ints + localSettings.ints,
+                floats = playerSettings.floats + localSettings.floats,
+                longs = playerSettings.longs + localSettings.longs
+            )
+            val backupData = BackupData(
+                viewHistory = viewHistory.getAllHistory().first(),
+                searchHistory = searchHistoryRepo.getSearchHistoryFlow().first(),
+                subscriptions = subscriptionRepo.getAllSubscriptions().first(),
+                playlists = database.playlistDao().getAllPlaylists().first(),
+                playlistVideos = database.playlistDao().getAllPlaylistVideoCrossRefs(),
+                videos = database.videoDao().getAllVideos(),
+                likedVideos = likedVideosRepo.getAllLikedVideos().first(),
+                settings = mergedSettings
+            )
+            val json = gson.toJson(backupData)
+            writeToFolder(folderUri, "flow_backup.json", "application/json") { out ->
+                out.write(json.toByteArray(Charsets.UTF_8))
+            }
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    suspend fun exportBrainToFolder(folderUri: Uri): Result<Unit> = withContext(Dispatchers.IO) {
+        try {
+            val brainBytes = ByteArrayOutputStream().also { bos ->
+                FlowNeuroEngine.exportBrainToStream(bos)
+            }.toByteArray()
+            writeToFolder(folderUri, "flow_engine.json", "application/json") { out ->
+                out.write(brainBytes)
+            }
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    suspend fun exportMasterToFolder(folderUri: Uri): Result<Unit> = withContext(Dispatchers.IO) {
+        try {
+            val playerSettings = playerPreferences.getExportData()
+            val localSettings = localDataManager.getExportData()
+            val activeIconSuffix = detectActiveIconSuffix()
+            val exportedStrings = if (activeIconSuffix != null)
+                playerSettings.strings + mapOf("app_icon_suffix" to activeIconSuffix) + localSettings.strings
+            else
+                playerSettings.strings + localSettings.strings
+            val mergedSettings = SettingsBackup(
+                strings = exportedStrings,
+                booleans = playerSettings.booleans + localSettings.booleans,
+                ints = playerSettings.ints + localSettings.ints,
+                floats = playerSettings.floats + localSettings.floats,
+                longs = playerSettings.longs + localSettings.longs
+            )
+            val backupData = BackupData(
+                viewHistory = viewHistory.getAllHistory().first(),
+                searchHistory = searchHistoryRepo.getSearchHistoryFlow().first(),
+                subscriptions = subscriptionRepo.getAllSubscriptions().first(),
+                playlists = database.playlistDao().getAllPlaylists().first(),
+                playlistVideos = database.playlistDao().getAllPlaylistVideoCrossRefs(),
+                videos = database.videoDao().getAllVideos(),
+                likedVideos = likedVideosRepo.getAllLikedVideos().first(),
+                settings = mergedSettings
+            )
+            val appDataJson = gson.toJson(backupData)
+            val brainBytes = ByteArrayOutputStream().also { bos ->
+                FlowNeuroEngine.exportBrainToStream(bos)
+            }.toByteArray()
+
+            writeToFolder(folderUri, "flow_master_backup.zip", "application/zip") { out ->
+                ZipOutputStream(out).use { zip ->
+                    zip.putNextEntry(ZipEntry("app_data.json"))
+                    zip.write(appDataJson.toByteArray(Charsets.UTF_8))
+                    zip.closeEntry()
+                    zip.putNextEntry(ZipEntry("engine_brain.json"))
+                    zip.write(brainBytes)
+                    zip.closeEntry()
+                }
+            }
+        } catch (e: Exception) {
+            Result.failure(e)
         }
     }
 

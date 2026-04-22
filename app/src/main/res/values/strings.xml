@@ -1271,6 +1271,49 @@
     <string name="import_engine_section_title">Flow Engine</string>
     <string name="import_engine_section_subtitle">Restore your AI learning profile</string>
 
+    <!-- Master Backup -->
+    <string name="master_backup_title">Master Backup</string>
+    <string name="master_backup_subtitle">Export brain and app data in one file</string>
+    <string name="master_backup_export_success">Master backup saved successfully</string>
+    <string name="master_backup_export_failed">Failed to export master backup</string>
+    <string name="import_master_backup_title">Import Master Backup</string>
+    <string name="import_master_backup_desc">Restore both app data and engine profile from a single master backup file</string>
+    <string name="import_master_backup_success">Master backup restored successfully</string>
+    <string name="import_master_backup_failed">Failed to import master backup</string>
+
+    <!-- Automated Backups -->
+    <string name="auto_backup_title">Automated Backups</string>
+    <string name="auto_backup_subtitle">Schedule automatic backups to a folder</string>
+    <string name="auto_backup_screen_title">Automated Backups</string>
+    <string name="auto_backup_schedule_section">Schedule</string>
+    <string name="auto_backup_type_section">Backup Type</string>
+    <string name="auto_backup_folder_section">Backup Folder</string>
+    <string name="auto_backup_status_section">Status</string>
+    <string name="auto_backup_frequency_none">None</string>
+    <string name="auto_backup_frequency_daily">Daily</string>
+    <string name="auto_backup_frequency_weekly">Weekly</string>
+    <string name="auto_backup_frequency_monthly">Monthly</string>
+    <string name="auto_backup_type_app_data">App Data</string>
+    <string name="auto_backup_type_brain">Engine Profile</string>
+    <string name="auto_backup_type_master">Master Backup</string>
+    <string name="auto_backup_folder_label">Backup Folder</string>
+    <string name="auto_backup_pick_folder">Pick Folder</string>
+    <string name="auto_backup_no_folder">No folder selected</string>
+    <string name="auto_backup_last_run">Last backup: %s</string>
+    <string name="auto_backup_last_run_label">Last Backup</string>
+    <string name="auto_backup_never_run">No backup yet</string>
+    <string name="auto_backup_run_now">Back Up Now</string>
+    <string name="auto_backup_success">Backup completed successfully</string>
+    <string name="auto_backup_failed">Backup failed</string>
+    <string name="auto_backup_notification_channel">Automated Backups</string>
+
+    <!-- Export Data Screen -->
+    <string name="export_data_screen_title">Export Data</string>
+    <string name="export_data_section_header">Choose Export Type</string>
+    <string name="export_data_section_subtitle">Select what you want to export and save to your device</string>
+    <string name="export_app_data_title">App Data Backup</string>
+    <string name="export_app_data_desc">Export your subscriptions, watch history, playlists, and settings</string>
+
     <!-- Video Player Errors -->
     <string name="error_age_restricted">Age-restricted content</string>
     <string name="error_age_restricted_hint">This video is only available to signed-in users who have verified their age.</string>

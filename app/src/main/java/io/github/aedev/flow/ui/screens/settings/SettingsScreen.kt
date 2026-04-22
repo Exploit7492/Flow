@@ -79,6 +79,8 @@ fun SettingsScreen(
     onNavigateToNotifications: () -> Unit,
     onNavigateToAppIconPicker: () -> Unit,
     onNavigateToDiagnostics: () -> Unit,
+    onNavigateToAutoBackup: () -> Unit,
+    onNavigateToExport: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
@@ -94,41 +96,6 @@ fun SettingsScreen(
         userBrain = FlowNeuroEngine.getBrainSnapshot()
     }
     
-    val exportLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.CreateDocument("application/json"),
-        onResult = { uri ->
-            uri?.let {
-                coroutineScope.launch {
-                    val result = backupRepo.exportData(it)
-                    if (result.isSuccess) {
-                        android.widget.Toast.makeText(context, context.getString(io.github.aedev.flow.R.string.settings_export_success), android.widget.Toast.LENGTH_SHORT).show()
-                    } else {
-                        android.widget.Toast.makeText(context, context.getString(io.github.aedev.flow.R.string.settings_export_failed, result.exceptionOrNull()?.message), android.widget.Toast.LENGTH_SHORT).show()
-                    }
-                }
-            }
-        }
-    )
-
-    // Brain / engine export launcher
-    val exportBrainLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.CreateDocument("application/json"),
-        onResult = { uri ->
-            uri?.let {
-                coroutineScope.launch {
-                    val success = context.contentResolver.openOutputStream(it)?.use { out ->
-                        FlowNeuroEngine.exportBrainToStream(out)
-                    } ?: false
-                    android.widget.Toast.makeText(
-                        context,
-                        context.getString(if (success) io.github.aedev.flow.R.string.export_engine_success else io.github.aedev.flow.R.string.export_engine_failed),
-                        android.widget.Toast.LENGTH_SHORT
-                    ).show()
-                }
-            }
-        }
-    )
-
     var showRegionDialog by remember { mutableStateOf(false) }
     var showResetBrainDialog by remember { mutableStateOf(false) }
     // Update checker state (github flavor only)
@@ -237,9 +204,9 @@ fun SettingsScreen(
         SettingSearchEntry(Icons.Outlined.NotificationsNone, androidx.compose.ui.res.stringResource(io.github.aedev.flow.R.string.settings_item_notifications), androidx.compose.ui.res.stringResource(io.github.aedev.flow.R.string.settings_item_notifications_subtitle), secNotifications, onNavigateToNotifications),
         SettingSearchEntry(Icons.Outlined.History, androidx.compose.ui.res.stringResource(io.github.aedev.flow.R.string.settings_item_search_history), androidx.compose.ui.res.stringResource(io.github.aedev.flow.R.string.settings_item_search_history_subtitle), secDataManagement, onNavigateToSearchHistory),
         SettingSearchEntry(Icons.Outlined.Schedule, androidx.compose.ui.res.stringResource(io.github.aedev.flow.R.string.settings_item_time_management), androidx.compose.ui.res.stringResource(io.github.aedev.flow.R.string.settings_item_time_management_subtitle), secDataManagement, onNavigateToTimeManagement),
-        SettingSearchEntry(Icons.Outlined.FileUpload, androidx.compose.ui.res.stringResource(io.github.aedev.flow.R.string.settings_item_export_data), androidx.compose.ui.res.stringResource(io.github.aedev.flow.R.string.settings_item_export_data_subtitle), secDataManagement) { exportLauncher.launch("flow_backup_${System.currentTimeMillis()}.json") },
+        SettingSearchEntry(Icons.Outlined.FileUpload, androidx.compose.ui.res.stringResource(io.github.aedev.flow.R.string.settings_item_export_data), androidx.compose.ui.res.stringResource(io.github.aedev.flow.R.string.settings_item_export_data_subtitle), secDataManagement, onNavigateToExport),
         SettingSearchEntry(Icons.Outlined.FileDownload, androidx.compose.ui.res.stringResource(io.github.aedev.flow.R.string.settings_item_import_data), androidx.compose.ui.res.stringResource(io.github.aedev.flow.R.string.settings_item_import_data_subtitle), secDataManagement, onNavigateToImport),
-        SettingSearchEntry(Icons.Outlined.Psychology, androidx.compose.ui.res.stringResource(io.github.aedev.flow.R.string.export_engine_data), androidx.compose.ui.res.stringResource(io.github.aedev.flow.R.string.export_engine_data_subtitle), secDataManagement) { exportBrainLauncher.launch("flow_engine_${System.currentTimeMillis()}.json") },
+        SettingSearchEntry(Icons.Outlined.Schedule, androidx.compose.ui.res.stringResource(io.github.aedev.flow.R.string.auto_backup_title), androidx.compose.ui.res.stringResource(io.github.aedev.flow.R.string.auto_backup_subtitle), secDataManagement, onNavigateToAutoBackup),
         SettingSearchEntry(Icons.Outlined.Info, androidx.compose.ui.res.stringResource(io.github.aedev.flow.R.string.settings_item_about_flow), androidx.compose.ui.res.stringResource(io.github.aedev.flow.R.string.settings_item_about_flow_subtitle), secAbout, onNavigateToAbout),
         SettingSearchEntry(Icons.Outlined.BugReport, androidx.compose.ui.res.stringResource(io.github.aedev.flow.R.string.settings_item_diagnostics), androidx.compose.ui.res.stringResource(io.github.aedev.flow.R.string.settings_item_diagnostics_subtitle), secAbout, onNavigateToDiagnostics),
         SettingSearchEntry(Icons.Outlined.Favorite, androidx.compose.ui.res.stringResource(io.github.aedev.flow.R.string.settings_item_support), androidx.compose.ui.res.stringResource(io.github.aedev.flow.R.string.settings_item_support_subtitle), secAbout, onNavigateToDonations)
@@ -662,7 +629,7 @@ item {
                         icon = Icons.Outlined.FileUpload,
                         title = androidx.compose.ui.res.stringResource(io.github.aedev.flow.R.string.settings_item_export_data),
                         subtitle = androidx.compose.ui.res.stringResource(io.github.aedev.flow.R.string.settings_item_export_data_subtitle),
-                        onClick = { exportLauncher.launch("flow_backup_${System.currentTimeMillis()}.json") }
+                        onClick = onNavigateToExport
                     )
                     HorizontalDivider(Modifier.padding(start = 56.dp), color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
                     SettingsItem(
@@ -673,10 +640,10 @@ item {
                     )
                     HorizontalDivider(Modifier.padding(start = 56.dp), color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
                     SettingsItem(
-                        icon = Icons.Outlined.Psychology,
-                        title = androidx.compose.ui.res.stringResource(io.github.aedev.flow.R.string.export_engine_data),
-                        subtitle = androidx.compose.ui.res.stringResource(io.github.aedev.flow.R.string.export_engine_data_subtitle),
-                        onClick = { exportBrainLauncher.launch("flow_engine_${System.currentTimeMillis()}.json") }
+                        icon = Icons.Outlined.Schedule,
+                        title = androidx.compose.ui.res.stringResource(io.github.aedev.flow.R.string.auto_backup_title),
+                        subtitle = androidx.compose.ui.res.stringResource(io.github.aedev.flow.R.string.auto_backup_subtitle),
+                        onClick = onNavigateToAutoBackup
                     )
                 }
             }

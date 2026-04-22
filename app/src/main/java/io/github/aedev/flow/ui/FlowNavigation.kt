@@ -291,7 +291,25 @@ fun NavGraphBuilder.flowAppGraph(
             onNavigateToUserPreferences = { navController.navigate("settings/user_preferences") },
             onNavigateToNotifications = { navController.navigate("settings/notifications") },
             onNavigateToAppIconPicker = { navController.navigate("settings/app_icon") },
-            onNavigateToDiagnostics = { navController.navigate("settings/diagnostics") }
+            onNavigateToDiagnostics = { navController.navigate("settings/diagnostics") },
+            onNavigateToAutoBackup = { navController.navigate("settings/auto_backup") },
+            onNavigateToExport = { navController.navigate("settings/export") }
+        )
+    }
+
+    composable("settings/auto_backup") {
+        currentRoute.value = "settings/auto_backup"
+        showBottomNav.value = false
+        io.github.aedev.flow.ui.screens.settings.AutoBackupSettingsScreen(
+            onNavigateBack = { navController.popBackStack() }
+        )
+    }
+
+    composable("settings/export") {
+        currentRoute.value = "settings/export"
+        showBottomNav.value = false
+        io.github.aedev.flow.ui.screens.settings.ExportDataScreen(
+            onNavigateBack = { navController.popBackStack() }
         )
     }
 

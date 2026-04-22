@@ -45,7 +45,15 @@ class LocalDataManager @Inject constructor(@ApplicationContext private val conte
         private val BREAK_FREQUENCY = androidx.datastore.preferences.core.intPreferencesKey("break_frequency") // Minutes
 
         private val CUSTOM_THEME_COLORS = stringPreferencesKey("custom_theme_colors")
+
+        val AUTO_BACKUP_FREQUENCY = stringPreferencesKey("auto_backup_frequency")
+        val AUTO_BACKUP_FOLDER_URI = stringPreferencesKey("auto_backup_folder_uri")
+        val AUTO_BACKUP_TYPE = stringPreferencesKey("auto_backup_type")
+        val AUTO_BACKUP_LAST_RUN = androidx.datastore.preferences.core.longPreferencesKey("auto_backup_last_run")
     }
+
+    enum class AutoBackupFrequency { NONE, DAILY, WEEKLY, MONTHLY }
+    enum class AutoBackupType { APP_DATA, BRAIN, MASTER }
 
     // Update Settings
     val lastUpdateCheck: Flow<Long> = context.dataStore.data.map { prefs ->
@@ -390,6 +398,53 @@ class LocalDataManager @Inject constructor(@ApplicationContext private val conte
                     prefs[androidx.datastore.preferences.core.intPreferencesKey(k)] = v 
                 }
             }
+        }
+    }
+
+    // ── Auto Backup Preferences ──
+
+    val autoBackupFrequency: Flow<AutoBackupFrequency> = context.dataStore.data.map { prefs ->
+        runCatching {
+            AutoBackupFrequency.valueOf(prefs[AUTO_BACKUP_FREQUENCY] ?: "NONE")
+        }.getOrDefault(AutoBackupFrequency.NONE)
+    }
+
+    suspend fun setAutoBackupFrequency(frequency: AutoBackupFrequency) {
+        context.dataStore.edit { prefs ->
+            prefs[AUTO_BACKUP_FREQUENCY] = frequency.name
+        }
+    }
+
+    val autoBackupFolderUri: Flow<String?> = context.dataStore.data.map { prefs ->
+        prefs[AUTO_BACKUP_FOLDER_URI]?.takeIf { it.isNotBlank() }
+    }
+
+    suspend fun setAutoBackupFolderUri(uri: String?) {
+        context.dataStore.edit { prefs ->
+            if (uri != null) prefs[AUTO_BACKUP_FOLDER_URI] = uri
+            else prefs.remove(AUTO_BACKUP_FOLDER_URI)
+        }
+    }
+
+    val autoBackupType: Flow<AutoBackupType> = context.dataStore.data.map { prefs ->
+        runCatching {
+            AutoBackupType.valueOf(prefs[AUTO_BACKUP_TYPE] ?: "APP_DATA")
+        }.getOrDefault(AutoBackupType.APP_DATA)
+    }
+
+    suspend fun setAutoBackupType(type: AutoBackupType) {
+        context.dataStore.edit { prefs ->
+            prefs[AUTO_BACKUP_TYPE] = type.name
+        }
+    }
+
+    val autoBackupLastRun: Flow<Long> = context.dataStore.data.map { prefs ->
+        prefs[AUTO_BACKUP_LAST_RUN] ?: 0L
+    }
+
+    suspend fun setAutoBackupLastRun(timestamp: Long) {
+        context.dataStore.edit { prefs ->
+            prefs[AUTO_BACKUP_LAST_RUN] = timestamp
         }
     }
 }
