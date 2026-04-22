@@ -265,8 +265,6 @@ class VideoPlayerService : Service() {
     override fun onTaskRemoved(rootIntent: Intent?) {
         if (isPlaying) {
             updateNotification()
-        } else {
-            stopPlayback()
         }
     }
     

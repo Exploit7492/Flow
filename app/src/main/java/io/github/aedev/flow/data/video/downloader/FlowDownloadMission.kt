@@ -1,7 +1,10 @@
 package io.github.aedev.flow.data.video.downloader
 
 import io.github.aedev.flow.data.model.Video
+import okhttp3.Call
+import java.util.Collections
 import java.util.UUID
+import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.atomic.AtomicLong
 
@@ -41,9 +44,15 @@ data class FlowDownloadMission(
     // Atomic counters — updated from multiple download threads without locks
     @Transient val downloadedBytesAtomic = AtomicLong(0L)
     @Transient val audioDownloadedBytesAtomic = AtomicLong(0L)
-    
+
     @Transient val videoBlockCounter = AtomicInteger(0)
     @Transient val audioBlockCounter = AtomicInteger(0)
+
+    // persist download blocks to avoid re-downloading
+    @Transient val completedVideoBlocks: MutableSet<Int> = ConcurrentHashMap.newKeySet()
+    @Transient val completedAudioBlocks: MutableSet<Int> = ConcurrentHashMap.newKeySet()
+
+    @Transient val activeCalls: MutableList<Call> = Collections.synchronizedList(mutableListOf())
     
     /** Convenience accessors for current downloaded bytes */
     val downloadedBytes: Long get() = downloadedBytesAtomic.get()

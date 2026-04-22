@@ -506,6 +506,8 @@ class FlowDownloadService : Service() {
                     stopForeground(false)
                     updateNotification(mission, videoId)
                 }
+            } else if (mission.status == MissionStatus.PAUSED) {
+                Log.d(TAG, "executeDownload: Download paused for $videoId (workers stopped naturally)")
             } else {
                 Log.e(TAG, "executeDownload: parallelDownloader.start returned false")
                 mission.status = MissionStatus.FAILED
@@ -523,9 +525,12 @@ class FlowDownloadService : Service() {
             stopForeground(false)
             updateNotification(mission, videoId)
         } finally {
-            Log.d(TAG, "executeDownload: Cleanup for $videoId")
-            activeMissions.remove(videoId)
-            itemIds.remove(videoId)
+            val currentStatus = activeMissions[videoId]?.status
+            Log.d(TAG, "executeDownload: Cleanup for $videoId (status=$currentStatus)")
+            if (currentStatus != MissionStatus.PAUSED) {
+                activeMissions.remove(videoId)
+                itemIds.remove(videoId)
+            }
             downloadJobs.remove(videoId)
         }
 
@@ -536,19 +541,34 @@ class FlowDownloadService : Service() {
     }
 
     private fun handlePause(videoId: String) {
-        val mission = activeMissions[videoId] ?: return
+        val mission = activeMissions[videoId] ?: run {
+            Log.w(TAG, "handlePause: No active mission for $videoId")
+            return
+        }
+        if (mission.status != MissionStatus.RUNNING) {
+            Log.d(TAG, "handlePause: Mission $videoId is not running (${mission.status}), ignoring")
+            return
+        }
+        Log.d(TAG, "handlePause: Setting status to PAUSED for $videoId")
         mission.status = MissionStatus.PAUSED
-        downloadJobs[videoId]?.cancel()
+
+        val calls = mission.activeCalls.toList()
+        mission.activeCalls.clear()
+        calls.forEach { it.cancel() }
+        Log.d(TAG, "handlePause: Cancelled ${calls.size} in-flight OkHttp call(s) for $videoId")
 
         serviceScope.launch {
             updateAllItemStatuses(videoId, DownloadItemStatus.PAUSED)
             val ids = itemIds[videoId]
             if (!ids.isNullOrEmpty()) {
+                val downloaded = mission.downloadedBytes + mission.audioDownloadedBytes
+                val total = mission.totalBytes + mission.audioTotalBytes
+                downloadManager.updateItemFull(ids.first(), downloaded, total, DownloadItemStatus.PAUSED)
                 downloadManager.emitProgress(
                     DownloadProgressUpdate(
                         videoId = videoId, itemId = ids.first(),
-                        downloadedBytes = mission.downloadedBytes + mission.audioDownloadedBytes,
-                        totalBytes = mission.totalBytes + mission.audioTotalBytes,
+                        downloadedBytes = downloaded,
+                        totalBytes = total,
                         status = DownloadItemStatus.PAUSED
                     )
                 )
@@ -556,20 +576,42 @@ class FlowDownloadService : Service() {
         }
 
         updateNotification(mission, videoId)
-        
-        // Stop foreground if no other active downloads
-        if (activeMissions.values.none { it.status == MissionStatus.RUNNING }) {
+
+        if (activeMissions.values.none { it.status == MissionStatus.RUNNING || it.status == MissionStatus.PAUSED }) {
             stopForeground(false)
         }
     }
 
     private fun handleResume(videoId: String) {
-        val mission = activeMissions[videoId] ?: return
-        mission.status = MissionStatus.RUNNING
+        val mission = activeMissions[videoId] ?: run {
+            Log.w(TAG, "handleResume: No mission found for $videoId — cannot resume")
+            return
+        }
+        if (mission.status != MissionStatus.PAUSED) {
+            Log.d(TAG, "handleResume: Mission $videoId is not paused (${mission.status}), ignoring")
+            return
+        }
+        Log.d(TAG, "handleResume: Resuming $videoId")
 
+        val notificationId = getNotificationId(videoId)
+        val notification = createNotification(mission, videoId)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+            try {
+                startForeground(
+                    notificationId, notification,
+                    android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC
+                )
+            } catch (e: Exception) {
+                startForeground(notificationId, notification)
+            }
+        } else {
+            startForeground(notificationId, notification)
+        }
+
+        val audioOnly = mission.audioUrl == null && mission.savePath.endsWith(".m4a")
+        val previousJob = downloadJobs[videoId]
         val job = serviceScope.launch {
-            val audioOnly = mission.audioUrl == null && 
-                mission.savePath.endsWith(".m4a")
+            previousJob?.join()
             executeDownload(mission, videoId, audioOnly)
         }
         downloadJobs[videoId] = job

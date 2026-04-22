@@ -500,7 +500,7 @@ private fun PersonaHeroCard(
                     brush = Brush.linearGradient(
                         colors = listOf(
                             MaterialTheme.colorScheme.primary,
-                            MaterialTheme.colorScheme.primary
+                            MaterialTheme.colorScheme.primaryContainer
                         ),
                         start = Offset(0f, 0f),
                         end = Offset(1000f, 1000f)

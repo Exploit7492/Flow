@@ -388,7 +388,7 @@ fun GlobalPlayerOverlay(
                 videoAspectRatio = videoAspectRatio,
                 bottomPadding = bottomPadding,
                 miniPlayerScale = miniPlayerScale,
-                tapToExpand = !playerUiState.isRestoredSession,
+                tapToExpand = true,
                 onDismiss = onClose,
                 onCollapseGesture = {
                     screenState.isFullscreen = false
@@ -646,6 +646,7 @@ fun GlobalPlayerOverlay(
                                         EnhancedPlayerManager.getInstance().pause()
                                     } else {
                                         EnhancedPlayerManager.getInstance().play()
+                                        playerViewModel.ensureNotificationServiceRunning()
                                     }
                                 },
                                 onSeek = { newPosition ->
@@ -757,6 +758,7 @@ fun GlobalPlayerOverlay(
                                 EnhancedPlayerManager.getInstance().pause()
                             } else {
                                 EnhancedPlayerManager.getInstance().play()
+                                playerViewModel.ensureNotificationServiceRunning()
                             }
                         },
                         onSkipForward = {

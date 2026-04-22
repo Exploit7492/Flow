@@ -201,6 +201,16 @@ class VideoPlayerViewModel @Inject constructor(
         }
     }
 
+    fun ensureNotificationServiceRunning() {
+        val video = _uiState.value.cachedVideo ?: return
+        EnhancedPlayerManager.getInstance().startBackgroundService(
+            videoId   = video.id,
+            title     = video.title.ifEmpty { "Playing…" },
+            channel   = video.channelName,
+            thumbnail = video.thumbnailUrl
+        )
+    }
+
     fun clearResumedInMiniPlayer() {
         _uiState.update { it.copy(resumedInMiniPlayer = false) }
     }

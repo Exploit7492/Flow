@@ -190,11 +190,22 @@ class ParallelDownloader @Inject constructor() {
                 val videoBlockCount = ((mission.totalBytes + BLOCK_SIZE - 1) / BLOCK_SIZE).toInt()
                 val audioBlockCount = if (isDash) ((mission.audioTotalBytes + BLOCK_SIZE - 1) / BLOCK_SIZE).toInt() else 0
 
-                // Reset atomic block counters (for fresh or resumed download)
                 mission.videoBlockCounter.set(0)
                 mission.audioBlockCounter.set(0)
 
-                Log.d(TAG, "start: video=${mission.totalBytes}B in $videoBlockCount blocks, audio=${mission.audioTotalBytes}B in $audioBlockCount blocks, threads=${mission.threads}")
+                val restoredVideoBytes = mission.completedVideoBlocks.sumOf { idx ->
+                    val s = idx.toLong() * BLOCK_SIZE
+                    minOf(s + BLOCK_SIZE, mission.totalBytes) - s
+                }
+                val restoredAudioBytes = mission.completedAudioBlocks.sumOf { idx ->
+                    val s = idx.toLong() * BLOCK_SIZE
+                    minOf(s + BLOCK_SIZE, mission.audioTotalBytes) - s
+                }
+                mission.downloadedBytesAtomic.set(restoredVideoBytes)
+                mission.audioDownloadedBytesAtomic.set(restoredAudioBytes)
+
+                Log.d(TAG, "start: video=${mission.totalBytes}B in $videoBlockCount blocks (${mission.completedVideoBlocks.size} already done), " +
+                    "audio=${mission.audioTotalBytes}B in $audioBlockCount blocks (${mission.completedAudioBlocks.size} already done), threads=${mission.threads}")
 
                 coroutineScope {
                     // Launch worker threads for video
@@ -281,10 +292,13 @@ class ParallelDownloader @Inject constructor() {
         isAudio: Boolean,
         threadName: String
     ): Boolean {
+        val completedBlocks = if (isAudio) mission.completedAudioBlocks else mission.completedVideoBlocks
         var blocksDownloaded = 0
         while (mission.status == MissionStatus.RUNNING) {
             val blockIndex = blockCounter.getAndIncrement()
-            if (blockIndex >= totalBlocks) break 
+            if (blockIndex >= totalBlocks) break
+
+            if (completedBlocks.contains(blockIndex)) continue
 
             val startByte = blockIndex.toLong() * BLOCK_SIZE
             val endByte = min(startByte + BLOCK_SIZE - 1, totalBytes - 1)
@@ -305,9 +319,10 @@ class ParallelDownloader @Inject constructor() {
                 Log.e(TAG, "Worker $threadName failed on block $blockIndex")
                 return false
             }
+            completedBlocks.add(blockIndex)
             blocksDownloaded++
         }
-        Log.d(TAG, "Worker $threadName finished ($blocksDownloaded blocks)")
+        Log.d(TAG, "Worker $threadName finished ($blocksDownloaded blocks, ${completedBlocks.size} total completed)")
         return mission.status == MissionStatus.RUNNING || mission.status == MissionStatus.FINISHED
     }
 
@@ -392,7 +407,14 @@ class ParallelDownloader @Inject constructor() {
                 .build()
         }
 
-        val response = client.newCall(request).execute()
+        val call = client.newCall(request)
+        mission.activeCalls.add(call)
+        val response = try {
+            call.execute()
+        } catch (e: Exception) {
+            mission.activeCalls.remove(call)
+            throw e
+        }
         try {
             if (!response.isSuccessful) {
                 val code = response.code
@@ -420,6 +442,7 @@ class ParallelDownloader @Inject constructor() {
 
             return true
         } finally {
+            mission.activeCalls.remove(call)
             response.close()
         }
     }
