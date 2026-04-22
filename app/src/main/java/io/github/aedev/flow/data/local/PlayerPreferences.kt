@@ -174,6 +174,11 @@ class PlayerPreferences(private val context: Context) {
         val DEEP_FLOW_ACTIVE = booleanPreferencesKey("deep_flow_active")
         val DEEP_FLOW_ACTIVATED_AT = longPreferencesKey("deep_flow_activated_at")
         val DEEP_FLOW_EXPIRE_HOURS = intPreferencesKey("deep_flow_expire_hours")
+
+        // Auto-backup settings
+        val AUTO_BACKUP_FREQUENCY = stringPreferencesKey("auto_backup_frequency")
+        val AUTO_BACKUP_FOLDER_URI = stringPreferencesKey("auto_backup_folder_uri")
+        val AUTO_BACKUP_TYPE = stringPreferencesKey("auto_backup_type")
     }
     
     // Grid item size preference
@@ -1224,8 +1229,48 @@ class PlayerPreferences(private val context: Context) {
         }
     }
 
+    // AUTO-BACKUP SETTINGS
+    val autoBackupFrequency: Flow<LocalDataManager.AutoBackupFrequency> = context.playerPreferencesDataStore.data
+        .map { preferences ->
+            runCatching {
+                LocalDataManager.AutoBackupFrequency.valueOf(
+                    preferences[Keys.AUTO_BACKUP_FREQUENCY] ?: LocalDataManager.AutoBackupFrequency.NONE.name
+                )
+            }.getOrDefault(LocalDataManager.AutoBackupFrequency.NONE)
+        }
+
+    suspend fun setAutoBackupFrequency(frequency: LocalDataManager.AutoBackupFrequency) {
+        context.playerPreferencesDataStore.edit { preferences ->
+            preferences[Keys.AUTO_BACKUP_FREQUENCY] = frequency.name
+        }
+    }
+
+    val autoBackupFolderUri: Flow<String?> = context.playerPreferencesDataStore.data
+        .map { preferences -> preferences[Keys.AUTO_BACKUP_FOLDER_URI]?.takeIf { it.isNotBlank() } }
+
+    suspend fun setAutoBackupFolderUri(uri: String?) {
+        context.playerPreferencesDataStore.edit { preferences ->
+            if (uri != null) preferences[Keys.AUTO_BACKUP_FOLDER_URI] = uri
+            else preferences.remove(Keys.AUTO_BACKUP_FOLDER_URI)
+        }
+    }
+
+    val autoBackupType: Flow<LocalDataManager.AutoBackupType> = context.playerPreferencesDataStore.data
+        .map { preferences ->
+            runCatching {
+                LocalDataManager.AutoBackupType.valueOf(
+                    preferences[Keys.AUTO_BACKUP_TYPE] ?: LocalDataManager.AutoBackupType.APP_DATA.name
+                )
+            }.getOrDefault(LocalDataManager.AutoBackupType.APP_DATA)
+        }
+
+    suspend fun setAutoBackupType(type: LocalDataManager.AutoBackupType) {
+        context.playerPreferencesDataStore.edit { preferences ->
+            preferences[Keys.AUTO_BACKUP_TYPE] = type.name
+        }
+    }
+
     
-    // Returns true if Deep Flow is active AND not yet expired.
     suspend fun isDeepFlowCurrentlyActive(): Boolean {
         val prefs = context.playerPreferencesDataStore.data.first()
         val active = prefs[Keys.DEEP_FLOW_ACTIVE] ?: false

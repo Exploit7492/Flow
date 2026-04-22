@@ -74,6 +74,8 @@ class ViewHistory private constructor(private val context: Context) {
         channelId: String = "",
         isMusic: Boolean = false
     ) {
+        if (PlayerPreferences(context).isDeepFlowCurrentlyActive()) return
+
         val thumbnail = thumbnailUrl.ifEmpty { "https://i.ytimg.com/vi/$videoId/hqdefault.jpg" }
         dao.upsert(
             WatchHistoryEntity(
@@ -103,6 +105,8 @@ class ViewHistory private constructor(private val context: Context) {
         channelId: String = "",
         duration: Long = 0L
     ) {
+        if (PlayerPreferences(context).isDeepFlowCurrentlyActive()) return
+
         val thumbnail = thumbnailUrl.ifEmpty { "https://i.ytimg.com/vi/$videoId/hqdefault.jpg" }
         val existingPosition = dao.getPosition(videoId) ?: 0L  // preserve saved progress
         dao.upsert(

@@ -19,6 +19,7 @@ import androidx.media.session.MediaButtonReceiver
 import io.github.aedev.flow.MainActivity
 import io.github.aedev.flow.R
 import io.github.aedev.flow.player.EnhancedPlayerManager
+import io.github.aedev.flow.player.GlobalPlayerState
 import io.github.aedev.flow.data.model.Video
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.collectLatest
@@ -120,6 +121,12 @@ class VideoPlayerService : Service() {
                 override fun onSkipToPrevious() {
                     EnhancedPlayerManager.getInstance().playPrevious()
                 }
+
+                override fun onCustomAction(action: String?, extras: android.os.Bundle?) {
+                    if (action == ACTION_CLOSE) {
+                        stopPlayback()
+                    }
+                }
             })
             
             isActive = true
@@ -138,6 +145,11 @@ class VideoPlayerService : Service() {
                 PlaybackStateCompat.ACTION_SKIP_TO_PREVIOUS
             )
             .setState(PlaybackStateCompat.STATE_PAUSED, 0L, 1f)
+            .addCustomAction(
+                PlaybackStateCompat.CustomAction.Builder(
+                    ACTION_CLOSE, "Close", R.drawable.ic_close
+                ).build()
+            )
             .build()
         mediaSession.setPlaybackState(initialState)
 
@@ -303,7 +315,13 @@ class VideoPlayerService : Service() {
         } else {
             PlaybackStateCompat.STATE_PAUSED
         }
-        
+
+        val closeAction = PlaybackStateCompat.CustomAction.Builder(
+            ACTION_CLOSE,
+            "Close",
+            R.drawable.ic_close
+        ).build()
+
         val playbackState = PlaybackStateCompat.Builder()
             .setActions(
                 PlaybackStateCompat.ACTION_PLAY or
@@ -315,8 +333,9 @@ class VideoPlayerService : Service() {
                 PlaybackStateCompat.ACTION_SKIP_TO_PREVIOUS
             )
             .setState(state, position, 1f)
+            .addCustomAction(closeAction)
             .build()
-        
+
         mediaSession.setPlaybackState(playbackState)
     }
     
@@ -468,7 +487,7 @@ class VideoPlayerService : Service() {
             .setContentTitle(video.title)
             .setContentText(video.channelName)
             .setSubText("Flow Player")
-            .setSmallIcon(R.drawable.ic_play)
+            .setSmallIcon(R.drawable.ic_notification_logo)
             .setLargeIcon(thumbnail)
             .setContentIntent(contentIntent)
             .setDeleteIntent(closeIntent)
@@ -487,16 +506,15 @@ class VideoPlayerService : Service() {
                 if (isPlaying) "Pause" else "Play",
                 playPauseIntent
             )
-            // Add Next Action
-            .addAction(
-                R.drawable.ic_next,
-                "Next",
-                nextIntent
-            )
             .addAction(
                 R.drawable.ic_close,
                 "Close",
                 closeIntent
+            )
+            .addAction(
+                R.drawable.ic_next,
+                "Next",
+                nextIntent
             )
             .setStyle(
                 androidx.media.app.NotificationCompat.MediaStyle()
@@ -513,7 +531,7 @@ class VideoPlayerService : Service() {
             .setContentTitle(title?.takeIf { it.isNotEmpty() } ?: "Flow Player")
             .setContentText(channel?.takeIf { it.isNotEmpty() } ?: "Preparing playback...")
             .setSubText("Flow Player")
-            .setSmallIcon(R.drawable.ic_play)
+            .setSmallIcon(R.drawable.ic_notification_logo)
             .setPriority(NotificationCompat.PRIORITY_LOW)
             .setOngoing(true)
             .build()
@@ -538,7 +556,8 @@ class VideoPlayerService : Service() {
     }
     
     private fun stopPlayback() {
-        EnhancedPlayerManager.getInstance().pause()
+        EnhancedPlayerManager.getInstance().stop()
+        GlobalPlayerState.requestDismiss()
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
             stopForeground(STOP_FOREGROUND_REMOVE)
         } else {

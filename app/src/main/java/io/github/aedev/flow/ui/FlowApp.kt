@@ -205,6 +205,22 @@ fun FlowApp(
         }
     }
 
+    val dismissRequested by GlobalPlayerState.dismissRequested.collectAsState()
+    LaunchedEffect(dismissRequested) {
+        if (dismissRequested) {
+            GlobalPlayerState.resetDismiss()
+            GlobalPlayerState.hideMiniPlayer()
+            playerVisible = false
+            if (playerUiState.isRestoredSession) {
+                playerViewModel.dismissContinueWatching()
+            }
+            playerViewModel.clearVideo()
+            if (isInPipMode) {
+                activity?.moveTaskToBack(false)
+            }
+        }
+    }
+
     Box(modifier = Modifier.fillMaxSize()) {
         Scaffold(
             modifier = Modifier.fillMaxSize(),

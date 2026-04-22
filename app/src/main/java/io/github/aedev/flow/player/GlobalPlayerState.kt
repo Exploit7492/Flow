@@ -35,6 +35,9 @@ object GlobalPlayerState {
     
     private val _isInPipMode = MutableStateFlow(false)
     val isInPipMode: StateFlow<Boolean> = _isInPipMode.asStateFlow()
+
+    private val _dismissRequested = MutableStateFlow(false)
+    val dismissRequested: StateFlow<Boolean> = _dismissRequested.asStateFlow()
     
     // Delegate to EnhancedPlayerManager for player state
     val playerState: StateFlow<EnhancedPlayerState> = EnhancedPlayerManager.getInstance().playerState
@@ -74,6 +77,14 @@ object GlobalPlayerState {
      */
     fun setPipMode(inPipMode: Boolean) {
         _isInPipMode.value = inPipMode
+    }
+
+    fun requestDismiss() {
+        _dismissRequested.value = true
+    }
+
+    fun resetDismiss() {
+        _dismissRequested.value = false
     }
     
     /**

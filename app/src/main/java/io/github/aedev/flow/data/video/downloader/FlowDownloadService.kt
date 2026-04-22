@@ -628,6 +628,13 @@ class FlowDownloadService : Service() {
         val mission = activeMissions[videoId]
         mission?.status = MissionStatus.FAILED
 
+        mission?.let { m ->
+            val calls = m.activeCalls.toList()
+            m.activeCalls.clear()
+            calls.forEach { it.cancel() }
+            Log.d(TAG, "handleCancel: Cancelled ${calls.size} in-flight OkHttp call(s) for $videoId")
+        }
+
         val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
         notificationManager.cancel(getNotificationId(videoId))
 

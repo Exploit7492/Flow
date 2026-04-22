@@ -684,6 +684,7 @@ class VideoDownloadManager @Inject constructor(
      * MediaStore-based recovery scan.  Queries the system media index for video and audio files
      * stored in any folder named [VIDEO_DIR] ("Flow").  Works with only READ_MEDIA_VIDEO /
      * READ_MEDIA_AUDIO — no MANAGE_EXTERNAL_STORAGE needed.  Safe to call repeatedly.
+     * Scans: Downloads/Flow, Movies/Flow, app-private external dirs, and the user's custom path.
      */
     @androidx.annotation.RequiresApi(Build.VERSION_CODES.Q)
     private suspend fun scanViaMediaStore(
@@ -694,13 +695,22 @@ class VideoDownloadManager @Inject constructor(
             MediaStore.MediaColumns.DATA,
             MediaStore.MediaColumns.DISPLAY_NAME,
             MediaStore.MediaColumns.SIZE,
-            MediaStore.MediaColumns.DURATION,
-            MediaStore.MediaColumns.BUCKET_DISPLAY_NAME
+            MediaStore.MediaColumns.DURATION
         )
-        val selection = "${MediaStore.MediaColumns.BUCKET_DISPLAY_NAME} = ?"
-        val selectionArgs = arrayOf(VIDEO_DIR)
 
-        val customBucket = customDownloadPath?.let { File(it).name }
+        val pathPrefixes = buildList {
+            Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
+                ?.let { File(it, VIDEO_DIR).canonicalPath }?.let { add(it) }
+            Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_MOVIES)
+                ?.let { File(it, VIDEO_DIR).canonicalPath }?.let { add(it) }
+            context.getExternalFilesDir(Environment.DIRECTORY_MOVIES)
+                ?.canonicalPath?.let { add(it) }
+            context.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS)
+                ?.canonicalPath?.let { add(it) }
+            customDownloadPath?.let { add(File(it).canonicalPath) }
+        }
+
+        if (pathPrefixes.isEmpty()) return@withContext
 
         val collections = listOf(
             MediaStore.Video.Media.EXTERNAL_CONTENT_URI,
@@ -708,94 +718,90 @@ class VideoDownloadManager @Inject constructor(
         )
 
         for (collectionUri in collections) {
-            for (bucket in buildList {
-                add(VIDEO_DIR)
-                if (customBucket != null && customBucket != VIDEO_DIR) add(customBucket)
-            }) {
-                try {
-                    context.contentResolver.query(
-                        collectionUri,
-                        projection,
-                        "${MediaStore.MediaColumns.BUCKET_DISPLAY_NAME} = ?",
-                        arrayOf(bucket),
-                        null
-                    )?.use { cursor ->
-                        val dataIdx = cursor.getColumnIndexOrThrow(MediaStore.MediaColumns.DATA)
-                        val nameIdx = cursor.getColumnIndexOrThrow(MediaStore.MediaColumns.DISPLAY_NAME)
-                        val sizeIdx = cursor.getColumnIndexOrThrow(MediaStore.MediaColumns.SIZE)
-                        val durIdx  = cursor.getColumnIndexOrThrow(MediaStore.MediaColumns.DURATION)
+            try {
+                context.contentResolver.query(
+                    collectionUri,
+                    projection,
+                    null,
+                    null,
+                    null
+                )?.use { cursor ->
+                    val dataIdx = cursor.getColumnIndexOrThrow(MediaStore.MediaColumns.DATA)
+                    val nameIdx = cursor.getColumnIndexOrThrow(MediaStore.MediaColumns.DISPLAY_NAME)
+                    val sizeIdx = cursor.getColumnIndexOrThrow(MediaStore.MediaColumns.SIZE)
+                    val durIdx  = cursor.getColumnIndexOrThrow(MediaStore.MediaColumns.DURATION)
 
-                        while (cursor.moveToNext()) {
-                            val filePath = cursor.getString(dataIdx) ?: continue
-                            val fileName = cursor.getString(nameIdx) ?: continue
-                            val fileSize = cursor.getLong(sizeIdx)
-                            val durationMs = cursor.getLong(durIdx)
+                    while (cursor.moveToNext()) {
+                        val filePath = cursor.getString(dataIdx) ?: continue
+                        val fileName = cursor.getString(nameIdx) ?: continue
+                        val fileSize = cursor.getLong(sizeIdx)
+                        val durationMs = cursor.getLong(durIdx)
+                        if (pathPrefixes.none { prefix -> filePath.startsWith(prefix) }) continue
 
-                            val ext = fileName.substringAfterLast('.', "").lowercase()
-                            val isVideo = ext in videoExtensions
-                            val isAudio = ext in audioExtensions
-                            if (!isVideo && !isAudio) continue
+                        val ext = fileName.substringAfterLast('.', "").lowercase()
+                        val isVideo = ext in videoExtensions
+                        val isAudio = ext in audioExtensions
+                        if (!isVideo && !isAudio) continue
 
-                            if (downloadDao.existsByFilePath(filePath)) continue
-                            if (recentlyDeletedPaths.contains(filePath)) continue
-                            if (tombstonePrefs.contains(filePath)) {
-                                if (deleteFileFromDisk(filePath)) tombstonePrefs.edit().remove(filePath).apply()
-                                continue
-                            }
-
-                            val file = File(filePath)
-                            val pseudoId = "recovered_${filePath.hashCode().toLong() and 0xFFFFFFFFL}"
-
-                            val thumbnailUrl: String = if (isVideo) {
-                                try {
-                                    val mmr = android.media.MediaMetadataRetriever()
-                                    mmr.setDataSource(filePath)
-                                    val bmp = mmr.getFrameAtTime(1_000_000L, android.media.MediaMetadataRetriever.OPTION_CLOSEST_SYNC)
-                                        ?: mmr.getFrameAtTime(0L, android.media.MediaMetadataRetriever.OPTION_CLOSEST_SYNC)
-                                    mmr.release()
-                                    if (bmp != null) {
-                                        val thumbFile = File(context.cacheDir, "thumb_$pseudoId.jpg")
-                                        thumbFile.outputStream().use {
-                                            bmp.compress(android.graphics.Bitmap.CompressFormat.JPEG, 85, it)
-                                        }
-                                        bmp.recycle()
-                                        if (thumbFile.exists() && thumbFile.length() > 0) "file://${thumbFile.absolutePath}" else ""
-                                    } else ""
-                                } catch (_: Exception) { "" }
-                            } else ""
-
-                            val fileType = if (isVideo) DownloadFileType.VIDEO else DownloadFileType.AUDIO
-
-                            downloadDao.insertDownload(
-                                DownloadEntity(
-                                    videoId = pseudoId,
-                                    title = fileName.substringBeforeLast('.'),
-                                    uploader = "Local File",
-                                    duration = durationMs / 1000,
-                                    thumbnailUrl = thumbnailUrl,
-                                    createdAt = if (file.exists()) file.lastModified() else System.currentTimeMillis()
-                                )
-                            )
-                            downloadDao.insertItem(
-                                DownloadItemEntity(
-                                    videoId = pseudoId,
-                                    fileType = fileType,
-                                    fileName = fileName,
-                                    filePath = filePath,
-                                    format = ext,
-                                    quality = "Local",
-                                    mimeType = if (isVideo) "video/mp4" else "audio/mp4",
-                                    downloadedBytes = fileSize,
-                                    totalBytes = fileSize,
-                                    status = DownloadItemStatus.COMPLETED
-                                )
-                            )
-                            Log.i(TAG, "scanViaMediaStore: recovered '$fileName' as $pseudoId")
+                        if (downloadDao.existsByFilePath(filePath)) continue
+                        if (recentlyDeletedPaths.contains(filePath)) continue
+                        if (tombstonePrefs.contains(filePath)) {
+                            if (deleteFileFromDisk(filePath)) tombstonePrefs.edit().remove(filePath).apply()
+                            continue
                         }
+
+                        val file = File(filePath)
+                        val pseudoId = "recovered_${filePath.hashCode().toLong() and 0xFFFFFFFFL}"
+
+                        val thumbnailUrl: String = if (isVideo) {
+                            try {
+                                val mmr = android.media.MediaMetadataRetriever()
+                                mmr.setDataSource(filePath)
+                                val bmp = mmr.getFrameAtTime(1_000_000L, android.media.MediaMetadataRetriever.OPTION_CLOSEST_SYNC)
+                                    ?: mmr.getFrameAtTime(0L, android.media.MediaMetadataRetriever.OPTION_CLOSEST_SYNC)
+                                mmr.release()
+                                if (bmp != null) {
+                                    val thumbFile = File(context.cacheDir, "thumb_$pseudoId.jpg")
+                                    thumbFile.outputStream().use {
+                                        bmp.compress(android.graphics.Bitmap.CompressFormat.JPEG, 85, it)
+                                    }
+                                    bmp.recycle()
+                                    if (thumbFile.exists() && thumbFile.length() > 0) "file://${thumbFile.absolutePath}" else ""
+                                } else ""
+                            } catch (_: Exception) { "" }
+                        } else ""
+
+                        val fileType = if (isVideo) DownloadFileType.VIDEO else DownloadFileType.AUDIO
+
+                        downloadDao.insertDownload(
+                            DownloadEntity(
+                                videoId = pseudoId,
+                                title = fileName.substringBeforeLast('.'),
+                                uploader = "Local File",
+                                duration = durationMs / 1000,
+                                thumbnailUrl = thumbnailUrl,
+                                createdAt = if (file.exists()) file.lastModified() else System.currentTimeMillis()
+                            )
+                        )
+                        downloadDao.insertItem(
+                            DownloadItemEntity(
+                                videoId = pseudoId,
+                                fileType = fileType,
+                                fileName = fileName,
+                                filePath = filePath,
+                                format = ext,
+                                quality = "Local",
+                                mimeType = if (isVideo) "video/mp4" else "audio/mp4",
+                                downloadedBytes = fileSize,
+                                totalBytes = fileSize,
+                                status = DownloadItemStatus.COMPLETED
+                            )
+                        )
+                        Log.i(TAG, "scanViaMediaStore: recovered '$fileName' as $pseudoId")
                     }
-                } catch (e: Exception) {
-                    Log.w(TAG, "scanViaMediaStore: query failed for $collectionUri bucket=$bucket", e)
                 }
+            } catch (e: Exception) {
+                Log.w(TAG, "scanViaMediaStore: query failed for $collectionUri", e)
             }
         }
     }

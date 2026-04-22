@@ -23,6 +23,7 @@ import androidx.compose.ui.unit.dp
 import io.github.aedev.flow.R
 import io.github.aedev.flow.data.local.BackupRepository
 import io.github.aedev.flow.data.local.LocalDataManager
+import io.github.aedev.flow.data.local.PlayerPreferences
 import io.github.aedev.flow.notification.AutoBackupWorker
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
@@ -37,11 +38,12 @@ fun AutoBackupSettingsScreen(
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val ldm = remember { LocalDataManager(context) }
+    val playerPrefs = remember { PlayerPreferences(context) }
     val backupRepo = remember { BackupRepository(context) }
 
-    val frequency by ldm.autoBackupFrequency.collectAsState(initial = LocalDataManager.AutoBackupFrequency.NONE)
-    val folderUriStr by ldm.autoBackupFolderUri.collectAsState(initial = null)
-    val backupType by ldm.autoBackupType.collectAsState(initial = LocalDataManager.AutoBackupType.APP_DATA)
+    val frequency by playerPrefs.autoBackupFrequency.collectAsState(initial = LocalDataManager.AutoBackupFrequency.NONE)
+    val folderUriStr by playerPrefs.autoBackupFolderUri.collectAsState(initial = null)
+    val backupType by playerPrefs.autoBackupType.collectAsState(initial = LocalDataManager.AutoBackupType.APP_DATA)
     val lastRun by ldm.autoBackupLastRun.collectAsState(initial = 0L)
 
     var isRunningNow by remember { mutableStateOf(false) }
@@ -54,7 +56,7 @@ fun AutoBackupSettingsScreen(
                 it,
                 Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION
             )
-            scope.launch { ldm.setAutoBackupFolderUri(it.toString()) }
+            scope.launch { playerPrefs.setAutoBackupFolderUri(it.toString()) }
         }
     }
 
@@ -128,7 +130,7 @@ fun AutoBackupSettingsScreen(
                                     selected = frequency == freq,
                                     onClick = {
                                         scope.launch {
-                                            ldm.setAutoBackupFrequency(freq)
+                                            playerPrefs.setAutoBackupFrequency(freq)
                                             when (freq) {
                                                 LocalDataManager.AutoBackupFrequency.NONE ->
                                                     AutoBackupWorker.cancelBackup(context)
@@ -155,7 +157,7 @@ fun AutoBackupSettingsScreen(
                                     selected = frequency == freq,
                                     onClick = {
                                         scope.launch {
-                                            ldm.setAutoBackupFrequency(freq)
+                                            playerPrefs.setAutoBackupFrequency(freq)
                                             when (freq) {
                                                 LocalDataManager.AutoBackupFrequency.NONE ->
                                                     AutoBackupWorker.cancelBackup(context)
@@ -199,7 +201,7 @@ fun AutoBackupSettingsScreen(
                                     .fillMaxWidth()
                                     .selectable(
                                         selected = backupType == type,
-                                        onClick = { scope.launch { ldm.setAutoBackupType(type) } },
+                                        onClick = { scope.launch { playerPrefs.setAutoBackupType(type) } },
                                         role = Role.RadioButton
                                     )
                                     .padding(horizontal = 16.dp, vertical = 14.dp),

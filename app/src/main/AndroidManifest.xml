@@ -46,7 +46,8 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.Flow"
         android:usesCleartextTraffic="true"
-        android:resizeableActivity="true">
+        android:resizeableActivity="true"
+        android:enableOnBackInvokedCallback="true">
 
         <!--
             Samsung keep-alive hints (same as NewPipe).

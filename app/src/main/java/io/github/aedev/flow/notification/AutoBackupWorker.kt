@@ -16,6 +16,7 @@ import androidx.work.WorkerParameters
 import io.github.aedev.flow.R
 import io.github.aedev.flow.data.local.BackupRepository
 import io.github.aedev.flow.data.local.LocalDataManager
+import io.github.aedev.flow.data.local.PlayerPreferences
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withContext
@@ -51,17 +52,18 @@ class AutoBackupWorker(
 
     override suspend fun doWork(): Result = withContext(Dispatchers.IO) {
         val ldm = LocalDataManager(appContext)
+        val playerPrefs = PlayerPreferences(appContext)
 
-        val frequency = ldm.autoBackupFrequency.first()
+        val frequency = playerPrefs.autoBackupFrequency.first()
         if (frequency == LocalDataManager.AutoBackupFrequency.NONE) {
             return@withContext Result.success()
         }
 
-        val folderUriStr = ldm.autoBackupFolderUri.first()
+        val folderUriStr = playerPrefs.autoBackupFolderUri.first()
             ?: return@withContext Result.failure()
 
         val folderUri = Uri.parse(folderUriStr)
-        val type = ldm.autoBackupType.first()
+        val type = playerPrefs.autoBackupType.first()
         val backupRepo = BackupRepository(appContext)
 
         val result = when (type) {
