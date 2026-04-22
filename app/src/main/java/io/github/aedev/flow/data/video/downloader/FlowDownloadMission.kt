@@ -52,6 +52,9 @@ data class FlowDownloadMission(
     @Transient val completedVideoBlocks: MutableSet<Int> = ConcurrentHashMap.newKeySet()
     @Transient val completedAudioBlocks: MutableSet<Int> = ConcurrentHashMap.newKeySet()
 
+    @Transient val partialVideoBlockBytes: ConcurrentHashMap<Int, Long> = ConcurrentHashMap()
+    @Transient val partialAudioBlockBytes: ConcurrentHashMap<Int, Long> = ConcurrentHashMap()
+
     @Transient val activeCalls: MutableList<Call> = Collections.synchronizedList(mutableListOf())
     
     /** Convenience accessors for current downloaded bytes */

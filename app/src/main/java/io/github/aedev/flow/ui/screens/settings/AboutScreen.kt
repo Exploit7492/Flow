@@ -179,7 +179,7 @@ fun AboutScreen(
             item { AboutRowDivider() }
             item {
                 AboutRow(
-                    icon = Icons.Outlined.Favorite,
+                    icon = Icons.Outlined.VolunteerActivism,
                     title = stringResource(R.string.donate_item_title),
                     subtitle = stringResource(R.string.support_dev_subtitle),
                     onClick = onNavigateToDonations

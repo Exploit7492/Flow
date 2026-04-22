@@ -209,7 +209,7 @@ fun SettingsScreen(
         SettingSearchEntry(Icons.Outlined.Schedule, androidx.compose.ui.res.stringResource(io.github.aedev.flow.R.string.auto_backup_title), androidx.compose.ui.res.stringResource(io.github.aedev.flow.R.string.auto_backup_subtitle), secDataManagement, onNavigateToAutoBackup),
         SettingSearchEntry(Icons.Outlined.Info, androidx.compose.ui.res.stringResource(io.github.aedev.flow.R.string.settings_item_about_flow), androidx.compose.ui.res.stringResource(io.github.aedev.flow.R.string.settings_item_about_flow_subtitle), secAbout, onNavigateToAbout),
         SettingSearchEntry(Icons.Outlined.BugReport, androidx.compose.ui.res.stringResource(io.github.aedev.flow.R.string.settings_item_diagnostics), androidx.compose.ui.res.stringResource(io.github.aedev.flow.R.string.settings_item_diagnostics_subtitle), secAbout, onNavigateToDiagnostics),
-        SettingSearchEntry(Icons.Outlined.Favorite, androidx.compose.ui.res.stringResource(io.github.aedev.flow.R.string.settings_item_support), androidx.compose.ui.res.stringResource(io.github.aedev.flow.R.string.settings_item_support_subtitle), secAbout, onNavigateToDonations)
+        SettingSearchEntry(Icons.Outlined.VolunteerActivism, androidx.compose.ui.res.stringResource(io.github.aedev.flow.R.string.settings_item_support), androidx.compose.ui.res.stringResource(io.github.aedev.flow.R.string.settings_item_support_subtitle), secAbout, onNavigateToDonations)
     ) + if (BuildConfig.UPDATER_ENABLED) listOf(
         SettingSearchEntry(Icons.Outlined.Update, androidx.compose.ui.res.stringResource(io.github.aedev.flow.R.string.check_for_updates), androidx.compose.ui.res.stringResource(io.github.aedev.flow.R.string.check_for_updates_subtitle), secAbout, onCheckForUpdatesClick)
     ) else emptyList()
@@ -681,7 +681,7 @@ item {
                         HorizontalDivider(Modifier.padding(start = 56.dp), color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
                     }
                     SettingsItem(
-                        icon = Icons.Outlined.Favorite,
+                        icon = Icons.Outlined.VolunteerActivism,
                         title = androidx.compose.ui.res.stringResource(io.github.aedev.flow.R.string.settings_item_support),
                         subtitle = androidx.compose.ui.res.stringResource(io.github.aedev.flow.R.string.settings_item_support_subtitle),
                         onClick = onNavigateToDonations

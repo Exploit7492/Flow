@@ -429,7 +429,7 @@ class VideoPlayerService : Service() {
         // Action intents
         val playPauseIntent = PendingIntent.getService(
             this,
-            0,
+            1,
             Intent(this, VideoPlayerService::class.java).apply {
                 action = ACTION_PLAY_PAUSE
             },
@@ -438,7 +438,7 @@ class VideoPlayerService : Service() {
         
         val closeIntent = PendingIntent.getService(
             this,
-            0,
+            2,
             Intent(this, VideoPlayerService::class.java).apply {
                 action = ACTION_CLOSE
             },
@@ -447,7 +447,7 @@ class VideoPlayerService : Service() {
         
         val nextIntent = PendingIntent.getService(
             this,
-            0,
+            3,
             Intent(this, VideoPlayerService::class.java).apply {
                 action = ACTION_NEXT
             },
@@ -456,7 +456,7 @@ class VideoPlayerService : Service() {
         
         val prevIntent = PendingIntent.getService(
             this,
-            0,
+            4,
             Intent(this, VideoPlayerService::class.java).apply {
                 action = ACTION_PREVIOUS
             },
@@ -493,10 +493,15 @@ class VideoPlayerService : Service() {
                 "Next",
                 nextIntent
             )
+            .addAction(
+                R.drawable.ic_close,
+                "Close",
+                closeIntent
+            )
             .setStyle(
                 androidx.media.app.NotificationCompat.MediaStyle()
                     .setMediaSession(mediaSession.sessionToken)
-                    .setShowActionsInCompactView(0, 1, 2) // Show Prev, Play, Next
+                    .setShowActionsInCompactView(0, 1, 2)
             )
             .build()
         

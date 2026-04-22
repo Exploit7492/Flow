@@ -56,7 +56,9 @@ IMPROVEMENTS
 - Improve watched videos hiding logic #305
 - Improve media playback notification handling #304 #310
 - Improve Personality screen performance
-- Improved Pause/Resume download #306
+- Improved Pause/Resume download and add better partial block handling #306
+- Add close button to video playback notification #310
+- Add new Monero (XMR) donation option and improve donation screen UI
 
 FIXES AND STABILITY
 - Fix video player playback speed issue #232

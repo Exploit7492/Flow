@@ -484,8 +484,12 @@ class FlowDownloadService : Service() {
                         )
                     }
 
-                    stopForeground(false)
-                    updateNotification(mission, videoId, isComplete = true)
+                    // Remove the foreground notification first (stopForeground(false) leaves the
+                    // old "Merging…" notification stuck on MIUI; true removes it cleanly).
+                    stopForeground(true)
+                    // Post a fresh completion notification after the foreground one is gone.
+                    val nmComplete = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+                    nmComplete.notify(getNotificationId(videoId), createNotification(mission, videoId, isComplete = true))
 
                     // Fetch and persist SponsorBlock segments inline (awaited) so it completes
                     // before the service's finally-block calls stopSelf() → onDestroy() → serviceScope.cancel().
@@ -503,11 +507,17 @@ class FlowDownloadService : Service() {
                     }
                 } else {
                     Log.e(TAG, "executeDownload: Final success check failed after download/mux")
-                    stopForeground(false)
+                    stopForeground(true)
                     updateNotification(mission, videoId)
                 }
             } else if (mission.status == MissionStatus.PAUSED) {
                 Log.d(TAG, "executeDownload: Download paused for $videoId (workers stopped naturally)")
+                val ids = itemIds[videoId]
+                if (!ids.isNullOrEmpty()) {
+                    val downloaded = mission.downloadedBytes + mission.audioDownloadedBytes
+                    val total = mission.totalBytes + mission.audioTotalBytes
+                    downloadManager.updateItemFull(ids.first(), downloaded, total, DownloadItemStatus.PAUSED)
+                }
             } else {
                 Log.e(TAG, "executeDownload: parallelDownloader.start returned false")
                 mission.status = MissionStatus.FAILED
@@ -561,14 +571,11 @@ class FlowDownloadService : Service() {
             updateAllItemStatuses(videoId, DownloadItemStatus.PAUSED)
             val ids = itemIds[videoId]
             if (!ids.isNullOrEmpty()) {
-                val downloaded = mission.downloadedBytes + mission.audioDownloadedBytes
-                val total = mission.totalBytes + mission.audioTotalBytes
-                downloadManager.updateItemFull(ids.first(), downloaded, total, DownloadItemStatus.PAUSED)
                 downloadManager.emitProgress(
                     DownloadProgressUpdate(
                         videoId = videoId, itemId = ids.first(),
-                        downloadedBytes = downloaded,
-                        totalBytes = total,
+                        downloadedBytes = mission.downloadedBytes + mission.audioDownloadedBytes,
+                        totalBytes = mission.totalBytes + mission.audioTotalBytes,
                         status = DownloadItemStatus.PAUSED
                     )
                 )

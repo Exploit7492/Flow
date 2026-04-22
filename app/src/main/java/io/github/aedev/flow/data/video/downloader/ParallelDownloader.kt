@@ -196,11 +196,11 @@ class ParallelDownloader @Inject constructor() {
                 val restoredVideoBytes = mission.completedVideoBlocks.sumOf { idx ->
                     val s = idx.toLong() * BLOCK_SIZE
                     minOf(s + BLOCK_SIZE, mission.totalBytes) - s
-                }
+                } + mission.partialVideoBlockBytes.values.sumOf { it }
                 val restoredAudioBytes = mission.completedAudioBlocks.sumOf { idx ->
                     val s = idx.toLong() * BLOCK_SIZE
                     minOf(s + BLOCK_SIZE, mission.audioTotalBytes) - s
-                }
+                } + mission.partialAudioBlockBytes.values.sumOf { it }
                 mission.downloadedBytesAtomic.set(restoredVideoBytes)
                 mission.audioDownloadedBytesAtomic.set(restoredAudioBytes)
 
@@ -311,7 +311,8 @@ class ParallelDownloader @Inject constructor() {
                 startByte = startByte,
                 endByte = endByte,
                 isAudio = isAudio,
-                blockName = "$threadName-b$blockIndex"
+                blockName = "$threadName-b$blockIndex",
+                blockIndex = blockIndex
             )
 
             if (!success) {
@@ -337,7 +338,8 @@ class ParallelDownloader @Inject constructor() {
         startByte: Long,
         endByte: Long,
         isAudio: Boolean,
-        blockName: String
+        blockName: String,
+        blockIndex: Int
     ): Boolean {
         var attempt = 0
         var lastError: Exception? = null
@@ -346,7 +348,7 @@ class ParallelDownloader @Inject constructor() {
             if (mission.status != MissionStatus.RUNNING) return false
 
             try {
-                val result = downloadBlock(client, mission, file, url, startByte, endByte, isAudio)
+                val result = downloadBlock(client, mission, file, url, startByte, endByte, isAudio, blockIndex)
                 if (result) return true
                 if (mission.status == MissionStatus.PAUSED) return false
             } catch (e: Exception) {
@@ -385,12 +387,22 @@ class ParallelDownloader @Inject constructor() {
         url: String,
         startByte: Long,
         endByte: Long,
-        isAudio: Boolean
+        isAudio: Boolean,
+        blockIndex: Int
     ): Boolean {
+        val partialBytesMap = if (isAudio) mission.partialAudioBlockBytes else mission.partialVideoBlockBytes
+        val alreadyWritten = partialBytesMap[blockIndex] ?: 0L
+        val resumeFrom = startByte + alreadyWritten
+
+        if (resumeFrom > endByte) {
+            partialBytesMap.remove(blockIndex)
+            return true
+        }
+
         val isYT = isYouTubeStreamUrl(url)
 
         val request = if (isYT) {
-            val rangedUrl = buildYouTubeBlockUrl(url, startByte, endByte)
+            val rangedUrl = buildYouTubeBlockUrl(url, resumeFrom, endByte)
             Request.Builder()
                 .url(rangedUrl)
                 .header("User-Agent", mission.userAgent)
@@ -402,7 +414,7 @@ class ParallelDownloader @Inject constructor() {
         } else {
             Request.Builder()
                 .url(url)
-                .header("Range", "bytes=$startByte-$endByte")
+                .header("Range", "bytes=$resumeFrom-$endByte")
                 .header("User-Agent", mission.userAgent)
                 .build()
         }
@@ -415,10 +427,11 @@ class ParallelDownloader @Inject constructor() {
             mission.activeCalls.remove(call)
             throw e
         }
+        var bytesWrittenInSession = 0L
         try {
             if (!response.isSuccessful) {
                 val code = response.code
-                Log.e(TAG, "Block download failed: HTTP $code (range=$startByte-$endByte, yt=$isYT)")
+                Log.e(TAG, "Block download failed: HTTP $code (range=$resumeFrom-$endByte, yt=$isYT)")
                 if (code == 403) {
                     mission.error = "URL expired (403). Re-fetch needed."
                 }
@@ -429,18 +442,25 @@ class ParallelDownloader @Inject constructor() {
             val buffer = ByteArray(BUFFER_SIZE)
 
             RandomAccessFile(file, "rw").use { raf ->
-                raf.seek(startByte)
+                raf.seek(resumeFrom)
                 var bytesRead: Int
 
                 while (inputStream.read(buffer).also { bytesRead = it } != -1) {
-                    if (mission.status != MissionStatus.RUNNING) return false
-
+                    if (mission.status != MissionStatus.RUNNING) {
+                        partialBytesMap[blockIndex] = alreadyWritten + bytesWrittenInSession
+                        return false
+                    }
                     raf.write(buffer, 0, bytesRead)
+                    bytesWrittenInSession += bytesRead
                     mission.updateProgress(bytesRead.toLong(), isAudio)
                 }
             }
 
+            partialBytesMap.remove(blockIndex)
             return true
+        } catch (e: Exception) {
+            partialBytesMap[blockIndex] = alreadyWritten + bytesWrittenInSession
+            throw e
         } finally {
             mission.activeCalls.remove(call)
             response.close()
