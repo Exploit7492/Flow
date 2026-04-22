@@ -237,4 +237,7 @@
     <string name="end_of_queue">Fim da fila</string>
     <string name="no_videos_found">Nenhum vídeo encontrado</string>
     <string name="no_shorts_found">Nenhum shorts encontrado</string>
+    <string name="no_playlists_found">Nenhuma playlists encontrada</string>
+    <string name="views_count_short_template">%1$s visualizações</string>
+    <string name="remove_from_history">Remover do histórico</string>
 </resources>
