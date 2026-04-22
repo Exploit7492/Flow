@@ -269,4 +269,22 @@
     <string name="filter_discover">Дослідити</string>
     <string name="filter_popular">Популярне</string>
     <string name="filter_workout">Тренування</string>
+    <string name="content_settings_show_app_logo_subtitle">Показувати логотип Flow поруч із назвою програми у верхній панелі головного екрана</string>
+    <string name="content_settings_header_content_components">Компоненти контенту</string>
+    <string name="content_settings_hide_watched_title">Сховати переглянуті відео</string>
+    <string name="content_settings_hide_watched_subtitle">Фільтрувати відео, які ви вже переглянули, зі своєї стрічки та підписок</string>
+    <string name="content_settings_disable_shorts_player_title">Вимкнути програвач Shorts</string>
+    <string name="content_settings_disable_shorts_player_subtitle">Відтворювати всі відео (включно з YouTube Shorts) у звичайному плеєрі</string>
+    <string name="categories_region_picker_desc">Змінити регіон трендів (поточний: %1$s)</string>
+    <string name="content_settings_header_nav_tabs">Вкладки навігації</string>
+    <string name="nav_search">Пошук</string>
+    <string name="settings_categories_nav_tab_subtitle">Відображати вкладку \"Тренди та категорії\" в нижній панелі навігації.</string>
+    <string name="nav_explore">Огляд</string>
+    <string name="nav_more">Більше</string>
+    <string name="categories_title">Категорії</string>
+    <string name="category_all">Все</string>
+    <string name="category_trending">Тренди</string>
+    <string name="category_movies">Фільми</string>
+    <string name="category_live">Ефір</string>
+    <string name="continue_watching_title">Продовжити перегляд+</string>
 </resources>
