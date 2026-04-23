@@ -221,6 +221,44 @@ class InnerTube {
         }
     }
 
+    /**
+     * Search for videos within a specific YouTube channel using the /browse endpoint.
+     * Uses the channel's Search Tab (params = "EgZzZWFyY2jyBgQKAloA") with the query as a
+     * top-level body field.
+     *
+     * @param channelId  The channel's browse ID, e.g. "UCxxxxxxxxxxxxxxxxxx"
+     * @param query      The search term
+     * @param continuation  Pagination token returned from a previous search call
+     */
+    suspend fun channelSearch(
+        client: YouTubeClient,
+        channelId: String,
+        query: String,
+        continuation: String? = null,
+    ) = withRetry {
+        httpClient.post("https://www.youtube.com/youtubei/v1/browse") {
+            headers {
+                append("X-YouTube-Client-Name", client.clientId)
+                append("X-YouTube-Client-Version", client.clientVersion)
+                append("X-Origin", "https://www.youtube.com")
+                append("Referer", "https://www.youtube.com/")
+                visitorData?.let { append("X-Goog-Visitor-Id", it) }
+            }
+            contentType(io.ktor.http.ContentType.Application.Json)
+            userAgent(client.userAgent)
+            parameter("prettyPrint", false)
+            setBody(
+                BrowseBody(
+                    context = client.toContext(locale, visitorData, null),
+                    browseId = if (continuation == null) channelId else null,
+                    params = if (continuation == null) "EgZzZWFyY2jyBgQKAloA" else null,
+                    query = if (continuation == null) query else null,
+                    continuation = continuation,
+                )
+            )
+        }
+    }
+
     suspend fun player(
         client: YouTubeClient,
         videoId: String,

@@ -31,6 +31,7 @@ FEATURES
 - Add new Deep Flow (Incognito mode) #282
 - Add new subscription groups #288
 - Add new DeArrow indicator toggle #291
+- Add new in-channel video search #313
 
 IMPROVEMENTS
 - New miniplayer secondary action buttons layout #225

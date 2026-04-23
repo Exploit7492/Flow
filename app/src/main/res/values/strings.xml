@@ -295,6 +295,12 @@
     <string name="subscribers_count_template">%1$s subscribers</string>
     <string name="views_count_short_template">%1$s views</string>
 
+    <!-- Channel Search -->
+    <string name="channel_search_hint">Search in channel</string>
+    <string name="channel_search_open">Search in channel</string>
+    <string name="channel_search_close">Close search</string>
+    <string name="channel_search_no_results">No results found for "%1$s"</string>
+
     <!-- History Screen -->
     <string name="music_history">Music History</string>
     <string name="remove_from_history">Remove from history</string>

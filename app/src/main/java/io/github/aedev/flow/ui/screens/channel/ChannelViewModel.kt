@@ -355,6 +355,124 @@ class ChannelViewModel : ViewModel() {
         _uiState.update { it.copy(selectedTab = tabIndex) }
     }
 
+    // ── Channel search ────────────────────────────────────────────────────────
+
+    fun setSearchActive(active: Boolean) {
+        _uiState.update {
+            it.copy(
+                searchActive = active,
+                searchQuery = if (!active) "" else it.searchQuery,
+                searchResults = if (!active) emptyList() else it.searchResults,
+                searchError = null,
+            )
+        }
+    }
+
+    fun searchInChannel(query: String) {
+        val channelId = _uiState.value.channelId ?: return
+        val channelInfo = _uiState.value.channelInfo ?: return
+        val trimmed = query.trim()
+
+        _uiState.update {
+            it.copy(
+                searchQuery = query,
+                searchError = null,
+            )
+        }
+
+        if (trimmed.isBlank()) {
+            _uiState.update { it.copy(searchResults = emptyList(), isSearching = false) }
+            return
+        }
+
+        viewModelScope.launch(PerformanceDispatcher.networkIO) {
+            _uiState.update { it.copy(isSearching = true) }
+            try {
+                val channelThumbnail = try {
+                    channelInfo.avatars.maxByOrNull { it.height }?.url
+                        ?: channelInfo.avatars.firstOrNull()?.url
+                        ?: ""
+                } catch (e: Exception) { "" }
+
+                val result = io.github.aedev.flow.innertube.YouTube.channelSearch(
+                    channelId = channelId,
+                    channelName = channelInfo.name,
+                    channelThumbnailUrl = channelThumbnail,
+                    query = trimmed,
+                )
+                result.fold(
+                    onSuccess = { page ->
+                        _uiState.update {
+                            it.copy(
+                                searchResults = page.videos,
+                                searchContinuation = page.continuation,
+                                isSearching = false,
+                                searchError = null,
+                            )
+                        }
+                    },
+                    onFailure = { e ->
+                        Log.e(TAG, "Channel search failed", e)
+                        _uiState.update {
+                            it.copy(
+                                isSearching = false,
+                                searchError = e.message ?: "Search failed",
+                            )
+                        }
+                    }
+                )
+            } catch (e: Exception) {
+                Log.e(TAG, "Channel search error", e)
+                _uiState.update {
+                    it.copy(isSearching = false, searchError = e.message ?: "Search failed")
+                }
+            }
+        }
+    }
+
+    fun loadMoreSearchResults() {
+        val state = _uiState.value
+        val continuation = state.searchContinuation ?: return
+        val channelId = state.channelId ?: return
+        val channelInfo = state.channelInfo ?: return
+        if (state.isLoadingMoreSearch) return
+
+        viewModelScope.launch(PerformanceDispatcher.networkIO) {
+            _uiState.update { it.copy(isLoadingMoreSearch = true) }
+            try {
+                val channelThumbnail = try {
+                    channelInfo.avatars.maxByOrNull { it.height }?.url
+                        ?: channelInfo.avatars.firstOrNull()?.url ?: ""
+                } catch (e: Exception) { "" }
+
+                val result = io.github.aedev.flow.innertube.YouTube.channelSearchContinuation(
+                    channelId = channelId,
+                    channelName = channelInfo.name,
+                    channelThumbnailUrl = channelThumbnail,
+                    continuation = continuation,
+                )
+                result.fold(
+                    onSuccess = { page ->
+                        _uiState.update {
+                            it.copy(
+                                searchResults = it.searchResults + page.videos,
+                                searchContinuation = page.continuation,
+                                isLoadingMoreSearch = false,
+                            )
+                        }
+                    },
+                    onFailure = { e ->
+                        Log.e(TAG, "Channel search continuation failed", e)
+                        _uiState.update { it.copy(isLoadingMoreSearch = false) }
+                    }
+                )
+            } catch (e: Exception) {
+                Log.e(TAG, "Channel search continuation error", e)
+                _uiState.update { it.copy(isLoadingMoreSearch = false) }
+            }
+        }
+    }
+
     /**
      * Fetches all pages for a channel tab sequentially and emits results
      * incrementally into [target]. This allows filters (Popular/Latest/Oldest)
@@ -433,6 +551,14 @@ data class ChannelUiState(
     val videosError: String? = null,
     val isSubscribed: Boolean = false,
     val isNotificationsEnabled: Boolean = false,
-    val selectedTab: Int = 0 // 0: Videos, 1: Shorts, 2: Live, 3: Playlists, 4: About
+    val selectedTab: Int = 0, // 0: Videos, 1: Shorts, 2: Live, 3: Playlists, 4: About
+    // ── Channel search ──────────────────────────────────────────────────────
+    val searchActive: Boolean = false,
+    val searchQuery: String = "",
+    val searchResults: List<Video> = emptyList(),
+    val isSearching: Boolean = false,
+    val searchError: String? = null,
+    val searchContinuation: String? = null,
+    val isLoadingMoreSearch: Boolean = false,
 )
 

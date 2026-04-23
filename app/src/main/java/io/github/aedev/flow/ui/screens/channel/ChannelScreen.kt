@@ -20,9 +20,15 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.AccountCircle
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.GridView
 import androidx.compose.material.icons.filled.PlaylistPlay
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.ViewList
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.NotificationsActive
 import androidx.compose.material.icons.rounded.NotificationsOff
@@ -133,6 +139,8 @@ fun ChannelScreen(
                         onUnsubscribeClick = { viewModel.unsubscribe() },
                         onNotificationChange = { viewModel.setNotificationState(it) },
                         onTabSelected = { viewModel.selectTab(it) },
+                        onSearchToggle = { viewModel.setSearchActive(!uiState.searchActive) },
+                        onSearchQueryChange = { viewModel.searchInChannel(it) },
                         initialScrollIndex = viewModel.listScrollIndex,
                         initialScrollOffset = viewModel.listScrollOffset,
                         onScrollChanged = { idx, off -> viewModel.saveScrollPosition(idx, off) }
@@ -159,6 +167,8 @@ private fun ChannelContent(
     onUnsubscribeClick: () -> Unit,
     onNotificationChange: (Boolean) -> Unit,
     onTabSelected: (Int) -> Unit,
+    onSearchToggle: () -> Unit = {},
+    onSearchQueryChange: (String) -> Unit = {},
     initialScrollIndex: Int = 0,
     initialScrollOffset: Int = 0,
     onScrollChanged: (index: Int, offset: Int) -> Unit = { _, _ -> }
@@ -253,8 +263,12 @@ private fun ChannelContent(
                     FilterAndToggleBar(
                         selectedFilter = selectedFilter,
                         isGridView = isGridView,
+                        searchActive = uiState.searchActive,
+                        searchQuery = uiState.searchQuery,
                         onFilterSelected = { selectedFilter = it },
-                        onToggleGridView = { coroutineScope.launch { preferences.setChannelIsGridView(!isGridView) } }
+                        onToggleGridView = { coroutineScope.launch { preferences.setChannelIsGridView(!isGridView) } },
+                        onSearchToggle = onSearchToggle,
+                        onSearchQueryChange = onSearchQueryChange,
                     )
                 }
             }
@@ -270,17 +284,60 @@ private fun ChannelContent(
             ) { page ->
                 when (page) {
                     0 -> {
-                        if (isLoadingAllVideos && sortedVideos.isEmpty()) {
-                            Box(
-                                modifier = Modifier.fillMaxSize().padding(top = 64.dp),
-                                contentAlignment = Alignment.Center
-                            ) { CircularProgressIndicator() }
-                        } else {
-                            LazyColumn(
-                                modifier = Modifier.fillMaxSize()
-                            ) {
-                                videosContent(null, sortedVideos, isGridView, onVideoClick)
-                                item { Spacer(Modifier.height(16.dp)) }
+                        when {
+                            uiState.searchActive && uiState.searchQuery.isNotBlank() -> {
+                                when {
+                                    uiState.isSearching -> {
+                                        Box(
+                                            modifier = Modifier.fillMaxSize().padding(top = 64.dp),
+                                            contentAlignment = Alignment.Center
+                                        ) { CircularProgressIndicator() }
+                                    }
+                                    uiState.searchError != null -> {
+                                        Box(
+                                            modifier = Modifier.fillMaxSize().padding(top = 64.dp),
+                                            contentAlignment = Alignment.Center
+                                        ) {
+                                            Text(
+                                                text = uiState.searchError,
+                                                style = MaterialTheme.typography.bodyMedium,
+                                                color = MaterialTheme.colorScheme.error,
+                                            )
+                                        }
+                                    }
+                                    uiState.searchResults.isEmpty() -> {
+                                        Box(
+                                            modifier = Modifier.fillMaxSize().padding(top = 64.dp),
+                                            contentAlignment = Alignment.Center
+                                        ) {
+                                            Text(
+                                                text = stringResource(R.string.channel_search_no_results, uiState.searchQuery),
+                                                style = MaterialTheme.typography.bodyMedium,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            )
+                                        }
+                                    }
+                                    else -> {
+                                        LazyColumn(modifier = Modifier.fillMaxSize()) {
+                                            videosContent(null, uiState.searchResults, isGridView, onVideoClick)
+                                            item { Spacer(Modifier.height(16.dp)) }
+                                        }
+                                    }
+                                }
+                            }
+                            isLoadingAllVideos && sortedVideos.isEmpty() -> {
+                                Box(
+                                    modifier = Modifier.fillMaxSize().padding(top = 64.dp),
+                                    contentAlignment = Alignment.Center
+                                ) { CircularProgressIndicator() }
+                            }
+                            else -> {
+                                LazyColumn(
+                                    modifier = Modifier.fillMaxSize()
+                                ) {
+                                    videosContent(null, sortedVideos, isGridView, onVideoClick)
+                                    item { Spacer(Modifier.height(16.dp)) }
+                                }
                             }
                         }
                     }
@@ -321,8 +378,12 @@ private fun ChannelContent(
 private fun FilterAndToggleBar(
     selectedFilter: VideoFilter,
     isGridView: Boolean,
+    searchActive: Boolean = false,
+    searchQuery: String = "",
     onFilterSelected: (VideoFilter) -> Unit,
-    onToggleGridView: () -> Unit
+    onToggleGridView: () -> Unit,
+    onSearchToggle: () -> Unit = {},
+    onSearchQueryChange: (String) -> Unit = {},
 ) {
     val filters = listOf(
         VideoFilter.Latest to "Latest",
@@ -336,37 +397,75 @@ private fun FilterAndToggleBar(
             .padding(start = 4.dp, end = 4.dp, bottom = 8.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        LazyRow(
-            modifier = Modifier.weight(1f),
-            contentPadding = PaddingValues(horizontal = 8.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            items(filters.size) { idx ->
-                val (filter, label) = filters[idx]
-                FilterChip(
-                    selected = selectedFilter == filter,
-                    onClick = { onFilterSelected(filter) },
-                    label = { Text(label, style = MaterialTheme.typography.labelMedium) },
-                    shape = RoundedCornerShape(20.dp),
-                    leadingIcon = if (selectedFilter == filter) {
-                        {
-                            Icon(
-                                imageVector = Icons.Rounded.Check,
-                                contentDescription = null,
-                                modifier = Modifier.size(14.dp)
-                            )
-                        }
-                    } else null
+        if (searchActive) {
+            OutlinedTextField(
+                value = searchQuery,
+                onValueChange = onSearchQueryChange,
+                modifier = Modifier
+                    .weight(1f)
+                    .padding(horizontal = 8.dp),
+                placeholder = { Text(stringResource(R.string.channel_search_hint), style = MaterialTheme.typography.bodySmall) },
+                singleLine = true,
+                textStyle = MaterialTheme.typography.bodySmall,
+                keyboardOptions = KeyboardOptions(
+                    keyboardType = KeyboardType.Text,
+                    imeAction = ImeAction.Search,
+                ),
+                keyboardActions = KeyboardActions(
+                    onSearch = { onSearchQueryChange(searchQuery) },
+                ),
+                shape = RoundedCornerShape(20.dp),
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedBorderColor = MaterialTheme.colorScheme.primary,
+                    unfocusedBorderColor = MaterialTheme.colorScheme.outline,
+                ),
+            )
+            IconButton(onClick = onSearchToggle) {
+                Icon(
+                    imageVector = Icons.Default.Close,
+                    contentDescription = stringResource(R.string.channel_search_close),
+                    modifier = Modifier.size(22.dp)
                 )
             }
-        }
-
-        IconButton(onClick = onToggleGridView) {
-            Icon(
-                imageVector = if (isGridView) Icons.Default.ViewList else Icons.Default.GridView,
-                contentDescription = if (isGridView) "List view" else "Grid view",
-                modifier = Modifier.size(22.dp)
-            )
+        } else {
+            LazyRow(
+                modifier = Modifier.weight(1f),
+                contentPadding = PaddingValues(horizontal = 8.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                items(filters.size) { idx ->
+                    val (filter, label) = filters[idx]
+                    FilterChip(
+                        selected = selectedFilter == filter,
+                        onClick = { onFilterSelected(filter) },
+                        label = { Text(label, style = MaterialTheme.typography.labelMedium) },
+                        shape = RoundedCornerShape(20.dp),
+                        leadingIcon = if (selectedFilter == filter) {
+                            {
+                                Icon(
+                                    imageVector = Icons.Rounded.Check,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(14.dp)
+                                )
+                            }
+                        } else null
+                    )
+                }
+            }
+            IconButton(onClick = onSearchToggle) {
+                Icon(
+                    imageVector = Icons.Default.Search,
+                    contentDescription = stringResource(R.string.channel_search_open),
+                    modifier = Modifier.size(22.dp)
+                )
+            }
+            IconButton(onClick = onToggleGridView) {
+                Icon(
+                    imageVector = if (isGridView) Icons.Default.ViewList else Icons.Default.GridView,
+                    contentDescription = if (isGridView) "List view" else "Grid view",
+                    modifier = Modifier.size(22.dp)
+                )
+            }
         }
     }
 }
