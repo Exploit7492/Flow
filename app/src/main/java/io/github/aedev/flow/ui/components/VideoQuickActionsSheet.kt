@@ -82,6 +82,9 @@ fun VideoQuickActionsBottomSheet(
         subscribedChannelIds.contains(video.channelId)
     }
 
+    val downloadedVideoIds by viewModel.downloadedVideoIds.collectAsState()
+    val isDownloaded = remember(downloadedVideoIds, video.id) { downloadedVideoIds.contains(video.id) }
+
     // Load subscription state when sheet opens
     LaunchedEffect(video.channelId) {
         if (video.channelId.isNotBlank()) {
@@ -392,13 +395,21 @@ fun VideoQuickActionsBottomSheet(
                 FlowMenuGroup(
                     items = listOf(
                         FlowMenuItemData(
-                            icon = { Icon(Icons.Outlined.Download, null) },
-                            title = { Text(stringResource(R.string.download)) },
+                            icon = {
+                                Icon(
+                                    if (isDownloaded) Icons.Outlined.CheckCircle else Icons.Outlined.Download,
+                                    null,
+                                    tint = if (isDownloaded) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            },
+                            title = { Text(if (isDownloaded) stringResource(R.string.downloaded) else stringResource(R.string.download)) },
                             onClick = {
-                                if (onDownload != null) {
-                                    onDownload()
-                                } else {
-                                    viewModel.downloadVideo(video)
+                                if (!isDownloaded) {
+                                    if (onDownload != null) {
+                                        onDownload()
+                                    } else {
+                                        viewModel.downloadVideo(video)
+                                    }
                                 }
                                 onDismiss()
                             }

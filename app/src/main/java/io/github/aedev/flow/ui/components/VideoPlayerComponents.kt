@@ -74,6 +74,7 @@ fun VideoInfoSection(
     onCopyLinkClick: () -> Unit = {},
     onCopyLinkAtTimeClick: () -> Unit = {},
     onDescriptionClick: () -> Unit,
+    isDownloaded: Boolean = false,
     modifier: Modifier = Modifier
 ) {
     Column(
@@ -208,7 +209,8 @@ fun VideoInfoSection(
             onSaveClick = onSaveClick,
             onBackgroundPlayClick = onBackgroundPlayClick,
             onCopyLinkClick = onCopyLinkClick,
-            onCopyLinkAtTimeClick = onCopyLinkAtTimeClick
+            onCopyLinkAtTimeClick = onCopyLinkAtTimeClick,
+            isDownloaded = isDownloaded
         )
     }
 }
@@ -397,7 +399,8 @@ fun VideoActionRow(
     onSaveClick: () -> Unit,
     onBackgroundPlayClick: () -> Unit,
     onCopyLinkClick: () -> Unit = {},
-    onCopyLinkAtTimeClick: () -> Unit = {}
+    onCopyLinkAtTimeClick: () -> Unit = {},
+    isDownloaded: Boolean = false
 ) {
     LazyRow(
         horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -423,9 +426,10 @@ fun VideoActionRow(
         
         item {
             ActionChip(
-                icon = Icons.Outlined.Download,
-                label = stringResource(R.string.download),
-                onClick = onDownloadClick
+                icon = if (isDownloaded) Icons.Outlined.CheckCircle else Icons.Outlined.Download,
+                label = if (isDownloaded) stringResource(R.string.downloaded) else stringResource(R.string.download),
+                onClick = onDownloadClick,
+                tint = if (isDownloaded) MaterialTheme.colorScheme.primary else null
             )
         }
         
@@ -542,7 +546,8 @@ fun SegmentedLikeDislikeButton(
 fun ActionChip(
     icon: ImageVector,
     label: String,
-    onClick: () -> Unit
+    onClick: () -> Unit,
+    tint: Color? = null
 ) {
     Surface(
         onClick = onClick,
@@ -558,13 +563,13 @@ fun ActionChip(
                 imageVector = icon,
                 contentDescription = label,
                 modifier = Modifier.size(18.dp),
-                tint = MaterialTheme.colorScheme.onSurface
+                tint = tint ?: MaterialTheme.colorScheme.onSurface
             )
             Spacer(modifier = Modifier.width(6.dp))
             Text(
                 text = label,
                 style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Medium),
-                color = MaterialTheme.colorScheme.onSurface
+                color = tint ?: MaterialTheme.colorScheme.onSurface
             )
         }
     }

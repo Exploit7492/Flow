@@ -21,8 +21,11 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
+import io.github.aedev.flow.data.video.VideoDownloadManager
+import io.github.aedev.flow.data.local.entity.DownloadItemStatus
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import javax.inject.Inject
@@ -50,6 +53,7 @@ class QuickActionsViewModel @Inject constructor(
     private val repository: YouTubeRepository,
     private val playlistRepository: PlaylistRepository,
     private val playerPreferences: io.github.aedev.flow.data.local.PlayerPreferences,
+    private val videoDownloadManager: VideoDownloadManager,
     @ApplicationContext private val context: Context
 ) : ViewModel() {
 
@@ -65,6 +69,14 @@ class QuickActionsViewModel @Inject constructor(
     /** Per-video subscription state cache: channelId -> Boolean */
     private val _subscribedChannelIds = MutableStateFlow<Set<String>>(emptySet())
     val subscribedChannelIds = _subscribedChannelIds.asStateFlow()
+
+    val downloadedVideoIds = videoDownloadManager.allDownloads
+        .map { list ->
+            list.filter { it.overallStatus == DownloadItemStatus.COMPLETED && it.items.isNotEmpty() }
+                .map { it.download.videoId }
+                .toSet()
+        }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptySet())
 
     fun loadSubscriptionState(channelId: String) {
         viewModelScope.launch {

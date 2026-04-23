@@ -19,6 +19,7 @@ import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.PlayCircle
 import androidx.compose.material.icons.outlined.ThumbDown
 import androidx.compose.material.icons.outlined.ThumbUp
+import androidx.compose.material.icons.outlined.AutoFixHigh
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
@@ -83,6 +84,7 @@ fun VideoCard(
 
     val playerPrefs = remember { PlayerPreferences(context) }
     val deArrowEnabled by playerPrefs.deArrowEnabled.collectAsState(initial = false)
+    val deArrowBadgeEnabled by playerPrefs.deArrowBadgeEnabled.collectAsState(initial = false)
     val deArrowResult by produceState<DeArrowResult?>(
         initialValue = null, key1 = video.id, key2 = deArrowEnabled
     ) {
@@ -169,6 +171,25 @@ fun VideoCard(
                     color = MaterialTheme.colorScheme.primary,
                     trackColor = Color.Black.copy(alpha = 0.4f)
                 )
+            }
+
+            if (deArrowResult != null && deArrowBadgeEnabled) {
+                Surface(
+                    modifier = Modifier
+                        .align(Alignment.TopEnd)
+                        .padding(4.dp),
+                    shape = RoundedCornerShape(4.dp),
+                    color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.85f)
+                ) {
+                    Icon(
+                        imageVector = Icons.Outlined.AutoFixHigh,
+                        contentDescription = stringResource(R.string.dearrow_badge),
+                        tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                        modifier = Modifier
+                            .size(16.dp)
+                            .padding(2.dp)
+                    )
+                }
             }
         }
 
@@ -476,6 +497,7 @@ fun VideoCardFullWidth(
     // DeArrow: replace clickbait titles and thumbnails if enabled
     val playerPrefsFullWidth = remember { PlayerPreferences(context) }
     val deArrowEnabledFullWidth by playerPrefsFullWidth.deArrowEnabled.collectAsState(initial = false)
+    val deArrowBadgeEnabledFullWidth by playerPrefsFullWidth.deArrowBadgeEnabled.collectAsState(initial = false)
     val deArrowResultFullWidth by produceState<DeArrowResult?>(
         initialValue = null, key1 = video.id, key2 = deArrowEnabledFullWidth
     ) {
@@ -562,6 +584,25 @@ fun VideoCardFullWidth(
                     color = MaterialTheme.colorScheme.primary,
                     trackColor = Color.Black.copy(alpha = 0.4f)
                 )
+            }
+
+            if (deArrowResultFullWidth != null && deArrowBadgeEnabledFullWidth) {
+                Surface(
+                    modifier = Modifier
+                        .align(Alignment.TopEnd)
+                        .padding(4.dp),
+                    shape = RoundedCornerShape(4.dp),
+                    color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.85f)
+                ) {
+                    Icon(
+                        imageVector = Icons.Outlined.AutoFixHigh,
+                        contentDescription = stringResource(R.string.dearrow_badge),
+                        tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                        modifier = Modifier
+                            .size(16.dp)
+                            .padding(2.dp)
+                    )
+                }
             }
         }
 
@@ -724,6 +765,7 @@ fun CompactVideoCard(
     // DeArrow: replace clickbait titles and thumbnails if enabled
     val playerPrefsCompact = remember { PlayerPreferences(context) }
     val deArrowEnabledCompact by playerPrefsCompact.deArrowEnabled.collectAsState(initial = false)
+    val deArrowBadgeEnabledCompact by playerPrefsCompact.deArrowBadgeEnabled.collectAsState(initial = false)
     val deArrowResultCompact by produceState<DeArrowResult?>(
         initialValue = null, key1 = video.id, key2 = deArrowEnabledCompact
     ) {
@@ -807,6 +849,25 @@ fun CompactVideoCard(
                     color = MaterialTheme.colorScheme.primary,
                     trackColor = Color.Black.copy(alpha = 0.4f)
                 )
+            }
+
+            if (deArrowResultCompact != null && deArrowBadgeEnabledCompact) {
+                Surface(
+                    modifier = Modifier
+                        .align(Alignment.TopEnd)
+                        .padding(4.dp),
+                    shape = RoundedCornerShape(4.dp),
+                    color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.85f)
+                ) {
+                    Icon(
+                        imageVector = Icons.Outlined.AutoFixHigh,
+                        contentDescription = stringResource(R.string.dearrow_badge),
+                        tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                        modifier = Modifier
+                            .size(16.dp)
+                            .padding(2.dp)
+                    )
+                }
             }
         }
 

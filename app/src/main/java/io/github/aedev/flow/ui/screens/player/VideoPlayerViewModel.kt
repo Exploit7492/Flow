@@ -87,7 +87,11 @@ class VideoPlayerViewModel @Inject constructor(
     
     private val _canGoPrevious = MutableStateFlow(false)
     val canGoPrevious: StateFlow<Boolean> = _canGoPrevious.asStateFlow()
-    
+
+    val downloadedVideoIds = videoDownloadManager.downloadedVideos
+        .map { list -> list.map { it.video.id }.toSet() }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptySet())
+
     fun initialize(context: Context) {
         // Handled by Hilt
     }

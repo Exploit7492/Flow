@@ -53,6 +53,7 @@ fun SponsorBlockSettingsScreen(
 
     val sponsorBlockEnabled by playerPreferences.sponsorBlockEnabled.collectAsState(initial = false)
     val deArrowEnabled by playerPreferences.deArrowEnabled.collectAsState(initial = false)
+    val deArrowBadgeEnabled by playerPreferences.deArrowBadgeEnabled.collectAsState(initial = false)
 
     val sbActions = SB_CATEGORIES_AND_LABELS.associate { (category, _) ->
         category to playerPreferences.sbActionForCategory(category).collectAsState(initial = SponsorBlockAction.SKIP).value
@@ -119,6 +120,17 @@ fun SponsorBlockSettingsScreen(
                         subtitle = stringResource(R.string.player_settings_dearrow_subtitle),
                         checked = deArrowEnabled,
                         onCheckedChange = { coroutineScope.launch { playerPreferences.setDeArrowEnabled(it) } }
+                    )
+                    HorizontalDivider(
+                        Modifier.padding(start = 56.dp),
+                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+                    )
+                    SettingsSwitchItem(
+                        icon = Icons.Outlined.AutoFixHigh,
+                        title = stringResource(R.string.dearrow_badge_toggle),
+                        subtitle = stringResource(R.string.dearrow_badge_toggle_subtitle),
+                        checked = deArrowBadgeEnabled,
+                        onCheckedChange = { coroutineScope.launch { playerPreferences.setDeArrowBadgeEnabled(it) } }
                     )
                 }
             }

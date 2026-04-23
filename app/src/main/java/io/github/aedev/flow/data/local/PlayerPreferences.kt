@@ -99,6 +99,7 @@ class PlayerPreferences(private val context: Context) {
 
         // DeArrow
         val DEARROW_ENABLED = booleanPreferencesKey("dearrow_enabled")
+        val DEARROW_BADGE_ENABLED = booleanPreferencesKey("dearrow_badge_enabled")
 
         // Notification preferences
         val NOTIF_NEW_VIDEOS_ENABLED = booleanPreferencesKey("notif_new_videos_enabled")
@@ -614,6 +615,15 @@ class PlayerPreferences(private val context: Context) {
     suspend fun setDeArrowEnabled(enabled: Boolean) {
         context.playerPreferencesDataStore.edit { preferences ->
             preferences[Keys.DEARROW_ENABLED] = enabled
+        }
+    }
+
+    val deArrowBadgeEnabled: Flow<Boolean> = context.playerPreferencesDataStore.data
+        .map { preferences -> preferences[Keys.DEARROW_BADGE_ENABLED] ?: false }
+
+    suspend fun setDeArrowBadgeEnabled(enabled: Boolean) {
+        context.playerPreferencesDataStore.edit { preferences ->
+            preferences[Keys.DEARROW_BADGE_ENABLED] = enabled
         }
     }
 

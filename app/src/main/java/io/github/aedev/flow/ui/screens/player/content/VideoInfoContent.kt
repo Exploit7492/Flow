@@ -16,6 +16,8 @@ import androidx.compose.material.icons.rounded.OpenInBrowser
 import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -143,6 +145,9 @@ fun VideoInfoContent(
         }
     }
 
+    val downloadedVideoIds by viewModel.downloadedVideoIds.collectAsState()
+    val isVideoDownloaded = remember(downloadedVideoIds, video.id) { downloadedVideoIds.contains(video.id) }
+
     VideoInfoSection(
         video = video,
         title = uiState.streamInfo?.name ?: video.title,
@@ -247,6 +252,7 @@ fun VideoInfoContent(
             context.startActivity(Intent.createChooser(shareIntent, context.getString(R.string.share_video)))
         },
         onDownloadClick = { screenState.showDownloadDialog = true },
+        isDownloaded = isVideoDownloaded,
         onBackgroundPlayClick = { viewModel.startBackgroundService() },
         onCopyLinkClick = {
             val url = "https://www.youtube.com/watch?v=${video.id}"
