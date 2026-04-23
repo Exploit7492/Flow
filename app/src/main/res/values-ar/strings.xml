@@ -1286,4 +1286,7 @@
     <string name="appearance_role_on_tertiary">علي المرحلة الثالثة</string>
     <string name="appearance_role_outline">Outline</string>
     <string name="deep_flow_mode_title">وضع تعلم Flow العميق</string>
+    <string name="sb_settings_title">SponsorBlock</string>
+    <string name="sb_settings_subtitle">إجراءات التقسيمات، الألوان، و المساهمة</string>
+    <string name="sb_settings_general_header">عام</string>
 </resources>
