@@ -1266,4 +1266,24 @@
     <string name="files_access_title">الوصول إلى الملفات</string>
     <string name="permissions_header">الأذونات</string>
     <string name="appearance_role_scrim">Scrim</string>
+    <string name="deep_flow_mode_subtitle">‏أوقف التعلم مؤقتًا — تصفح دون التأثير على ملفك الشخصي</string>
+    <string name="deep_flow_learning_paused">التعلم متوقف</string>
+    <string name="deep_flow_expires_in">تنتهي صلاحيته خلال %s</string>
+    <string name="deep_flow_expire_duration_title">التعطيل التلقائي بعد</string>
+    <string name="deep_flow_expire_duration_subtitle">إستأنف التعلم تلقائيًا بعد %s</string>
+    <string name="deep_flow_dialog_title">مدة الإيقاف المؤقت</string>
+    <string name="deep_flow_dialog_body">إلى متى يجب أن يتوقف التعلم؟</string>
+    <string name="deep_flow_duration_1h">1 ساعة</string>
+    <string name="deep_flow_duration_2h">2 ساعة</string>
+    <string name="deep_flow_duration_4h">4 ساعة</string>
+    <string name="deep_flow_duration_6h">6 ساعة</string>
+    <string name="deep_flow_duration_8h">8 ساعة</string>
+    <string name="deep_flow_duration_12h">12 ساعة</string>
+    <string name="deep_flow_duration_24h">24 ساعة</string>
+    <string name="appearance_customizer_subtitle">قم بتعيين كل لون باستخدام قيم (hex) سداسية عشرية و عاينها على الفور</string>
+    <string name="appearance_customizer_format_hint">تنسيق Hex: #RRGGBB أو #AARRGGBB</string>
+    <string name="appearance_role_tertiary">مرحلة ثالثة</string>
+    <string name="appearance_role_on_tertiary">علي المرحلة الثالثة</string>
+    <string name="appearance_role_outline">Outline</string>
+    <string name="deep_flow_mode_title">وضع تعلم Flow العميق</string>
 </resources>
