@@ -1283,4 +1283,17 @@
     <string name="add_all_to_playlist">Aggiungi alla mia playlist</string>
     <string name="merge_playlist_dialog_title">Aggiungi tutti i brani a…</string>
     <string name="merge_playlist_success">Aggiunti %1$d brani a “%2$s”</string>
+    <string name="group_all">Tutti</string>
+    <string name="manage_groups">Gestisci gruppi</string>
+    <string name="new_group">Nuovo gruppo</string>
+    <string name="edit_group">Modifica gruppo</string>
+    <string name="delete_group">Elimina gruppo</string>
+    <string name="group_name_label">Nome gruppo</string>
+    <string name="no_groups_yet">Ancora nessun gruppo. Creane uno per filtrare il tuo feed.</string>
+    <string name="search_channels_hint">Cerca canali…</string>
+    <string name="dearrow_badge_toggle">Mostra badge DeArrow</string>
+    <string name="dearrow_badge_toggle_subtitle">Mostra un badge sulle miniature corrette da DeArrow</string>
+    <string name="sb_settings_title">SponsorBlock</string>
+    <string name="sb_settings_subtitle">Azioni sui segmenti, colori e contributi</string>
+    <string name="sb_settings_general_header">Generale</string>
 </resources>
