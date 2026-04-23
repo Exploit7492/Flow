@@ -23,6 +23,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.FilterQuality
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.input.pointer.pointerInput
@@ -37,11 +38,17 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import io.github.aedev.flow.R
 import coil.compose.AsyncImage
+import coil.request.ImageRequest
 import io.github.aedev.flow.data.model.Comment
 import io.github.aedev.flow.utils.formatLikeCount
 import io.github.aedev.flow.utils.formatRichText
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.material3.ripple
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -56,6 +63,8 @@ fun FlowCommentsBottomSheet(
     isLoadingMore: Boolean = false,
     onLoadMore: () -> Unit = {},
     hasMore: Boolean = false,
+    onAuthorClick: (String) -> Unit = {},
+    onAvatarClick: (String) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val configuration = androidx.compose.ui.platform.LocalConfiguration.current
@@ -150,7 +159,9 @@ fun FlowCommentsBottomSheet(
                     FlowCommentItem(
                         comment = comment,
                         onTimestampClick = onTimestampClick,
-                        onLoadReplies = onLoadReplies
+                        onLoadReplies = onLoadReplies,
+                        onAuthorClick = onAuthorClick,
+                        onAvatarClick = onAvatarClick
                     )
                 }
                 if (hasMore) {
@@ -177,13 +188,16 @@ fun FlowCommentsBottomSheet(
 fun FlowCommentItem(
     comment: Comment,
     onTimestampClick: (String) -> Unit,
-    onLoadReplies: (Comment) -> Unit
+    onLoadReplies: (Comment) -> Unit,
+    onAuthorClick: (String) -> Unit = {},
+    onAvatarClick: (String) -> Unit = {}
 ) {
     var isExpanded by remember { mutableStateOf(false) }
     var isRepliesVisible by remember { mutableStateOf(false) }
     var isOverflowing by remember { mutableStateOf(false) }
     var isLoadingReplies by remember { mutableStateOf(false) }
     var commentTextLayoutResult by remember { mutableStateOf<TextLayoutResult?>(null) }
+    var showFullSizeImage by remember { mutableStateOf(false) }
 
     val uriHandler = LocalUriHandler.current
 
@@ -202,19 +216,35 @@ fun FlowCommentItem(
         )
     }
 
+    // Full-size image viewer
+    if (showFullSizeImage) {
+        FullSizeImageDialog(
+            imageUrl = toHighQualityAvatarUrl(comment.authorThumbnail),
+            onDismiss = { showFullSizeImage = false }
+        )
+    }
+
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .padding(vertical = 12.dp, horizontal = 16.dp)
     ) {
+        val context = LocalContext.current
         // Avatar
         AsyncImage(
-            model = comment.authorThumbnail,
+            model = ImageRequest.Builder(context)
+                .data(comment.authorThumbnail)
+                .crossfade(true)
+                .build(),
             contentDescription = null,
             modifier = Modifier
                 .size(40.dp)
                 .clip(CircleShape)
-                .background(MaterialTheme.colorScheme.surfaceVariant),
+                .background(MaterialTheme.colorScheme.surfaceVariant)
+                .clickable {
+                    onAvatarClick(comment.authorThumbnail)
+                    showFullSizeImage = true
+                },
             contentScale = ContentScale.Crop
         )
 
@@ -247,13 +277,19 @@ fun FlowCommentItem(
             // Header: Author + Time
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
-                    text = "@${comment.author.trim()}",
+                    text = formatAuthorName(comment.author),
                     style = MaterialTheme.typography.labelMedium.copy(fontSize = 13.sp),
                     fontWeight = FontWeight.SemiBold,
-                    color = MaterialTheme.colorScheme.onSurface,
+                    color = MaterialTheme.colorScheme.primary,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.weight(1f, fill = false)
+                    modifier = Modifier
+                        .weight(1f, fill = false)
+                        .clickable(
+                            interactionSource = remember { MutableInteractionSource() },
+                            indication = ripple(),
+                            onClick = { onAuthorClick(getAuthorHandle(comment.author)) }
+                        )
                 )
                 Spacer(modifier = Modifier.width(6.dp))
                 Text(
@@ -401,7 +437,12 @@ fun FlowCommentItem(
                         .padding(top = 8.dp)
                 ) {
                     comment.replies.forEach { reply ->
-                        FlowReplyItem(reply = reply, onTimestampClick = onTimestampClick)
+                        FlowReplyItem(
+                            reply = reply,
+                            onTimestampClick = onTimestampClick,
+                            onAuthorClick = onAuthorClick,
+                            onAvatarClick = onAvatarClick
+                        )
                     }
                 }
             }
@@ -412,7 +453,9 @@ fun FlowCommentItem(
 @Composable
 fun FlowReplyItem(
     reply: Comment,
-    onTimestampClick: (String) -> Unit
+    onTimestampClick: (String) -> Unit,
+    onAuthorClick: (String) -> Unit = {},
+    onAvatarClick: (String) -> Unit = {}
 ) {
     val primaryColor = MaterialTheme.colorScheme.primary
     val onSurface = MaterialTheme.colorScheme.onSurface
@@ -425,20 +468,36 @@ fun FlowReplyItem(
         )
     }
     var replyTextLayoutResult by remember { mutableStateOf<TextLayoutResult?>(null) }
+    var showFullSizeImage by remember { mutableStateOf(false) }
+
+    if (showFullSizeImage) {
+        FullSizeImageDialog(
+            imageUrl = toHighQualityAvatarUrl(reply.authorThumbnail),
+            onDismiss = { showFullSizeImage = false }
+        )
+    }
 
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .padding(vertical = 8.dp)
     ) {
+        val context = LocalContext.current
         // Avatar (Small for replies)
         AsyncImage(
-            model = reply.authorThumbnail,
+            model = ImageRequest.Builder(context)
+                .data(reply.authorThumbnail)
+                .crossfade(true)
+                .build(),
             contentDescription = null,
             modifier = Modifier
                 .size(24.dp)
                 .clip(CircleShape)
-                .background(MaterialTheme.colorScheme.surfaceVariant),
+                .background(MaterialTheme.colorScheme.surfaceVariant)
+                .clickable {
+                    onAvatarClick(reply.authorThumbnail)
+                    showFullSizeImage = true
+                },
             contentScale = ContentScale.Crop
         )
 
@@ -448,13 +507,19 @@ fun FlowReplyItem(
             // Header: Author + Time
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
-                    text = "@${reply.author.trim()}",
+                    text = formatAuthorName(reply.author),
                     style = MaterialTheme.typography.labelSmall.copy(fontSize = 12.sp),
                     fontWeight = FontWeight.SemiBold,
-                    color = MaterialTheme.colorScheme.onSurface,
+                    color = MaterialTheme.colorScheme.primary,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.weight(1f, fill = false)
+                    modifier = Modifier
+                        .weight(1f, fill = false)
+                        .clickable(
+                            interactionSource = remember { MutableInteractionSource() },
+                            indication = ripple(),
+                            onClick = { onAuthorClick(getAuthorHandle(reply.author)) }
+                        )
                 )
                 Spacer(modifier = Modifier.width(6.dp))
                 Text(
@@ -533,4 +598,80 @@ fun CommentSkeleton() {
             Box(modifier = Modifier.width(200.dp).height(12.dp).background(Color.Gray.copy(0.2f), RoundedCornerShape(4.dp)))
         }
     }
+}
+
+// HELPER COMPOSABLES & UTILITIES
+@Composable
+fun FullSizeImageDialog(
+    imageUrl: String,
+    onDismiss: () -> Unit
+) {
+    val context = LocalContext.current
+    
+    Dialog(
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(usePlatformDefaultWidth = false)
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(Color.Black.copy(alpha = 0.95f))
+                .clickable { onDismiss() },
+            contentAlignment = Alignment.Center
+        ) {
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center,
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(32.dp)
+            ) {
+                AsyncImage(
+                    model = ImageRequest.Builder(context)
+                        .data(toHighQualityAvatarUrl(imageUrl))
+                        .crossfade(true)
+                        .size(1600, 1600)
+                        .scale(coil.size.Scale.FIT)
+                        .allowHardware(false)
+                        .build(),
+                    contentDescription = null,
+                    modifier = Modifier
+                        .fillMaxWidth(0.9f)
+                        .aspectRatio(1f)
+                        .clip(RoundedCornerShape(12.dp)),
+                    contentScale = ContentScale.Fit,
+                    filterQuality = FilterQuality.High
+                )
+                Spacer(modifier = Modifier.height(16.dp))
+                Text(
+                    text = stringResource(R.string.tap_to_close),
+                    color = Color.White,
+                    style = MaterialTheme.typography.labelMedium
+                )
+            }
+        }
+    }
+}
+
+
+fun formatAuthorName(author: String): String {
+    val trimmed = author.trim()
+    return if (trimmed.startsWith("@")) {
+        trimmed
+    } else {
+        "@$trimmed"
+    }
+}
+
+fun getAuthorHandle(author: String): String {
+    return author.trim().removePrefix("@")
+}
+
+private fun toHighQualityAvatarUrl(url: String): String {
+    if (url.isBlank()) return url
+
+    return url
+        .replace(Regex("=s\\d+"), "=s1024")
+        .replace(Regex("/s\\d+-"), "/s1024-")
+        .replace(Regex("=w\\d+-h\\d+"), "=w1024-h1024")
 }

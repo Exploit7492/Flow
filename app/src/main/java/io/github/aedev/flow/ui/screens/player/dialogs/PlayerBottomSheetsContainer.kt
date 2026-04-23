@@ -143,6 +143,10 @@ fun PlayerBottomSheetsContainer(
             isLoadingMore = isLoadingMoreComments,
             hasMore = hasMoreComments,
             onLoadMore = { onLoadMoreComments(video.id) },
+            onAuthorClick = { authorHandle ->
+                screenState.showCommentsSheet = false
+                onNavigateToChannel?.invoke("@$authorHandle")
+            },
             onDismiss = { screenState.showCommentsSheet = false }
         )
     }

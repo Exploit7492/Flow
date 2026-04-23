@@ -379,8 +379,13 @@ fun FlowApp(
         onMinimize = {
             playerVisible = false
         },
-        onNavigateToChannel = { channelId ->
-            val channelUrl = "https://www.youtube.com/channel/$channelId"
+        onNavigateToChannel = { channelArg ->
+            val channelUrl = when {
+                channelArg.startsWith("http://") || channelArg.startsWith("https://") -> channelArg
+                channelArg.startsWith("@") -> "https://www.youtube.com/$channelArg"
+                channelArg.startsWith("UC") && channelArg.length >= 24 -> "https://www.youtube.com/channel/$channelArg"
+                else -> "https://www.youtube.com/channel/$channelArg"
+            }
             val encodedUrl = java.net.URLEncoder.encode(channelUrl, "UTF-8")
             playerSheetState.collapse()
             navController.navigate("channel?url=$encodedUrl")

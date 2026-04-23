@@ -181,7 +181,6 @@ class VideoPlayerService : Service() {
                     lockReleaseJob = serviceScope.launch {
                         delay(30_000L)
                         releaseLocks()
-                        stopPlayback()
                     }
                 }
                 

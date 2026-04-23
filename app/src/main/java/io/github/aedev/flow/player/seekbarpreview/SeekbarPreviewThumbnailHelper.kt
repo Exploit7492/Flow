@@ -3,17 +3,11 @@ package io.github.aedev.flow.player.seekbarpreview
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.Canvas
-import android.graphics.Rect
 import android.util.Log
-import android.util.SparseArray
 import android.view.View
 import androidx.collection.SparseArrayCompat
-import androidx.media3.common.C
-import androidx.media3.common.MediaItem
 import androidx.media3.common.Player
 import androidx.media3.ui.TimeBar
-import com.squareup.picasso.Picasso
-import com.squareup.picasso.Target
 import io.reactivex.rxjava3.core.Observable
 import io.reactivex.rxjava3.disposables.CompositeDisposable
 import io.reactivex.rxjava3.schedulers.Schedulers
@@ -40,6 +34,7 @@ class SeekbarPreviewThumbnailHelper(
     private var previewHolder: SeekbarPreviewThumbnailHolder? = null
     private var frameset: Frameset? = null
     private val thumbnailCache = SparseArrayCompat<Bitmap>()
+    private val storyboardCache = SparseArrayCompat<Bitmap>()
     private var qualityPreference = SeekbarPreviewThumbnailQuality.HIGH_QUALITY
 
     /**
@@ -70,8 +65,9 @@ class SeekbarPreviewThumbnailHelper(
         return try {
             // Get preview frames from stream info
             val previewFrames = streamInfo.previewFrames
-            // Return the first frameset if available
-            previewFrames.firstOrNull()
+            // Prefer the highest resolution storyboard when multiple framesets are available.
+            previewFrames.maxByOrNull { fs -> fs.frameWidth * fs.frameHeight }
+                ?: previewFrames.lastOrNull()
         } catch (e: Exception) {
             Log.w("SeekbarPreviewThumbnailHelper", "Could not extract frameset from stream info", e)
             null
@@ -181,7 +177,7 @@ class SeekbarPreviewThumbnailHelper(
 
         // Load storyboard image and extract frame
         return try {
-            val storyboardBitmap = loadStoryboardImage(storyboardUrl)
+            val storyboardBitmap = getOrLoadStoryboardBitmap(storyboardIndex, storyboardUrl)
             val frameBitmap = extractFrameFromStoryboard(
                 storyboardBitmap,
                 left, top, right, bottom
@@ -196,15 +192,43 @@ class SeekbarPreviewThumbnailHelper(
         }
     }
 
+    fun getFrameSize(): Pair<Int, Int>? {
+        val fs = frameset ?: return null
+        if (fs.frameWidth <= 0 || fs.frameHeight <= 0) return null
+        return fs.frameWidth to fs.frameHeight
+    }
+
+    private fun getOrLoadStoryboardBitmap(storyboardIndex: Int, url: String): Bitmap {
+        val cachedStoryboard = storyboardCache.get(storyboardIndex)
+        if (cachedStoryboard != null && !cachedStoryboard.isRecycled) {
+            return cachedStoryboard
+        }
+
+        val storyboard = loadStoryboardImage(url)
+        storyboardCache.put(storyboardIndex, storyboard)
+        return storyboard
+    }
+
     /**
      * Loads storyboard image using Picasso with timeout.
      * Based on NewPipe's implementation with timeout handling.
      */
     private fun loadStoryboardImage(url: String): Bitmap {
         return try {
-            Picasso.get()
-                .load(url)
-                .get() // Synchronous loading with default timeout
+            val connection = java.net.URL(url).openConnection() as java.net.HttpURLConnection
+            connection.connectTimeout = 10_000
+            connection.readTimeout = 10_000
+            connection.connect()
+            val bitmap = connection.inputStream.use { stream ->
+                val options = android.graphics.BitmapFactory.Options().apply {
+                    inSampleSize = 1
+                    inPreferredConfig = Bitmap.Config.ARGB_8888
+                    inScaled = false
+                }
+                android.graphics.BitmapFactory.decodeStream(stream, null, options)
+            }
+            connection.disconnect()
+            bitmap ?: throw RuntimeException("Failed to decode storyboard image")
         } catch (e: Exception) {
             Log.w("SeekbarPreviewThumbnailHelper", "Failed to load storyboard image: $url", e)
             throw RuntimeException("Failed to load storyboard image", e)
@@ -221,19 +245,18 @@ class SeekbarPreviewThumbnailHelper(
         right: Int,
         bottom: Int
     ): Bitmap {
-        val frameWidth = right - left
-        val frameHeight = bottom - top
+        val safeLeft = left.coerceIn(0, storyboard.width)
+        val safeTop = top.coerceIn(0, storyboard.height)
+        val safeRight = right.coerceIn(safeLeft, storyboard.width)
+        val safeBottom = bottom.coerceIn(safeTop, storyboard.height)
+        val frameWidth = safeRight - safeLeft
+        val frameHeight = safeBottom - safeTop
 
-        // Create frame bitmap
-        val frameBitmap = Bitmap.createBitmap(frameWidth, frameHeight, Bitmap.Config.ARGB_8888)
-        val canvas = Canvas(frameBitmap)
+        if (frameWidth <= 0 || frameHeight <= 0) {
+            return createPlaceholderThumbnail(null)
+        }
 
-        // Extract the frame from storyboard
-        val srcRect = Rect(left, top, right, bottom)
-        val dstRect = Rect(0, 0, frameWidth, frameHeight)
-        canvas.drawBitmap(storyboard, srcRect, dstRect, null)
-
-        return frameBitmap
+        return Bitmap.createBitmap(storyboard, safeLeft, safeTop, frameWidth, frameHeight)
     }
 
     /**
@@ -306,6 +329,7 @@ class SeekbarPreviewThumbnailHelper(
         disposables.dispose()
         executor.shutdown()
         thumbnailCache.clear()
+        storyboardCache.clear()
         previewHolder?.cleanup()
         previewHolder = null
     }

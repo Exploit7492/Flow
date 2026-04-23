@@ -635,6 +635,7 @@ fun GlobalPlayerOverlay(
                                     context.getString(R.string.quality_auto_template, playerState.effectiveQuality) 
                                 else 
                                     playerState.currentQuality.toString(),
+                                videoTitle = playerUiState.streamInfo?.name ?: video.title,
                                 resizeMode = screenState.resizeMode,
                                 onResizeClick = { 
                                     screenState.onInteraction()

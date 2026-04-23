@@ -52,6 +52,7 @@ fun PlayerAppearanceScreen(
     
     val currentSliderStyle by playerPreferences.sliderStyle.collectAsState(initial = SliderStyle.DEFAULT)
     val swipeGesturesEnabled by playerPreferences.swipeGesturesEnabled.collectAsState(initial = true)
+    val showFullscreenTitle by playerPreferences.showFullscreenTitle.collectAsState(initial = false)
 
     var showStyleSheet by remember { mutableStateOf(false) }
 
@@ -205,6 +206,27 @@ fun PlayerAppearanceScreen(
                         onCheckedChange = { enabled ->
                             coroutineScope.launch {
                                 playerPreferences.setSwipeGesturesEnabled(enabled)
+                            }
+                        }
+                    )
+                }
+            }
+
+            item {
+                Spacer(modifier = Modifier.height(8.dp))
+                SectionHeader(text = stringResource(R.string.player_appearance_fullscreen_header))
+            }
+
+            item {
+                SettingsGroup {
+                    SettingsToggleItem(
+                        icon = painterResource(R.drawable.ic_progress_bar_style),
+                        title = stringResource(R.string.player_show_title_title),
+                        subtitle = stringResource(R.string.player_show_title_subtitle),
+                        checked = showFullscreenTitle,
+                        onCheckedChange = { enabled ->
+                            coroutineScope.launch {
+                                playerPreferences.setShowFullscreenTitle(enabled)
                             }
                         }
                     )

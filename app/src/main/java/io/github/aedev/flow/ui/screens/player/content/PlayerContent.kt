@@ -17,6 +17,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -36,6 +38,7 @@ import io.github.aedev.flow.ui.screens.player.VideoPlayerViewModel
 import io.github.aedev.flow.ui.screens.player.components.*
 import io.github.aedev.flow.ui.screens.player.state.PlayerScreenState
 import kotlinx.coroutines.CoroutineScope
+import kotlin.math.max
 
 @UnstableApi
 @Composable
@@ -56,6 +59,20 @@ fun PlayerContent(
     onVideoClick: (Video) -> Unit
 ) {
     val context = LocalContext.current
+    val density = LocalDensity.current
+    val layoutDirection = LocalLayoutDirection.current
+    val leftSafeInset = with(density) {
+        max(
+            WindowInsets.displayCutout.getLeft(this, layoutDirection),
+            WindowInsets.systemBars.getLeft(this, layoutDirection)
+        ).toDp()
+    }
+    val rightSafeInset = with(density) {
+        max(
+            WindowInsets.displayCutout.getRight(this, layoutDirection),
+            WindowInsets.systemBars.getRight(this, layoutDirection)
+        ).toDp()
+    }
     Box(
         modifier = Modifier
             .fillMaxWidth()
@@ -119,7 +136,7 @@ fun PlayerContent(
             brightnessLevel = screenState.brightnessLevel,
             modifier = Modifier
                 .align(Alignment.CenterStart)
-                .padding(start = 32.dp)
+                .padding(start = leftSafeInset + 24.dp)
         )
         
         // Volume overlay
@@ -128,7 +145,7 @@ fun PlayerContent(
             volumeLevel = screenState.volumeLevel,
             modifier = Modifier
                 .align(Alignment.CenterEnd)
-                .padding(end = 32.dp)
+                .padding(end = rightSafeInset + 24.dp)
         )
         
         // Speed boost overlay
@@ -183,6 +200,7 @@ fun PlayerContent(
                 stringResource(R.string.quality_auto_template, playerState.effectiveQuality) 
             else 
                 playerState.currentQuality.toString(),
+            videoTitle = uiState.streamInfo?.name ?: video.title,
             resizeMode = screenState.resizeMode,
             onResizeClick = { screenState.cycleResizeMode() },
             onPlayPause = {

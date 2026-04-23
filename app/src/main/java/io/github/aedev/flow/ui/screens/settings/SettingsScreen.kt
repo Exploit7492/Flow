@@ -43,6 +43,7 @@ import io.github.aedev.flow.ui.theme.extendedColors
 import io.github.aedev.flow.data.local.PlayerPreferences
 import com.google.gson.JsonParser
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
@@ -121,6 +122,18 @@ fun SettingsScreen(
         if (remainingMs <= 0) return@remember null
         val remainingMins = remainingMs / 60_000
         if (remainingMins < 60) "${remainingMins}m" else "${remainingMins / 60}h ${remainingMins % 60}m"
+    }
+
+    LaunchedEffect(deepFlowActive, deepFlowActivatedAt, deepFlowExpireHours) {
+        if (!deepFlowActive || deepFlowActivatedAt == 0L) return@LaunchedEffect
+        val expiresAt = deepFlowActivatedAt + deepFlowExpireHours * 3_600_000L
+        val remainingMs = expiresAt - System.currentTimeMillis()
+        if (remainingMs <= 0L) {
+            playerPreferences.setDeepFlowActive(false)
+            return@LaunchedEffect
+        }
+        delay(remainingMs)
+        playerPreferences.setDeepFlowActive(false)
     }
 
     // Optimize Region Dialog: compute list only once

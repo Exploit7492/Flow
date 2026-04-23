@@ -386,6 +386,10 @@ fun ShortsScreen(
                 isTopSelected = isTopComments,
                 onFilterChanged = { isTopComments = it },
                 onLoadReplies = { viewModel.loadCommentReplies(it) },
+                onAuthorClick = { authorHandle ->
+                    showCommentsSheet = false
+                    onChannelClick("@$authorHandle")
+                },
                 onDismiss = { showCommentsSheet = false }
             )
         }

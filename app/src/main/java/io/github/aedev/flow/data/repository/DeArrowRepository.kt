@@ -3,11 +3,7 @@ package io.github.aedev.flow.data.repository
 import android.util.LruCache
 import io.github.aedev.flow.data.model.DeArrowContent
 import io.github.aedev.flow.data.model.DeArrowResult
-import io.github.aedev.flow.data.model.DeArrowThumbnail
-import io.github.aedev.flow.data.model.DeArrowTitle
 import com.google.gson.Gson
-import com.google.gson.JsonObject
-import com.google.gson.reflect.TypeToken
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
@@ -49,38 +45,34 @@ object DeArrowRepository {
         // Cache hit
         cache.get(videoId)?.let { return@withContext it.value }
 
-        val result = try {
+        try {
             val request = Request.Builder()
-                .url("$BRANDING_BASE_URL/$videoId")
+                .url("$BRANDING_BASE_URL?videoID=$videoId")
                 .header("User-Agent", "FlowYouTube/1.0")
                 .build()
 
             val response = client.newCall(request).execute()
             if (!response.isSuccessful) {
-                null
+                return@withContext null
             } else {
                 val body = response.body?.string()
                 if (body.isNullOrBlank()) {
-                    null
+                    cache.put(videoId, Optional(null))
+                    return@withContext null
                 } else {
-                    parseResponse(body, videoId)
+                    val parsed = parseResponse(body, videoId)
+                    cache.put(videoId, Optional(parsed))
+                    return@withContext parsed
                 }
             }
         } catch (e: Exception) {
-            null
+            return@withContext null
         }
-
-        cache.put(videoId, Optional(result))
-        result
     }
 
     private fun parseResponse(json: String, videoId: String): DeArrowResult? {
         return try {
-            val mapType = object : TypeToken<Map<String, JsonObject>>() {}.type
-            val map: Map<String, JsonObject> = gson.fromJson(json, mapType)
-            val videoObject = map[videoId] ?: return null
-
-            val content = gson.fromJson(videoObject, DeArrowContent::class.java)
+            val content = gson.fromJson(json, DeArrowContent::class.java)
             extractResult(content, videoId)
         } catch (e: Exception) {
             null

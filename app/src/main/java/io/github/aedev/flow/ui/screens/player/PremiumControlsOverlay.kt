@@ -27,6 +27,7 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -52,6 +53,7 @@ fun PremiumControlsOverlay(
     currentPosition: Long,
     duration: Long,
     qualityLabel: String?,
+    videoTitle: String?,
     resizeMode: Int,
     onResizeClick: () -> Unit,
     onPlayPause: () -> Unit,
@@ -105,11 +107,12 @@ fun PremiumControlsOverlay(
 
     val context = LocalContext.current
     val playerPreferences = remember { PlayerPreferences(context) }
-    val overlayCastEnabled by playerPreferences.overlayCastEnabled.collectAsState(initial = true)
+    val overlayCastEnabled by playerPreferences.overlayCastEnabled.collectAsState(initial = false)
     val overlayCcEnabled by playerPreferences.overlayCcEnabled.collectAsState(initial = false)
     val overlayPipEnabled by playerPreferences.overlayPipEnabled.collectAsState(initial = false)
     val overlayAutoplayEnabled by playerPreferences.overlayAutoplayEnabled.collectAsState(initial = false)
-    val overlaySleepTimerEnabled by playerPreferences.overlaySleepTimerEnabled.collectAsState(initial = true)
+    val overlaySleepTimerEnabled by playerPreferences.overlaySleepTimerEnabled.collectAsState(initial = false)
+    val showFullscreenTitle by playerPreferences.showFullscreenTitle.collectAsState(initial = false)
 
     val isInitialLoading = isBuffering && duration <= 0L && currentPosition <= 0L
 
@@ -128,10 +131,14 @@ fun PremiumControlsOverlay(
         ) {
             // Top Bar
             if (!isInitialLoading) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .align(Alignment.TopStart)
+                ) {
                 Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .align(Alignment.TopStart)
                     .padding(horizontal = 16.dp, vertical = 12.dp),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.SpaceBetween
@@ -308,6 +315,21 @@ fun PremiumControlsOverlay(
                     }
                 }
             }
+                if (isFullscreen && showFullscreenTitle && !videoTitle.isNullOrBlank()) {
+                    Text(
+                        text = videoTitle,
+                        color = Color.White,
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.SemiBold,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 20.dp)
+                            .padding(bottom = 8.dp)
+                    )
+                }
+                }
         }
 
         // Center Controls

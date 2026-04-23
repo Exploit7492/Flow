@@ -115,6 +115,9 @@ class PlayerPreferences(private val context: Context) {
         val OVERLAY_AUTOPLAY_ENABLED = booleanPreferencesKey("overlay_autoplay_enabled")
         val OVERLAY_SLEEPTIMER_ENABLED = booleanPreferencesKey("overlay_sleeptimer_enabled")
         
+        // Fullscreen Player
+        val SHOW_FULLSCREEN_TITLE = booleanPreferencesKey("show_fullscreen_title")
+        
         // Mini Player Customizations
         val MINI_PLAYER_SCALE = floatPreferencesKey("mini_player_scale")
         val MINI_PLAYER_SHOW_SKIP_CONTROLS = booleanPreferencesKey("mini_player_show_skip_controls")
@@ -735,6 +738,16 @@ class PlayerPreferences(private val context: Context) {
             preferences[Keys.OVERLAY_SLEEPTIMER_ENABLED] = enabled
         }
     }
+
+    //  FULLSCREEN PLAYER PREFERENCES
+    val showFullscreenTitle: Flow<Boolean> = context.playerPreferencesDataStore.data
+        .map { preferences -> preferences[Keys.SHOW_FULLSCREEN_TITLE] ?: false }
+
+    suspend fun setShowFullscreenTitle(enabled: Boolean) {
+        context.playerPreferencesDataStore.edit { preferences ->
+            preferences[Keys.SHOW_FULLSCREEN_TITLE] = enabled
+        }
+    }
     
     // Subtitles
     val subtitlesEnabled: Flow<Boolean> = context.playerPreferencesDataStore.data
@@ -1303,7 +1316,11 @@ class PlayerPreferences(private val context: Context) {
         val activatedAt = prefs[Keys.DEEP_FLOW_ACTIVATED_AT] ?: 0L
         val expireHours = prefs[Keys.DEEP_FLOW_EXPIRE_HOURS] ?: 4
         val elapsedHours = (System.currentTimeMillis() - activatedAt) / 3_600_000.0
-        return elapsedHours < expireHours
+        val stillActive = elapsedHours < expireHours
+        if (!stillActive) {
+            setDeepFlowActive(false)
+        }
+        return stillActive
     }
 
     suspend fun getExportData(): SettingsBackup {

@@ -8,8 +8,6 @@ import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
-import androidx.compose.animation.scaleIn
-import androidx.compose.animation.scaleOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.BorderStroke
@@ -33,7 +31,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Slider
-import androidx.compose.material3.SliderColors
 import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -58,17 +55,20 @@ import androidx.compose.ui.layout.layout
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.viewinterop.AndroidView
 import io.github.aedev.flow.player.seekbarpreview.SeekbarPreviewThumbnailHelper
 import io.github.aedev.flow.ui.screens.player.util.VideoPlayerUtils
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 import androidx.compose.foundation.Image
+import androidx.compose.ui.graphics.FilterQuality
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.IntOffset
+import androidx.core.graphics.BitmapCompat
+import androidx.core.math.MathUtils
 import org.schabi.newpipe.extractor.stream.StreamSegment
+import kotlin.math.roundToInt
 
 // Custom seekbar with preview thumbnails
 @Composable
@@ -87,11 +87,15 @@ fun SeekbarWithPreview(
     duration: Long = 0L,
     bufferedValue: Float = 0f
 ) {
-    var showPreview by remember { mutableStateOf(false) }
     var previewPosition by remember { mutableFloatStateOf(0f) }
     var previewBitmap by remember { mutableStateOf<android.graphics.Bitmap?>(null) }
     val primaryColor = MaterialTheme.colorScheme.primary
     val density = LocalDensity.current
+
+    val fallbackPreviewW = 240.dp
+    val fallbackPreviewH = 135.dp
+    val previewW = previewBitmap?.let { with(density) { it.width.toDp() } } ?: fallbackPreviewW
+    val previewH = previewBitmap?.let { with(density) { it.height.toDp() } } ?: fallbackPreviewH
     
     var sliderWidth by remember { mutableFloatStateOf(0f) }
     
@@ -116,24 +120,28 @@ fun SeekbarWithPreview(
             if (durationMs > 0) {
                 // Round to nearest 2 seconds for better cache hits during scrub
                 val positionMs = ((internalValue * durationMs) / 2000).toLong() * 2000
-                
-                withContext(Dispatchers.IO) {
+
+                val bitmap = withContext(Dispatchers.IO) {
                     try {
-                        val bitmap = seekbarPreviewHelper.loadThumbnailForPosition(positionMs)
-                        if (bitmap != null) {
-                            previewBitmap = bitmap
-                            showPreview = true
-                        }
+                        val rawBitmap = seekbarPreviewHelper.loadThumbnailForPosition(positionMs)
+                        resizeBitmapLikeNewPipe(
+                            source = rawBitmap,
+                            baseViewWidthPx = sliderWidth.roundToInt().coerceAtLeast(1),
+                            minWidthPx = with(density) { 10.dp.roundToPx() }
+                        )
                     } catch (e: Exception) {
-                        // Keep previous bitmap if error
+                        null
                     }
+                }
+
+                if (bitmap != null) {
+                    previewBitmap = bitmap
                 }
             }
         } else {
             // Delay hiding to make it feel smoother
             delay(300)
             if (!isInteracting) {
-                showPreview = false
                 previewBitmap = null
             }
         }
@@ -315,8 +323,6 @@ fun SeekbarWithPreview(
         )
         } 
 
-        val previewW = 200.dp
-        val previewH = 112.dp
         val triangleH = 7.dp
 
         AnimatedVisibility(
@@ -353,7 +359,8 @@ fun SeekbarWithPreview(
                                 bitmap = bmp.asImageBitmap(),
                                 contentDescription = null,
                                 modifier = Modifier.fillMaxSize(),
-                                contentScale = ContentScale.Crop
+                                contentScale = ContentScale.Fit,
+                                filterQuality = FilterQuality.High
                             )
                         } else {
                             Box(
@@ -393,5 +400,34 @@ fun SeekbarWithPreview(
                 )
             }
         }
+    }
+}
+
+private fun resizeBitmapLikeNewPipe(
+    source: android.graphics.Bitmap,
+    baseViewWidthPx: Int,
+    minWidthPx: Int
+): android.graphics.Bitmap {
+    if (source.width <= 0 || source.height <= 0) return source
+
+    val srcWidth = source.width
+    val desiredWidth = Math.round(baseViewWidthPx / 4f)
+    val newWidth = MathUtils.clamp(
+        desiredWidth,
+        minWidthPx,
+        Math.round(srcWidth * 2.5f)
+    )
+
+    if (newWidth <= 0 || newWidth == srcWidth) {
+        return source
+    }
+
+    val scaleFactor = newWidth.toFloat() / srcWidth.toFloat()
+    val newHeight = (source.height * scaleFactor).roundToInt().coerceAtLeast(1)
+
+    return try {
+        BitmapCompat.createScaledBitmap(source, newWidth, newHeight, null, true)
+    } catch (e: Exception) {
+        source
     }
 }
