@@ -1297,4 +1297,6 @@
     <string name="group_name_label">إسم المجموعة</string>
     <string name="no_groups_yet">لا توجد مجموعات حتى الآن. أنشئ واحدة لتصفية التغذية الخاص بك.</string>
     <string name="search_channels_hint">بحث في القنوات…</string>
+    <string name="dearrow_badge_toggle">أظهر شارة DeArrow</string>
+    <string name="dearrow_badge_toggle_subtitle">إعرض شارة على الصور المصغرة تعرض (تم التصحيح بواسطة DeArrow)</string>
 </resources>
