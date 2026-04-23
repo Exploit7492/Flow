@@ -223,6 +223,15 @@
     <string name="import_newpipe_backup">Import NewPipe Backup</string>
     <string name="importing_from_backup">Importing subscriptions from NewPipe backup...</string>
     <string name="search_subscriptions">Search Subscriptions</string>
+    <!-- Subscription Groups -->
+    <string name="group_all">All</string>
+    <string name="manage_groups">Manage Groups</string>
+    <string name="new_group">New Group</string>
+    <string name="edit_group">Edit Group</string>
+    <string name="delete_group">Delete Group</string>
+    <string name="group_name_label">Group name</string>
+    <string name="no_groups_yet">No groups yet. Create one to filter your feed.</string>
+    <string name="search_channels_hint">Search channels…</string>
     <string name="toggle_view_mode">Toggle View Mode</string>
     <string name="unsubscribed_from_template">Unsubscribed from %1$s</string>
     <string name="videos_count_template">%1$d videos</string>

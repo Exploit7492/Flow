@@ -16,10 +16,16 @@ import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material.icons.outlined.Notifications
 import androidx.compose.material.icons.outlined.Search
+import androidx.compose.material.icons.rounded.KeyboardArrowDown
+import androidx.compose.material.icons.rounded.NotificationsActive
+import androidx.compose.material.icons.rounded.NotificationsOff
+import androidx.compose.material.icons.rounded.PersonRemove
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -80,6 +86,10 @@ fun SubscriptionsScreen(
     
     var isManagingSubs by remember { mutableStateOf(false) }
     var searchQuery by remember { mutableStateOf("") }
+
+    var showGroupsDialog by remember { mutableStateOf(false) }
+    var showCreateGroupDialog by remember { mutableStateOf(false) }
+    var editingGroup by remember { mutableStateOf<SubscriptionGroup?>(null) }
     
     // Initialize view model
     LaunchedEffect(Unit) {
@@ -297,6 +307,41 @@ fun SubscriptionsScreen(
                                         }
                                         
                                         HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
+
+                                        if (uiState.groups.isNotEmpty() || true) {
+                                            Row(
+                                                modifier = Modifier
+                                                    .fillMaxWidth()
+                                                    .horizontalScroll(rememberScrollState())
+                                                    .padding(horizontal = 16.dp, vertical = 8.dp),
+                                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                                verticalAlignment = Alignment.CenterVertically
+                                            ) {
+                                                FilterChip(
+                                                    selected = uiState.selectedGroupName == null,
+                                                    onClick = { viewModel.selectGroup(null) },
+                                                    label = { Text(stringResource(R.string.group_all)) }
+                                                )
+                                                uiState.groups.forEach { group ->
+                                                    FilterChip(
+                                                        selected = uiState.selectedGroupName == group.name,
+                                                        onClick = { viewModel.selectGroup(group.name) },
+                                                        label = { Text(group.name) }
+                                                    )
+                                                }
+                                                IconButton(
+                                                    onClick = { showGroupsDialog = true },
+                                                    modifier = Modifier.size(32.dp)
+                                                ) {
+                                                    Icon(
+                                                        Icons.Default.Edit,
+                                                        contentDescription = stringResource(R.string.manage_groups),
+                                                        modifier = Modifier.size(18.dp),
+                                                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                                    )
+                                                }
+                                            }
+                                        }
                                     }
                                 }
     
@@ -340,6 +385,222 @@ fun SubscriptionsScreen(
             }
         }
     }
+
+    if (showGroupsDialog) {
+        GroupsManagerDialog(
+            groups = uiState.groups,
+            onDismiss = { showGroupsDialog = false },
+            onCreateNew = {
+                editingGroup = null
+                showGroupsDialog = false
+                showCreateGroupDialog = true
+            },
+            onEdit = { group ->
+                editingGroup = group
+                showGroupsDialog = false
+                showCreateGroupDialog = true
+            },
+            onDelete = { group ->
+                viewModel.deleteGroup(group.name)
+            }
+        )
+    }
+
+    if (showCreateGroupDialog) {
+        CreateEditGroupDialog(
+            existingGroup = editingGroup,
+            allChannels = uiState.subscribedChannels,
+            onDismiss = { showCreateGroupDialog = false },
+            onConfirm = { name, channelIds ->
+                val existing = editingGroup
+                if (existing == null) {
+                    viewModel.createGroup(name, channelIds)
+                } else {
+                    viewModel.updateGroup(existing.name, name, channelIds)
+                }
+                showCreateGroupDialog = false
+            }
+        )
+    }
+}
+
+@Composable
+private fun GroupsManagerDialog(
+    groups: List<SubscriptionGroup>,
+    onDismiss: () -> Unit,
+    onCreateNew: () -> Unit,
+    onEdit: (SubscriptionGroup) -> Unit,
+    onDelete: (SubscriptionGroup) -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(R.string.manage_groups)) },
+        text = {
+            Column {
+                if (groups.isEmpty()) {
+                    Text(
+                        text = stringResource(R.string.no_groups_yet),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(vertical = 8.dp)
+                    )
+                } else {
+                    groups.forEach { group ->
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 4.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = group.name,
+                                style = MaterialTheme.typography.bodyLarge,
+                                modifier = Modifier.weight(1f)
+                            )
+                            Text(
+                                text = pluralStringResource(
+                                    R.plurals.channels_count,
+                                    group.channelIds.size,
+                                    group.channelIds.size
+                                ),
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.padding(end = 8.dp)
+                            )
+                            IconButton(onClick = { onEdit(group) }, modifier = Modifier.size(32.dp)) {
+                                Icon(Icons.Default.Edit, null, modifier = Modifier.size(16.dp))
+                            }
+                            IconButton(onClick = { onDelete(group) }, modifier = Modifier.size(32.dp)) {
+                                Icon(
+                                    Icons.Default.Delete,
+                                    null,
+                                    modifier = Modifier.size(16.dp),
+                                    tint = MaterialTheme.colorScheme.error
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onCreateNew) {
+                Icon(Icons.Default.Add, null, modifier = Modifier.size(16.dp))
+                Spacer(modifier = Modifier.width(4.dp))
+                Text(stringResource(R.string.new_group))
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text(stringResource(R.string.close))
+            }
+        }
+    )
+}
+
+@Composable
+private fun CreateEditGroupDialog(
+    existingGroup: SubscriptionGroup?,
+    allChannels: List<Channel>,
+    onDismiss: () -> Unit,
+    onConfirm: (name: String, channelIds: List<String>) -> Unit
+) {
+    var groupName by remember { mutableStateOf(existingGroup?.name ?: "") }
+    val selectedChannelIds = remember {
+        mutableStateOf(existingGroup?.channelIds?.toMutableSet() ?: mutableSetOf())
+    }
+    var searchQuery by remember { mutableStateOf("") }
+
+    val filteredChannels = remember(allChannels, searchQuery) {
+        if (searchQuery.isBlank()) allChannels
+        else allChannels.filter { it.name.contains(searchQuery, ignoreCase = true) }
+    }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Text(
+                if (existingGroup == null) stringResource(R.string.new_group)
+                else stringResource(R.string.edit_group)
+            )
+        },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedTextField(
+                    value = groupName,
+                    onValueChange = { groupName = it },
+                    label = { Text(stringResource(R.string.group_name_label)) },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+                OutlinedTextField(
+                    value = searchQuery,
+                    onValueChange = { searchQuery = it },
+                    placeholder = { Text(stringResource(R.string.search_channels_hint)) },
+                    leadingIcon = { Icon(Icons.Default.Search, null, modifier = Modifier.size(18.dp)) },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+                LazyColumn(
+                    modifier = Modifier.heightIn(max = 280.dp),
+                    verticalArrangement = Arrangement.spacedBy(2.dp)
+                ) {
+                    items(filteredChannels) { channel ->
+                        val isChecked = channel.id in selectedChannelIds.value
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable {
+                                    val updated = selectedChannelIds.value.toMutableSet()
+                                    if (isChecked) updated.remove(channel.id) else updated.add(channel.id)
+                                    selectedChannelIds.value = updated
+                                }
+                                .padding(vertical = 4.dp, horizontal = 4.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Checkbox(
+                                checked = isChecked,
+                                onCheckedChange = { checked ->
+                                    val updated = selectedChannelIds.value.toMutableSet()
+                                    if (checked) updated.add(channel.id) else updated.remove(channel.id)
+                                    selectedChannelIds.value = updated
+                                }
+                            )
+                            AsyncImage(
+                                model = channel.thumbnailUrl,
+                                contentDescription = null,
+                                modifier = Modifier
+                                    .size(32.dp)
+                                    .clip(CircleShape)
+                                    .background(MaterialTheme.colorScheme.surfaceVariant),
+                                contentScale = ContentScale.Crop
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = channel.name,
+                                style = MaterialTheme.typography.bodyMedium,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(
+                onClick = { onConfirm(groupName.trim(), selectedChannelIds.value.toList()) },
+                enabled = groupName.isNotBlank() && selectedChannelIds.value.isNotEmpty()
+            ) {
+                Text(stringResource(R.string.save))
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text(stringResource(R.string.cancel))
+            }
+        }
+    )
 }
 
 @Composable
@@ -438,9 +699,15 @@ fun SubscriptionManagerItem(
                 ),
                 contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp)
             ) {
-                Text(androidx.compose.ui.res.stringResource(R.string.subscribed))
+                Icon(
+                    imageVector = if (isNotificationsEnabled) Icons.Rounded.NotificationsActive else Icons.Rounded.NotificationsOff,
+                    contentDescription = null,
+                    modifier = Modifier.size(16.dp)
+                )
                 Spacer(modifier = Modifier.width(4.dp))
-                Icon(Icons.Default.Notifications, null, modifier = Modifier.size(16.dp))
+                Text(androidx.compose.ui.res.stringResource(R.string.subscribed))
+                Spacer(modifier = Modifier.width(2.dp))
+                Icon(Icons.Rounded.KeyboardArrowDown, null, modifier = Modifier.size(14.dp))
             }
             DropdownMenu(
                 expanded = expanded,
@@ -458,10 +725,7 @@ fun SubscriptionManagerItem(
                         onNotificationChange(true)
                         expanded = false
                     },
-                    leadingIcon = { Icon(Icons.Default.NotificationsActive, null) },
-                    trailingIcon = if (isNotificationsEnabled) {
-                        { Icon(Icons.Default.Check, null) }
-                    } else null
+                    leadingIcon = { Icon(Icons.Rounded.NotificationsActive, null) }
                 )
                 DropdownMenuItem(
                     text = { Text(androidx.compose.ui.res.stringResource(R.string.off)) },
@@ -469,19 +733,16 @@ fun SubscriptionManagerItem(
                         onNotificationChange(false)
                         expanded = false
                     },
-                    leadingIcon = { Icon(Icons.Default.NotificationsOff, null) },
-                    trailingIcon = if (!isNotificationsEnabled) {
-                        { Icon(Icons.Default.Check, null) }
-                    } else null
+                    leadingIcon = { Icon(Icons.Rounded.NotificationsOff, null) }
                 )
-                HorizontalDivider()
+                HorizontalDivider(thickness = 0.5.dp, color = MaterialTheme.colorScheme.surfaceVariant)
                 DropdownMenuItem(
                     text = { Text(androidx.compose.ui.res.stringResource(R.string.unsubscribe)) },
                     onClick = {
                         onUnsubscribe()
                         expanded = false
                     },
-                    leadingIcon = { Icon(Icons.Default.PersonRemove, null) }
+                    leadingIcon = { Icon(Icons.Rounded.PersonRemove, null) }
                 )
             }
         }

@@ -9,6 +9,7 @@ import io.github.aedev.flow.data.local.dao.DownloadDao
 import io.github.aedev.flow.data.local.dao.DownloadedSongDao
 import io.github.aedev.flow.data.local.dao.NotificationDao
 import io.github.aedev.flow.data.local.dao.PlaylistDao
+import io.github.aedev.flow.data.local.dao.SubscriptionGroupDao
 import io.github.aedev.flow.data.local.dao.VideoDao
 import io.github.aedev.flow.data.local.dao.WatchHistoryDao
 import io.github.aedev.flow.data.local.entity.DownloadEntity
@@ -20,6 +21,7 @@ import io.github.aedev.flow.data.local.entity.PlaylistEntity
 import io.github.aedev.flow.data.local.entity.PlaylistVideoCrossRef
 import io.github.aedev.flow.data.local.entity.MusicHomeChipEntity
 import io.github.aedev.flow.data.local.entity.SubscriptionFeedEntity
+import io.github.aedev.flow.data.local.entity.SubscriptionGroupEntity
 import io.github.aedev.flow.data.local.entity.VideoEntity
 import io.github.aedev.flow.data.local.entity.WatchHistoryEntity
 
@@ -35,9 +37,10 @@ import io.github.aedev.flow.data.local.entity.WatchHistoryEntity
         DownloadedSongEntity::class,
         DownloadEntity::class,
         DownloadItemEntity::class,
-        WatchHistoryEntity::class
+        WatchHistoryEntity::class,
+        SubscriptionGroupEntity::class
     ],
-    version = 14,
+    version = 15,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -48,6 +51,7 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun downloadedSongDao(): DownloadedSongDao
     abstract fun downloadDao(): DownloadDao
     abstract fun watchHistoryDao(): WatchHistoryDao
+    abstract fun subscriptionGroupDao(): SubscriptionGroupDao
 
     companion object {
         @Volatile
@@ -96,6 +100,20 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
+        val MIGRATION_14_15 = object : Migration(14, 15) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS subscription_groups (
+                        name TEXT NOT NULL PRIMARY KEY,
+                        channelIds TEXT NOT NULL DEFAULT '',
+                        sortOrder INTEGER NOT NULL DEFAULT 0
+                    )
+                    """.trimIndent()
+                )
+            }
+        }
+
         fun getDatabase(context: android.content.Context): AppDatabase {
             return INSTANCE ?: synchronized(this) {
                 val instance = androidx.room.Room.databaseBuilder(
@@ -103,7 +121,7 @@ abstract class AppDatabase : RoomDatabase() {
                     AppDatabase::class.java,
                     "flow_database"
                 )
-                .addMigrations(MIGRATION_10_11, MIGRATION_11_12, MIGRATION_12_13, MIGRATION_13_14)
+                .addMigrations(MIGRATION_10_11, MIGRATION_11_12, MIGRATION_12_13, MIGRATION_13_14, MIGRATION_14_15)
                 .fallbackToDestructiveMigration()
                 .build()
                 INSTANCE = instance

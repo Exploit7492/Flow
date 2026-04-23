@@ -4,10 +4,13 @@ import android.content.Context
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import io.github.aedev.flow.data.local.AppDatabase
 import io.github.aedev.flow.data.local.ChannelSubscription
 import io.github.aedev.flow.data.local.SubscriptionRepository
 import io.github.aedev.flow.data.local.VideoHistoryEntry
 import io.github.aedev.flow.data.local.ViewHistory
+import io.github.aedev.flow.data.local.dao.SubscriptionGroupDao
+import io.github.aedev.flow.data.local.entity.SubscriptionGroupEntity
 import io.github.aedev.flow.data.model.Channel
 import io.github.aedev.flow.data.model.Video
 import io.github.aedev.flow.data.repository.YouTubeRepository
@@ -39,14 +42,23 @@ class SubscriptionsViewModel : ViewModel() {
     private lateinit var cacheDao: io.github.aedev.flow.data.local.dao.CacheDao
     private lateinit var watchHistoryDao: io.github.aedev.flow.data.local.dao.WatchHistoryDao
     private lateinit var playerPreferences: PlayerPreferences
-    
+    private lateinit var subscriptionGroupDao: SubscriptionGroupDao
+
     fun initialize(context: Context) {
         subscriptionRepository = SubscriptionRepository.getInstance(context)
         playerPreferences = PlayerPreferences(context)
         viewHistory = ViewHistory.getInstance(context)
-        val db = io.github.aedev.flow.data.local.AppDatabase.getDatabase(context)
+        val db = AppDatabase.getDatabase(context)
         cacheDao = db.cacheDao()
         watchHistoryDao = db.watchHistoryDao()
+        subscriptionGroupDao = db.subscriptionGroupDao()
+        
+        viewModelScope.launch(PerformanceDispatcher.diskIO) {
+            subscriptionGroupDao.getAllGroups().collect { entities ->
+                val groups = entities.map { it.toUiModel() }
+                _uiState.update { it.copy(groups = groups) }
+            }
+        }
         
         viewModelScope.launch(PerformanceDispatcher.diskIO) {
             playerPreferences.shortsShelfEnabled.collect { enabled ->
@@ -226,9 +238,97 @@ class SubscriptionsViewModel : ViewModel() {
             regular
         }
 
-        _uiState.update { it.copy(recentVideos = filteredRegular, shorts = unwatchedShorts) }
+        val selectedGroup = _uiState.value.selectedGroupName
+        val allowedChannelIds: Set<String>? = if (selectedGroup != null) {
+            _uiState.value.groups.find { it.name == selectedGroup }?.channelIds?.toHashSet()
+        } else {
+            null
+        }
+
+        val groupFilteredRegular = if (allowedChannelIds != null) {
+            filteredRegular.filter { it.channelId in allowedChannelIds }
+        } else {
+            filteredRegular
+        }
+
+        val groupFilteredShorts = if (allowedChannelIds != null) {
+            unwatchedShorts.filter { it.channelId in allowedChannelIds }
+        } else {
+            unwatchedShorts
+        }
+
+        _uiState.update { it.copy(recentVideos = groupFilteredRegular, shorts = groupFilteredShorts) }
     }
     
+
+    fun selectGroup(groupName: String?) {
+        _uiState.update { it.copy(selectedGroupName = groupName) }
+        viewModelScope.launch(PerformanceDispatcher.diskIO) {
+            val cached = cacheDao.getSubscriptionFeed().first()
+            if (cached.isNotEmpty()) {
+                val videos = cached.map { entity ->
+                    Video(
+                        id = entity.videoId,
+                        title = entity.title,
+                        channelName = entity.channelName,
+                        channelId = entity.channelId,
+                        thumbnailUrl = entity.thumbnailUrl,
+                        duration = entity.duration,
+                        viewCount = entity.viewCount,
+                        uploadDate = entity.uploadDate,
+                        timestamp = entity.timestamp,
+                        channelThumbnailUrl = entity.channelThumbnailUrl,
+                        isShort = entity.isShort
+                    )
+                }
+                updateVideos(videos)
+            }
+        }
+    }
+
+    fun createGroup(name: String, channelIds: List<String>) {
+        viewModelScope.launch(PerformanceDispatcher.diskIO) {
+            val nextOrder = subscriptionGroupDao.getAllGroupsOnce().size
+            subscriptionGroupDao.insertGroup(
+                SubscriptionGroupEntity(
+                    name = name,
+                    channelIds = channelIds.joinToString(","),
+                    sortOrder = nextOrder
+                )
+            )
+        }
+    }
+
+    fun updateGroup(oldName: String, newName: String, channelIds: List<String>) {
+        viewModelScope.launch(PerformanceDispatcher.diskIO) {
+            val existing = subscriptionGroupDao.getAllGroupsOnce().find { it.name == oldName }
+            if (existing != null) {
+                if (oldName != newName) {
+                    subscriptionGroupDao.deleteGroup(oldName)
+                    subscriptionGroupDao.insertGroup(
+                        existing.copy(name = newName, channelIds = channelIds.joinToString(","))
+                    )
+                } else {
+                    subscriptionGroupDao.updateGroup(
+                        existing.copy(channelIds = channelIds.joinToString(","))
+                    )
+                }
+                if (_uiState.value.selectedGroupName == oldName) {
+                    _uiState.update { it.copy(selectedGroupName = newName) }
+                }
+            }
+        }
+    }
+
+    fun deleteGroup(name: String) {
+        viewModelScope.launch(PerformanceDispatcher.diskIO) {
+            subscriptionGroupDao.deleteGroup(name)
+            if (_uiState.value.selectedGroupName == name) {
+                selectGroup(null)
+            }
+        }
+    }
+
     private fun parseRelativeTime(dateString: String): Long {
         try {
             val now = System.currentTimeMillis()
@@ -415,6 +515,20 @@ data class SubscriptionsUiState(
     val isLoading: Boolean = false,
     val isFullWidthView: Boolean = false,
     val isShortsShelfEnabled: Boolean = true,
-    val notificationStates: Map<String, Boolean> = emptyMap()
+    val notificationStates: Map<String, Boolean> = emptyMap(),
+    val groups: List<SubscriptionGroup> = emptyList(),
+    val selectedGroupName: String? = null
+)
+
+data class SubscriptionGroup(
+    val name: String,
+    val channelIds: List<String>,
+    val sortOrder: Int = 0
+)
+
+fun SubscriptionGroupEntity.toUiModel() = SubscriptionGroup(
+    name = name,
+    channelIds = if (channelIds.isBlank()) emptyList() else channelIds.split(",").filter { it.isNotBlank() },
+    sortOrder = sortOrder
 )
 

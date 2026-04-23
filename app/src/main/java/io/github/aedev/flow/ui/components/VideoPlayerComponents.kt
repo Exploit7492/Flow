@@ -316,7 +316,7 @@ fun SubscribeButton(
             ) {
                 if (isSubscribed) {
                     Icon(
-                        imageVector = if (isNotificationsEnabled) Icons.Rounded.NotificationsActive else Icons.Outlined.Notifications,
+                        imageVector = if (isNotificationsEnabled) Icons.Rounded.NotificationsActive else Icons.Rounded.NotificationsOff,
                         contentDescription = null,
                         modifier = Modifier.size(18.dp),
                         tint = contentColor
