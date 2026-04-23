@@ -64,6 +64,7 @@ IMPROVEMENTS
 - Add new Monero (XMR) donation option and improve donation screen UI
 - Improve SponsorBlock segment auto fill and Unify SponsorBlock and DeArrow #308
 - Show Video download status
+- Improve Home feed and Subscription screen subs recency #311 
 
 FIXES AND STABILITY
 - Fix video player playback speed issue #232

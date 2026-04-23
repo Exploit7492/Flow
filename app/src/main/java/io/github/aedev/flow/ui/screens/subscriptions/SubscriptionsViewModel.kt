@@ -20,6 +20,7 @@ import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.async
 import kotlinx.coroutines.supervisorScope
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 
 class SubscriptionsViewModel : ViewModel() {
@@ -30,6 +31,7 @@ class SubscriptionsViewModel : ViewModel() {
          * 4 hours — balances freshness with avoiding an RSS fetch on every screen visit.
          */
         private const val FEED_CACHE_TTL_MS = 30 * 60 * 1000L // 30 minutes
+        private const val SOFT_REFRESH_MAX_AGE_MS = 10 * 60 * 1000L // 10 minutes
     }
 
     private lateinit var subscriptionRepository: SubscriptionRepository
@@ -43,8 +45,13 @@ class SubscriptionsViewModel : ViewModel() {
     private lateinit var watchHistoryDao: io.github.aedev.flow.data.local.dao.WatchHistoryDao
     private lateinit var playerPreferences: PlayerPreferences
     private lateinit var subscriptionGroupDao: SubscriptionGroupDao
+    private var isInitialized = false
+    private var isNetworkFetchRunning = false
 
     fun initialize(context: Context) {
+        if (isInitialized) return
+        isInitialized = true
+
         subscriptionRepository = SubscriptionRepository.getInstance(context)
         playerPreferences = PlayerPreferences(context)
         viewHistory = ViewHistory.getInstance(context)
@@ -134,44 +141,20 @@ class SubscriptionsViewModel : ViewModel() {
                         val latestCachedAt = cacheDao.getLatestCachedAt() ?: 0L
                         val cacheAgeMs   = System.currentTimeMillis() - latestCachedAt
                         val isCacheStale = cacheCount == 0 || cacheAgeMs > FEED_CACHE_TTL_MS
+                        val hasNewUploadSignal = hasNewUploadSignalSinceCache(latestCachedAt)
 
-                        if (!isCacheStale) {
-                            Log.i(TAG, "Feed cache is fresh (age=${cacheAgeMs / 60_000}min, $cacheCount entries) — skipping network fetch")
-                            _uiState.update { it.copy(isLoading = false) }
+                        if (isCacheStale || hasNewUploadSignal) {
+                            Log.i(
+                                TAG,
+                                "Refreshing subscriptions feed (stale=$isCacheStale, newSignal=$hasNewUploadSignal, age=${cacheAgeMs / 60_000}min, rows=$cacheCount)"
+                            )
+                            fetchAndCacheSubscriptionFeed(
+                                channelIds = channels.map { it.id },
+                                showLoading = true
+                            )
                         } else {
-                            Log.i(TAG, "Starting network fetch for ${channels.size} channels (cacheAge=${cacheAgeMs / 60_000}min, rows=$cacheCount)")
-
-                            io.github.aedev.flow.data.innertube.RssSubscriptionService.fetchSubscriptionVideos(
-                                channelIds = channels.map { it.id }
-                            ).collect { videos ->
-                                Log.i(TAG, "Network emit received: ${videos.size} videos (shorts=${videos.count { it.isShort }}, regular=${videos.count { !it.isShort }})")
-                                if (videos.isNotEmpty()) {
-                                    updateVideos(videos)
-                                    val entities = videos.map { video ->
-                                        io.github.aedev.flow.data.local.entity.SubscriptionFeedEntity(
-                                            videoId = video.id,
-                                            title = video.title,
-                                            channelName = video.channelName,
-                                            channelId = video.channelId,
-                                            thumbnailUrl = video.thumbnailUrl,
-                                            duration = video.duration,
-                                            viewCount = video.viewCount,
-                                            uploadDate = video.uploadDate,
-                                            timestamp = video.timestamp,
-                                            channelThumbnailUrl = video.channelThumbnailUrl,
-                                            isShort = video.isShort,
-                                            cachedAt = System.currentTimeMillis()
-                                        )
-                                    }
-                                    launch(PerformanceDispatcher.diskIO) {
-                                        cacheDao.clearSubscriptionFeed()
-                                        cacheDao.insertSubscriptionFeed(entities)
-                                    }
-                                } else {
-                                    Log.w(TAG, "Network emit was empty!")
-                                }
-                                _uiState.update { it.copy(isLoading = false) }
-                            }
+                            Log.i(TAG, "Feed cache is fresh (age=${cacheAgeMs / 60_000}min, rows=$cacheCount) — skipping network fetch")
+                            _uiState.update { it.copy(isLoading = false) }
                         }
                     } else {
                         Log.w(TAG, "No channels \u2014 skipping fetch")
@@ -180,6 +163,68 @@ class SubscriptionsViewModel : ViewModel() {
                 }
         }
 
+    }
+
+    private suspend fun fetchAndCacheSubscriptionFeed(
+        channelIds: List<String>,
+        showLoading: Boolean
+    ) {
+        if (channelIds.isEmpty()) return
+        if (isNetworkFetchRunning) {
+            Log.d(TAG, "Skip fetch: another subscription fetch is running")
+            return
+        }
+
+        isNetworkFetchRunning = true
+        if (showLoading) {
+            _uiState.update { it.copy(isLoading = true) }
+        }
+
+        try {
+            io.github.aedev.flow.data.innertube.RssSubscriptionService.fetchSubscriptionVideos(
+                channelIds = channelIds,
+                maxTotal = 200
+            ).collect { videos ->
+                Log.i(TAG, "Network emit received: ${videos.size} videos (shorts=${videos.count { it.isShort }}, regular=${videos.count { !it.isShort }})")
+                if (videos.isNotEmpty()) {
+                    updateVideos(videos)
+                    val entities = videos.map { video ->
+                        io.github.aedev.flow.data.local.entity.SubscriptionFeedEntity(
+                            videoId = video.id,
+                            title = video.title,
+                            channelName = video.channelName,
+                            channelId = video.channelId,
+                            thumbnailUrl = video.thumbnailUrl,
+                            duration = video.duration,
+                            viewCount = video.viewCount,
+                            uploadDate = video.uploadDate,
+                            timestamp = video.timestamp,
+                            channelThumbnailUrl = video.channelThumbnailUrl,
+                            isShort = video.isShort,
+                            cachedAt = System.currentTimeMillis()
+                        )
+                    }
+                    withContext(PerformanceDispatcher.diskIO) {
+                        cacheDao.clearSubscriptionFeed()
+                        cacheDao.insertSubscriptionFeed(entities)
+                    }
+                } else {
+                    Log.w(TAG, "Network emit was empty!")
+                }
+            }
+        } finally {
+            if (showLoading) {
+                _uiState.update { it.copy(isLoading = false) }
+            }
+            isNetworkFetchRunning = false
+        }
+    }
+
+    private suspend fun hasNewUploadSignalSinceCache(latestCachedAt: Long): Boolean {
+        if (latestCachedAt <= 0L) return true
+        val latestSignal = subscriptionRepository.getAllSubscriptions().first()
+            .maxOfOrNull { it.lastCheckTime } ?: 0L
+        return latestSignal > latestCachedAt
     }
 
 
@@ -416,38 +461,34 @@ class SubscriptionsViewModel : ViewModel() {
         viewModelScope.launch(PerformanceDispatcher.networkIO) {
             val channels = _uiState.value.subscribedChannels
             if (channels.isEmpty()) return@launch
-            _uiState.update { it.copy(isLoading = true) }
-            
-            supervisorScope {
-                io.github.aedev.flow.data.innertube.RssSubscriptionService.fetchSubscriptionVideos(
+            fetchAndCacheSubscriptionFeed(
+                channelIds = channels.map { it.id },
+                showLoading = true
+            )
+        }
+    }
+
+    fun refreshIfStaleOrMissedUploads(maxAgeMs: Long = SOFT_REFRESH_MAX_AGE_MS) {
+        viewModelScope.launch(PerformanceDispatcher.networkIO) {
+            val channels = _uiState.value.subscribedChannels
+            if (channels.isEmpty()) return@launch
+            if (isNetworkFetchRunning) return@launch
+
+            val cacheCount = cacheDao.getSubscriptionFeedCount()
+            val latestCachedAt = cacheDao.getLatestCachedAt() ?: 0L
+            val cacheAgeMs = System.currentTimeMillis() - latestCachedAt
+            val staleByAge = cacheCount == 0 || cacheAgeMs > maxAgeMs
+            val hasNewUploadSignal = hasNewUploadSignalSinceCache(latestCachedAt)
+
+            if (staleByAge || hasNewUploadSignal) {
+                Log.i(
+                    TAG,
+                    "Soft refresh triggered (staleByAge=$staleByAge, newSignal=$hasNewUploadSignal, age=${cacheAgeMs / 60_000}min)"
+                )
+                fetchAndCacheSubscriptionFeed(
                     channelIds = channels.map { it.id },
-                    maxTotal = 200
-                ).collect { videos ->
-                    if (videos.isNotEmpty()) {
-                        updateVideos(videos)
-                        val entities = videos.map { video ->
-                            io.github.aedev.flow.data.local.entity.SubscriptionFeedEntity(
-                                videoId = video.id,
-                                title = video.title,
-                                channelName = video.channelName,
-                                channelId = video.channelId,
-                                thumbnailUrl = video.thumbnailUrl,
-                                duration = video.duration,
-                                viewCount = video.viewCount,
-                                uploadDate = video.uploadDate,
-                                timestamp = video.timestamp,
-                                channelThumbnailUrl = video.channelThumbnailUrl,
-                                isShort = video.isShort,
-                                cachedAt = System.currentTimeMillis()
-                            )
-                        }
-                        launch(PerformanceDispatcher.diskIO) {
-                            cacheDao.clearSubscriptionFeed()
-                            cacheDao.insertSubscriptionFeed(entities)
-                        }
-                    }
-                    _uiState.update { it.copy(isLoading = false) }
-                }
+                    showLoading = false
+                )
             }
         }
     }

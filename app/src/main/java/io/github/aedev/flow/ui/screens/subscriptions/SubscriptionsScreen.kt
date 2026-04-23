@@ -56,6 +56,7 @@ import kotlinx.coroutines.flow.collectLatest
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.res.pluralStringResource
 import io.github.aedev.flow.ui.TabScrollEventBus
+import kotlinx.coroutines.delay
 
 @OptIn(ExperimentalAnimationApi::class, ExperimentalMaterial3Api::class)
 @Composable
@@ -94,6 +95,14 @@ fun SubscriptionsScreen(
     // Initialize view model
     LaunchedEffect(Unit) {
         viewModel.initialize(context)
+        viewModel.refreshIfStaleOrMissedUploads()
+    }
+
+    LaunchedEffect(Unit) {
+        while (true) {
+            delay(3 * 60 * 1000L)
+            viewModel.refreshIfStaleOrMissedUploads()
+        }
     }
 
     // Scroll to top and refresh when tapping the subscriptions tab while already on this screen

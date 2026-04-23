@@ -176,6 +176,9 @@ class PlayerPreferences(private val context: Context) {
         val DEEP_FLOW_ACTIVATED_AT = longPreferencesKey("deep_flow_activated_at")
         val DEEP_FLOW_EXPIRE_HOURS = intPreferencesKey("deep_flow_expire_hours")
 
+        // Home subscription feed rotation cursor
+        val HOME_SUBS_ROTATION_CURSOR = intPreferencesKey("home_subs_rotation_cursor")
+
         // Auto-backup settings
         val AUTO_BACKUP_FREQUENCY = stringPreferencesKey("auto_backup_frequency")
         val AUTO_BACKUP_FOLDER_URI = stringPreferencesKey("auto_backup_folder_uri")
@@ -459,6 +462,18 @@ class PlayerPreferences(private val context: Context) {
     suspend fun setHomeFeedEnabled(enabled: Boolean) {
         context.playerPreferencesDataStore.edit { preferences ->
             preferences[Keys.HOME_FEED_ENABLED] = enabled
+        }
+    }
+
+    // Home subscription rotation cursor
+    val homeSubsRotationCursor: Flow<Int> = context.playerPreferencesDataStore.data
+        .map { preferences ->
+            preferences[Keys.HOME_SUBS_ROTATION_CURSOR] ?: 0
+        }
+
+    suspend fun setHomeSubsRotationCursor(cursor: Int) {
+        context.playerPreferencesDataStore.edit { preferences ->
+            preferences[Keys.HOME_SUBS_ROTATION_CURSOR] = cursor.coerceAtLeast(0)
         }
     }
 

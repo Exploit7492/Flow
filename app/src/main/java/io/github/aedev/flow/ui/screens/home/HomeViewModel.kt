@@ -1,6 +1,7 @@
 package io.github.aedev.flow.ui.screens.home
 
 import android.content.Context
+import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import io.github.aedev.flow.data.recommendation.FlowNeuroEngine
@@ -36,6 +37,12 @@ class HomeViewModel @Inject constructor(
     private val shortsRepository: ShortsRepository,
     private val playerPreferences: io.github.aedev.flow.data.local.PlayerPreferences
 ) : ViewModel() {
+    companion object {
+        private const val TAG = "HomeViewModel"
+        private const val HOME_TARGET_SIZE = 40
+        private const val FRESH_SUB_WINDOW_MS = 72L * 60L * 60L * 1000L
+    }
+
     
     private val _uiState = MutableStateFlow(HomeUiState())
     val uiState: StateFlow<HomeUiState> = _uiState.asStateFlow()
@@ -213,13 +220,16 @@ class HomeViewModel @Inject constructor(
                 
                 val userSubs = subscriptionRepository.getAllSubscriptionIds()
                 val region = playerPreferences.trendingRegion.first()
+                val fetchStart = System.currentTimeMillis()
 
                 val results = supervisorScope {
                     val deferredSubs = async {
                         if (userSubs.isNotEmpty()) {
-                            runCatching { 
-                                repository.getSubscriptionFeed(userSubs.toList())
-                            }.getOrElse { emptyList() }
+                            withTimeoutOrNull(8_000L) {
+                                runCatching {
+                                    repository.getSubscriptionFeed(userSubs.toList())
+                                }.getOrElse { emptyList() }
+                            } ?: emptyList()
                         } else emptyList()
                     }
 
@@ -242,7 +252,7 @@ class HomeViewModel @Inject constructor(
 
                     // ── Fast first paint ────────────────────────────────────────
                     val viralResult = deferredViral.await()
-                    if (viralResult.isNotEmpty()) {
+                    if (viralResult.isNotEmpty() && userSubs.isEmpty()) {
                         val watched = watchedVideoIds.value
                         val quickFeed = FlowNeuroEngine.rank(
                             viralResult.filterValid().filterWatched(watched), userSubs
@@ -264,6 +274,8 @@ class HomeViewModel @Inject constructor(
                 currentQueryIndex = 3
                 
                 val (rawSubs, rawDiscovery, rawViral) = results
+
+                Log.d(TAG, "Flow fetch completed in ${System.currentTimeMillis() - fetchStart}ms")
 
                 val subAvatarMap: Map<String, String> = runCatching {
                     subscriptionRepository.getAllSubscriptions().first()
@@ -294,8 +306,24 @@ class HomeViewModel @Inject constructor(
                 val subsPool = rawSubs.filterValid().filterWatched(watched).enrichAvatars()
                 val discoveryPool = rawDiscovery.filterValid().filterWatched(watched)
                 val viralPool = rawViral.filterValid().filterWatched(watched)
-                
-                val bestSubs = FlowNeuroEngine.rank(subsPool, userSubs).take(10)
+
+                Log.d(
+                    TAG,
+                    "Flow candidates: subs=${subsPool.size}, discovery=${discoveryPool.size}, viral=${viralPool.size}, subCount=${userSubs.size}"
+                )
+
+                val now = System.currentTimeMillis()
+                val rankedSubs = FlowNeuroEngine.rank(subsPool, userSubs)
+                val freshSlotTarget = dynamicFreshSubSlots(userSubs.size)
+                val freshSubsLane = rankedSubs
+                    .filter { isFreshSubscribedCandidate(it, now) }
+                    .take(freshSlotTarget)
+                val freshIds = freshSubsLane.map { it.id }.toHashSet()
+
+                val bestSubs = rankedSubs
+                    .filter { !freshIds.contains(it.id) }
+                    .take(15)
+
                 val bestDiscovery = FlowNeuroEngine.rank(discoveryPool, userSubs)
                     .filter { video ->
                         val isOld = video.uploadDate.contains("year") && 
@@ -305,24 +333,65 @@ class HomeViewModel @Inject constructor(
                         
                         !isOld || isClassic
                     }
-                    .take(15) 
-                val bestViral = FlowNeuroEngine.rank(viralPool, userSubs).take(10)
+                    .take(15)
+                val bestViral = FlowNeuroEngine.rank(viralPool, userSubs).take(6)
 
                 val finalMix = mutableListOf<Video>()
+                val usedVideoIds = mutableSetOf<String>()
                 val usedChannelIds = mutableSetOf<String>()
+
+                freshSubsLane.forEach { video ->
+                    addUnique(video, finalMix, usedChannelIds, usedVideoIds)
+                }
+
+                val remaining = (HOME_TARGET_SIZE - finalMix.size).coerceAtLeast(0)
+                val subsQuota = (remaining * 0.50).toInt().coerceAtLeast(0)
+                val discoveryQuota = (remaining * 0.40).toInt().coerceAtLeast(0)
+                val viralQuota = (remaining - subsQuota - discoveryQuota).coerceAtLeast(0)
                 
                 val qSubs = java.util.ArrayDeque(bestSubs)
                 val qDisc = java.util.ArrayDeque(bestDiscovery)
                 val qViral = java.util.ArrayDeque(bestViral)
+
+                var subsAdded = 0
+                var discoveryAdded = 0
+                var viralAdded = 0
                 
-                while (qSubs.isNotEmpty() || qDisc.isNotEmpty() || qViral.isNotEmpty()) {
-                    addUnique(qSubs.pollFirst(), finalMix, usedChannelIds)
-                    
-                    addUnique(qDisc.pollFirst(), finalMix, usedChannelIds)
-                    
-                    addUnique(qSubs.pollFirst(), finalMix, usedChannelIds)
-                    
-                    addUnique(qViral.pollFirst(), finalMix, usedChannelIds)
+                while (
+                    finalMix.size < HOME_TARGET_SIZE &&
+                    (qSubs.isNotEmpty() || qDisc.isNotEmpty() || qViral.isNotEmpty())
+                ) {
+                    var addedThisRound = false
+
+                    if (subsAdded < subsQuota && addUnique(qSubs.pollFirst(), finalMix, usedChannelIds, usedVideoIds)) {
+                        subsAdded++
+                        addedThisRound = true
+                    }
+
+                    if (discoveryAdded < discoveryQuota && addUnique(qDisc.pollFirst(), finalMix, usedChannelIds, usedVideoIds)) {
+                        discoveryAdded++
+                        addedThisRound = true
+                    }
+
+                    if (viralAdded < viralQuota && addUnique(qViral.pollFirst(), finalMix, usedChannelIds, usedVideoIds)) {
+                        viralAdded++
+                        addedThisRound = true
+                    }
+
+                    if (!addedThisRound) {
+                        val forced = addUnique(qSubs.pollFirst(), finalMix, usedChannelIds, usedVideoIds) ||
+                            addUnique(qDisc.pollFirst(), finalMix, usedChannelIds, usedVideoIds) ||
+                            addUnique(qViral.pollFirst(), finalMix, usedChannelIds, usedVideoIds)
+                        if (!forced) break
+                    }
+                }
+
+                if (finalMix.size < HOME_TARGET_SIZE) {
+                    val fallback = bestSubs + bestDiscovery + bestViral
+                    fallback.forEach { video ->
+                        if (finalMix.size >= HOME_TARGET_SIZE) return@forEach
+                        addUnique(video, finalMix, usedChannelIds, usedVideoIds)
+                    }
                 }
 
                 if (finalMix.isEmpty()) {
@@ -330,7 +399,11 @@ class HomeViewModel @Inject constructor(
                    return@launch
                 }
 
-                val now = System.currentTimeMillis()
+                Log.d(
+                    TAG,
+                    "Flow mix: freshLane=${freshSubsLane.size}, final=${finalMix.size}, quotas=s:$subsQuota d:$discoveryQuota v:$viralQuota"
+                )
+
                 _uiState.update { it.copy(
                     videos = finalMix, 
                     isLoading = false,
@@ -371,9 +444,11 @@ class HomeViewModel @Inject constructor(
 
                 val rawVideos = finalQueries.map { q ->
                    async { 
-                       runCatching {
-                           repository.searchVideos(q).first
-                       }.getOrElse { emptyList() }
+                       withTimeoutOrNull(6_000L) {
+                           runCatching {
+                               repository.searchVideos(q).first
+                           }.getOrElse { emptyList() }
+                       } ?: emptyList()
                    }
                 }.awaitAll().flatten()
                 
@@ -475,15 +550,43 @@ class HomeViewModel @Inject constructor(
     private fun addUnique(
         video: Video?, 
         targetList: MutableList<Video>, 
-        usedChannels: MutableSet<String>
-    ) {
-        if (video == null) return
+        usedChannels: MutableSet<String>,
+        usedVideoIds: MutableSet<String>
+    ): Boolean {
+        if (video == null) return false
         
 
-        if (!usedChannels.contains(video.channelId)) {
+        if (!usedChannels.contains(video.channelId) && usedVideoIds.add(video.id)) {
             targetList.add(video)
             usedChannels.add(video.channelId)
+            return true
         }
+        return false
+    }
+
+    private fun dynamicFreshSubSlots(subCount: Int): Int {
+        return when {
+            subCount >= 120 -> 3
+            subCount >= 40 -> 2
+            else -> 1
+        }
+    }
+
+    private fun isFreshSubscribedCandidate(video: Video, now: Long): Boolean {
+        val ageByTimestamp = now - video.timestamp
+        if (ageByTimestamp in 0..FRESH_SUB_WINDOW_MS) return true
+
+        val text = video.uploadDate.lowercase()
+        if (text.contains("second") || text.contains("minute") || text.contains("hour")) {
+            return true
+        }
+
+        if (text.contains("day")) {
+            val days = text.filter { it.isDigit() }.toIntOrNull() ?: 1
+            return days <= 3
+        }
+
+        return false
     }
     
     private fun List<Video>.filterValid(): List<Video> {

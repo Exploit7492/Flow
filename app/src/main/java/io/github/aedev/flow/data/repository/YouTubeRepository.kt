@@ -24,6 +24,7 @@ import org.schabi.newpipe.extractor.exceptions.ExtractionException
 import org.schabi.newpipe.extractor.stream.StreamInfo
 import io.github.aedev.flow.data.local.PlayerPreferences
 import kotlinx.coroutines.flow.first
+import java.util.Locale
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -32,6 +33,9 @@ class YouTubeRepository @Inject constructor(
     private val playerPreferences: PlayerPreferences
 ) {
     private val TAG = "YouTubeRepository"
+    private val HOME_SUBS_MIN_CHANNELS = 10
+    private val HOME_SUBS_MEDIUM_CHANNELS = 14
+    private val HOME_SUBS_MAX_CHANNELS = 18
     private val service = ServiceList.YouTube
 
     // Cache for channel avatar URLs to avoid redundant network calls
@@ -315,7 +319,7 @@ class YouTubeRepository @Inject constructor(
                 id = videoId,
                 title = info.name ?: "Unknown Title",
                 channelName = info.uploaderName ?: "Unknown Channel",
-                channelId = info.uploaderUrl?.substringAfterLast("/") ?: "",
+                channelId = extractChannelId(info.uploaderUrl),
                 thumbnailUrl = bestThumbnail,
                 duration = info.duration.toInt(),
                 viewCount = info.viewCount,
@@ -439,7 +443,7 @@ class YouTubeRepository @Inject constructor(
                 channelIdsOrUrls.chunked(chunkSize).forEach { chunk ->
                     val chunkResults = chunk.map { id ->
                         async(PerformanceDispatcher.networkIO) {
-                            withTimeoutOrNull(15_000L) { // 15 second timeout per channel
+                            withTimeoutOrNull(8_000L) { // 8 second timeout per channel
                                 try {
                                     getChannelUploads(id, perChannelLimit)
                                 } catch (e: Exception) {
@@ -453,8 +457,10 @@ class YouTubeRepository @Inject constructor(
                     chunkResults.forEach { combined.addAll(it) }
                 }
                 
-                // Shuffle to mix channels and then limit
-                combined.shuffled().take(totalLimit)
+                combined
+                    .distinctBy { it.id }
+                    .sortedByDescending { it.timestamp }
+                    .take(totalLimit)
             }
         } catch (e: Exception) {
             Log.e("YouTubeRepository", "getVideosForChannels failed: ${e.message}")
@@ -579,17 +585,45 @@ class YouTubeRepository @Inject constructor(
 
     /**
      * Fetch a "Lite" Subscription Feed
-     * Randomly picks 10 subscribed channels and fetches their latest videos.
+     * Rotates through subscribed channels to improve fresh-upload coverage.
      */
     suspend fun getSubscriptionFeed(
         allChannelIds: List<String>
     ): List<Video> = withContext(Dispatchers.IO) {
         if (allChannelIds.isEmpty()) return@withContext emptyList()
-        
-        // Pick 10 random subs to get more variety
-        val randomBatch = allChannelIds.shuffled().take(10)
-        
-        getVideosForChannels(randomBatch, perChannelLimit = 5, totalLimit = 40)
+
+        val channels = allChannelIds
+            .map { it.trim() }
+            .filter { it.isNotEmpty() }
+            .distinct()
+            .sorted()
+
+        if (channels.isEmpty()) return@withContext emptyList()
+
+        val channelsPerRefresh = when {
+            channels.size <= HOME_SUBS_MIN_CHANNELS -> channels.size
+            channels.size <= 60 -> HOME_SUBS_MEDIUM_CHANNELS
+            else -> HOME_SUBS_MAX_CHANNELS
+        }
+
+        val cursor = playerPreferences.homeSubsRotationCursor.first()
+            .coerceIn(0, (channels.size - 1).coerceAtLeast(0))
+
+        val selectedChannels = takeRotatingWindow(channels, cursor, channelsPerRefresh)
+
+        val newCursor = (cursor + selectedChannels.size) % channels.size
+        playerPreferences.setHomeSubsRotationCursor(newCursor)
+
+        Log.d(
+            TAG,
+            "Home subs fetch total=${channels.size}, selected=${selectedChannels.size}, cursor=$cursor->$newCursor"
+        )
+
+        getVideosForChannels(
+            channelIdsOrUrls = selectedChannels,
+            perChannelLimit = 5,
+            totalLimit = (channelsPerRefresh * 5).coerceAtMost(150)
+        )
     }
     
     /**
@@ -780,7 +814,7 @@ class YouTubeRepository @Inject constructor(
             id = videoId,
             title = name ?: "Unknown Title",
             channelName = uploaderName ?: "Unknown Channel",
-            channelId = uploaderUrl?.substringAfterLast("/") ?: "",
+            channelId = extractChannelId(uploaderUrl),
             thumbnailUrl = bestThumbnail,
             duration = durationSecs,
             viewCount = viewCount,
@@ -798,7 +832,10 @@ class YouTubeRepository @Inject constructor(
                     else -> "Unknown"
                 }
             },
-            timestamp = System.currentTimeMillis(), // Best effort, refined by parser if needed
+            timestamp = resolveUploadTimestamp(
+                uploadDate?.offsetDateTime()?.toInstant()?.toEpochMilli(),
+                textualUploadDate
+            ),
             channelThumbnailUrl = bestAvatar,
             isUpcoming = streamType == StreamType.NONE,
             isLive = isLiveStream,
@@ -859,6 +896,79 @@ class YouTubeRepository @Inject constructor(
             videoCount = streamCount.toInt(),
             isLocal = false
         )
+    }
+
+    private fun extractChannelId(uploaderUrl: String?): String {
+        if (uploaderUrl.isNullOrBlank()) return ""
+        val url = uploaderUrl.trim()
+        return when {
+            url.contains("/channel/") -> url.substringAfter("/channel/")
+                .substringBefore("/")
+                .substringBefore("?")
+            url.contains("/@") -> url.substringAfter("/@")
+                .substringBefore("/")
+                .substringBefore("?")
+            url.contains("/user/") -> url.substringAfter("/user/")
+                .substringBefore("/")
+                .substringBefore("?")
+            url.contains("/c/") -> url.substringAfter("/c/")
+                .substringBefore("/")
+                .substringBefore("?")
+            else -> url.substringAfterLast("/").substringBefore("?")
+        }
+    }
+
+    private fun resolveUploadTimestamp(absoluteMillis: Long?, textualDate: String?): Long {
+        absoluteMillis?.let { if (it > 0L) return it }
+        val parsed = parseRelativeUploadDate(textualDate)
+        return parsed ?: System.currentTimeMillis()
+    }
+
+    private fun parseRelativeUploadDate(textualDate: String?): Long? {
+        val raw = textualDate?.trim().orEmpty()
+        if (raw.isBlank()) return null
+
+        val normalized = raw.lowercase(Locale.US)
+            .replace("streamed", "")
+            .replace("premiered", "")
+            .replace("ago", "")
+            .trim()
+
+        if (normalized.contains("just now") || normalized.contains("today")) {
+            return System.currentTimeMillis()
+        }
+        if (normalized.contains("yesterday")) {
+            return System.currentTimeMillis() - 24L * 60L * 60L * 1000L
+        }
+
+        val value = Regex("(\\d+)").find(normalized)?.groupValues?.getOrNull(1)?.toLongOrNull()
+            ?: return null
+
+        val unitMillis = when {
+            normalized.contains("second") -> 1_000L
+            normalized.contains("minute") -> 60_000L
+            normalized.contains("hour") -> 3_600_000L
+            normalized.contains("day") -> 86_400_000L
+            normalized.contains("week") -> 7L * 86_400_000L
+            normalized.contains("month") -> 30L * 86_400_000L
+            normalized.contains("year") -> 365L * 86_400_000L
+            else -> return null
+        }
+
+        return System.currentTimeMillis() - (value * unitMillis)
+    }
+
+    private fun <T> takeRotatingWindow(items: List<T>, start: Int, count: Int): List<T> {
+        if (items.isEmpty() || count <= 0) return emptyList()
+        if (items.size <= count) return items
+
+        val safeStart = start.coerceIn(0, items.lastIndex)
+        val result = ArrayList<T>(count)
+        for (i in 0 until count) {
+            val index = (safeStart + i) % items.size
+            result.add(items[index])
+        }
+        return result
     }
     
     companion object {
