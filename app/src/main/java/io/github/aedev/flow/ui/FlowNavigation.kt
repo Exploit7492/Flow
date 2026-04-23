@@ -293,7 +293,8 @@ fun NavGraphBuilder.flowAppGraph(
             onNavigateToAppIconPicker = { navController.navigate("settings/app_icon") },
             onNavigateToDiagnostics = { navController.navigate("settings/diagnostics") },
             onNavigateToAutoBackup = { navController.navigate("settings/auto_backup") },
-            onNavigateToExport = { navController.navigate("settings/export") }
+            onNavigateToExport = { navController.navigate("settings/export") },
+            onNavigateToSponsorBlockSettings = { navController.navigate("settings/sponsorblock") }
         )
     }
 
@@ -325,6 +326,14 @@ fun NavGraphBuilder.flowAppGraph(
         currentRoute.value = "settings/player"
         showBottomNav.value = false
         io.github.aedev.flow.ui.screens.settings.PlayerSettingsScreen(
+            onNavigateBack = { navController.popBackStack() }
+        )
+    }
+
+    composable("settings/sponsorblock") {
+        currentRoute.value = "settings/sponsorblock"
+        showBottomNav.value = false
+        io.github.aedev.flow.ui.screens.settings.SponsorBlockSettingsScreen(
             onNavigateBack = { navController.popBackStack() }
         )
     }

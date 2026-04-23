@@ -19,6 +19,7 @@ import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material.icons.outlined.*
+import androidx.compose.ui.res.painterResource
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -81,6 +82,7 @@ fun SettingsScreen(
     onNavigateToDiagnostics: () -> Unit,
     onNavigateToAutoBackup: () -> Unit,
     onNavigateToExport: () -> Unit,
+    onNavigateToSponsorBlockSettings: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
@@ -211,6 +213,7 @@ fun SettingsScreen(
         SettingSearchEntry(Icons.Outlined.GridView, androidx.compose.ui.res.stringResource(io.github.aedev.flow.R.string.settings_item_content_display), androidx.compose.ui.res.stringResource(io.github.aedev.flow.R.string.settings_item_content_display_subtitle), secAppearance, onNavigateToContentSettings),
         SettingSearchEntry(Icons.Outlined.FilterAlt, androidx.compose.ui.res.stringResource(io.github.aedev.flow.R.string.settings_item_content_prefs), androidx.compose.ui.res.stringResource(io.github.aedev.flow.R.string.settings_item_content_prefs_subtitle), secContentPlayback, onNavigateToUserPreferences),
         SettingSearchEntry(Icons.Outlined.PlayCircle, androidx.compose.ui.res.stringResource(io.github.aedev.flow.R.string.settings_item_player), androidx.compose.ui.res.stringResource(io.github.aedev.flow.R.string.settings_item_player_subtitle), secContentPlayback, onNavigateToPlayerSettings),
+        SettingSearchEntry(io.github.aedev.flow.R.drawable.ic_block, androidx.compose.ui.res.stringResource(io.github.aedev.flow.R.string.sb_settings_title), androidx.compose.ui.res.stringResource(io.github.aedev.flow.R.string.sb_settings_subtitle), secContentPlayback, onNavigateToSponsorBlockSettings),
         SettingSearchEntry(Icons.Outlined.HighQuality, androidx.compose.ui.res.stringResource(io.github.aedev.flow.R.string.settings_item_quality), androidx.compose.ui.res.stringResource(io.github.aedev.flow.R.string.settings_item_quality_subtitle), secContentPlayback, onNavigateToVideoQuality),
         SettingSearchEntry(Icons.Outlined.Slideshow, androidx.compose.ui.res.stringResource(io.github.aedev.flow.R.string.shorts_quality_settings_title), androidx.compose.ui.res.stringResource(io.github.aedev.flow.R.string.shorts_quality_settings_subtitle), secContentPlayback, onNavigateToShortsQuality),
         SettingSearchEntry(Icons.Outlined.Speed, androidx.compose.ui.res.stringResource(io.github.aedev.flow.R.string.settings_item_buffer), androidx.compose.ui.res.stringResource(io.github.aedev.flow.R.string.settings_item_buffer_subtitle), secContentPlayback, onNavigateToBufferSettings),
@@ -679,6 +682,13 @@ item {
                     )
                     HorizontalDivider(Modifier.padding(start = 56.dp), color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
                     SettingsItem(
+                        icon = painterResource(io.github.aedev.flow.R.drawable.ic_block),
+                        title = androidx.compose.ui.res.stringResource(io.github.aedev.flow.R.string.sb_settings_title),
+                        subtitle = androidx.compose.ui.res.stringResource(io.github.aedev.flow.R.string.sb_settings_subtitle),
+                        onClick = onNavigateToSponsorBlockSettings
+                    )
+                    HorizontalDivider(Modifier.padding(start = 56.dp), color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
+                    SettingsItem(
                          icon = Icons.Outlined.HighQuality,
                          title = androidx.compose.ui.res.stringResource(io.github.aedev.flow.R.string.settings_item_quality),
                          subtitle = androidx.compose.ui.res.stringResource(io.github.aedev.flow.R.string.settings_item_quality_subtitle),
@@ -1072,7 +1082,7 @@ private fun getThemeNameRes(theme: ThemeMode): Int {
 }
 
 private data class SettingSearchEntry(
-    val icon: ImageVector,
+    val icon: Any,
     val title: String,
     val subtitle: String,
     val sectionLabel: String,
@@ -1091,12 +1101,24 @@ private fun SettingsSearchResultItem(
             color = MaterialTheme.colorScheme.primary,
             modifier = Modifier.padding(start = 72.dp, top = 8.dp, bottom = 2.dp)
         )
-        SettingsItem(
-            icon = entry.icon,
-            title = entry.title,
-            subtitle = entry.subtitle,
-            onClick = onNavigate
-        )
+        when (entry.icon) {
+            is ImageVector -> {
+                SettingsItem(
+                    icon = entry.icon as ImageVector,
+                    title = entry.title,
+                    subtitle = entry.subtitle,
+                    onClick = onNavigate
+                )
+            }
+            is Int -> {
+                SettingsItem(
+                    icon = painterResource(entry.icon as Int),
+                    title = entry.title,
+                    subtitle = entry.subtitle,
+                    onClick = onNavigate
+                )
+            }
+        }
         HorizontalDivider(
             Modifier.padding(start = 56.dp),
             color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)

@@ -638,7 +638,8 @@ class FlowDownloadService : Service() {
         val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
         notificationManager.cancel(getNotificationId(videoId))
 
-        downloadJobs[videoId]?.cancel()
+        val downloadJob = downloadJobs[videoId]
+        downloadJob?.cancel()
 
         activeMissions.remove(videoId)
         downloadJobs.remove(videoId)
@@ -646,7 +647,7 @@ class FlowDownloadService : Service() {
 
         serviceScope.launch {
             updateAllItemStatuses(videoId, DownloadItemStatus.CANCELLED)
-            // Clean up partial files
+            try { downloadJob?.join() } catch (_: Exception) {}
             mission?.let { m ->
                 listOf(
                     m.savePath,
@@ -655,6 +656,7 @@ class FlowDownloadService : Service() {
                 ).forEach { path ->
                     try { File(path).takeIf { it.exists() }?.delete() } catch (_: Exception) {}
                 }
+                Log.d(TAG, "handleCancel: Cleaned up tmp files for $videoId")
             }
             downloadManager.deleteDownload(videoId)
         }

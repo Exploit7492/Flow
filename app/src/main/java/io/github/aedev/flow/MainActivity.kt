@@ -54,10 +54,6 @@ class MainActivity : ComponentActivity() {
     private val _pendingUpdateInfo = mutableStateOf<UpdateInfo?>(null)
     val pendingUpdateInfo: State<UpdateInfo?> = _pendingUpdateInfo
 
-    // Tracks whether playback was active when PiP window closed, so we can
-    // resume automatically if the user taps to expand back to the app.
-    private var wasPlayingWhenPipExited = false
-
     // Cached auto-PiP preference
     private var cachedAutoPipEnabled = false
 
@@ -344,36 +340,14 @@ class MainActivity : ComponentActivity() {
     override fun onPictureInPictureModeChanged(isInPictureInPictureMode: Boolean, newConfig: android.content.res.Configuration) {
         super.onPictureInPictureModeChanged(isInPictureInPictureMode, newConfig)
         GlobalPlayerState.setPipMode(isInPictureInPictureMode)
-
-        if (!isInPictureInPictureMode) {
-            val pm = io.github.aedev.flow.player.EnhancedPlayerManager.getInstance()
-            wasPlayingWhenPipExited = pm.isPlaying()
-            pm.pause()
-            pm.stopBackgroundService()
-        }
     }
 
     override fun onResume() {
         super.onResume()
-        if (wasPlayingWhenPipExited) {
-            wasPlayingWhenPipExited = false
-            val pm = io.github.aedev.flow.player.EnhancedPlayerManager.getInstance()
-            pm.play()
-            val video = GlobalPlayerState.currentVideo.value
-            if (video != null) {
-                pm.startBackgroundService(
-                    videoId   = video.id,
-                    title     = video.title,
-                    channel   = video.channelName,
-                    thumbnail = video.thumbnailUrl
-                )
-            }
-        }
     }
 
     override fun onStop() {
         super.onStop()
-        wasPlayingWhenPipExited = false  
         if (!isInPictureInPictureMode) {
             requestedOrientation = android.content.pm.ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
             if (!cachedShortsBackgroundPlay) {

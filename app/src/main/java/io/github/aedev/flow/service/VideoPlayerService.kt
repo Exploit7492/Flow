@@ -124,6 +124,7 @@ class VideoPlayerService : Service() {
 
                 override fun onCustomAction(action: String?, extras: android.os.Bundle?) {
                     if (action == ACTION_CLOSE) {
+                        GlobalPlayerState.requestDismiss()
                         stopPlayback()
                     }
                 }
@@ -232,7 +233,9 @@ class VideoPlayerService : Service() {
             }
             ACTION_NEXT -> EnhancedPlayerManager.getInstance().playNext()
             ACTION_PREVIOUS -> EnhancedPlayerManager.getInstance().playPrevious()
-            ACTION_STOP, ACTION_CLOSE -> {
+            ACTION_STOP -> stopPlayback()
+            ACTION_CLOSE -> {
+                GlobalPlayerState.requestDismiss()
                 stopPlayback()
             }
             else -> {
@@ -557,7 +560,6 @@ class VideoPlayerService : Service() {
     
     private fun stopPlayback() {
         EnhancedPlayerManager.getInstance().stop()
-        GlobalPlayerState.requestDismiss()
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
             stopForeground(STOP_FOREGROUND_REMOVE)
         } else {

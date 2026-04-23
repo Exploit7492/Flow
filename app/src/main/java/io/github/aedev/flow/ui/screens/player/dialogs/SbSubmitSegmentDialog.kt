@@ -33,7 +33,7 @@ private val SB_SUBMIT_CATEGORIES = listOf(
 
 /**
  * Dialog for submitting a new SponsorBlock segment.
- * Start time is pre-filled with the current player position.
+ * End time is pre-filled with the current player position.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -73,8 +73,8 @@ fun SbSubmitSegmentDialog(
         }
     }
 
-    var startTime by remember { mutableStateOf(msToTimestamp(currentPositionMs)) }
-    var endTime by remember { mutableStateOf("") }
+    var startTime by remember { mutableStateOf("") }
+    var endTime by remember { mutableStateOf(msToTimestamp(currentPositionMs)) }
     var selectedCategoryIndex by remember { mutableIntStateOf(0) }
     var categoryExpanded by remember { mutableStateOf(false) }
     var isSubmitting by remember { mutableStateOf(false) }

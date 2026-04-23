@@ -1,6 +1,6 @@
 FLOW CHANGE LOG
 VERSION: 2.1.0
-DATE: 2026-04-22
+DATE: 2026-04-23
 
 LIBRARIES
 - Bump NewpipeExtractor to latest version (v0.26.1)
@@ -60,6 +60,7 @@ IMPROVEMENTS
 - Improved Pause/Resume download and add better partial block handling #306
 - Add close button to video playback notification #310
 - Add new Monero (XMR) donation option and improve donation screen UI
+- Improve SponsorBlock segment auto fill and Unify SponsorBlock and DeArrow #308
 
 FIXES AND STABILITY
 - Fix video player playback speed issue #232
