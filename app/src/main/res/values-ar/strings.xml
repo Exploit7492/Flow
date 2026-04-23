@@ -1289,4 +1289,12 @@
     <string name="sb_settings_title">SponsorBlock</string>
     <string name="sb_settings_subtitle">إجراءات التقسيمات، الألوان، و المساهمة</string>
     <string name="sb_settings_general_header">عام</string>
+    <string name="group_all">الكل</string>
+    <string name="manage_groups">إدارة المجموعات</string>
+    <string name="new_group">مجموعة جديدة</string>
+    <string name="edit_group">تحرير المجموعة</string>
+    <string name="delete_group">حذف المجموعة</string>
+    <string name="group_name_label">إسم المجموعة</string>
+    <string name="no_groups_yet">لا توجد مجموعات حتى الآن. أنشئ واحدة لتصفية التغذية الخاص بك.</string>
+    <string name="search_channels_hint">بحث في القنوات…</string>
 </resources>
