@@ -5,7 +5,7 @@
     <string name="top_bar_subscriptions_title">Підписки</string>
     <string name="view_all_button_label">Всі</string>
     <string name="subscribed">Підписано</string>
-    <string name="empty_subscriptions_body">Підпишіться на канали щоб бачити\nостанні відео тут</string>
+    <string name="empty_subscriptions_body">Підпишіться на канали щоб бачити їх\nостанні відео тут</string>
     <string name="home_refresh_feed">Оновити стрічку</string>
     <string name="retry">Повторити спробу</string>
     <string name="shorts">Shorts</string>
@@ -252,10 +252,10 @@
     <string name="settings_item_app_icon">Значок програми</string>
     <string name="settings_item_app_icon_subtitle">Налаштуйте значок запускача</string>
     <string name="settings_item_content_prefs">Налаштування контенту</string>
-    <string name="library_music_playlists_label">Музичний плейлист</string>
+    <string name="library_music_playlists_label">Списки відтворення музики</string>
     <string name="empty_description">Опис відсутній</string>
     <string name="like">Лайк</string>
-    <string name="previous">Минулий</string>
+    <string name="previous">Попереднє</string>
     <string name="play">Грати</string>
     <string name="next">Наступний</string>
     <string name="repeat">Повторити</string>
