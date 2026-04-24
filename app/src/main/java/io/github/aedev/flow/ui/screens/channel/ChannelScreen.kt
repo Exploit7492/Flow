@@ -65,6 +65,7 @@ import coil.compose.AsyncImage
 import io.github.aedev.flow.R
 import io.github.aedev.flow.data.model.Video
 import io.github.aedev.flow.ui.components.CompactVideoCard
+import io.github.aedev.flow.ui.components.FullSizeImageDialog
 import io.github.aedev.flow.ui.components.VideoCardFullWidth
 import io.github.aedev.flow.ui.theme.extendedColors
 import kotlinx.coroutines.launch
@@ -590,6 +591,14 @@ private fun ChannelHeader(
         channelInfo.avatars.maxByOrNull { it.height }?.url
             ?: channelInfo.avatars.firstOrNull()?.url
     } catch (e: Exception) { null }
+    var showFullSizeAvatar by remember { mutableStateOf(false) }
+
+    if (showFullSizeAvatar && !avatarUrl.isNullOrEmpty()) {
+        FullSizeImageDialog(
+            imageUrl = avatarUrl,
+            onDismiss = { showFullSizeAvatar = false }
+        )
+    }
 
     Log.d("ChannelHeader", "channel=${channelInfo.name} avatarUrl=$avatarUrl bannerUrl=$bannerUrl")
     val context = LocalContext.current
@@ -636,7 +645,10 @@ private fun ChannelHeader(
                         width = 2.dp,
                         color = MaterialTheme.colorScheme.surfaceVariant,
                         shape = CircleShape
-                    ),
+                    )
+                    .clickable(enabled = !avatarUrl.isNullOrEmpty()) {
+                        showFullSizeAvatar = true
+                    },
                 contentAlignment = Alignment.Center
             ) {
                 if (!avatarUrl.isNullOrEmpty()) {

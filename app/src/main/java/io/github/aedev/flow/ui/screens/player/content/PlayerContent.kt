@@ -9,8 +9,11 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.ErrorOutline
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.produceState
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -27,7 +30,10 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.media3.common.util.UnstableApi
 import io.github.aedev.flow.R
+import io.github.aedev.flow.data.local.PlayerPreferences
+import io.github.aedev.flow.data.model.DeArrowResult
 import io.github.aedev.flow.data.model.Video
+import io.github.aedev.flow.data.repository.DeArrowRepository
 import io.github.aedev.flow.player.EnhancedPlayerManager
 import io.github.aedev.flow.player.PictureInPictureHelper
 import io.github.aedev.flow.player.state.EnhancedPlayerState
@@ -59,6 +65,17 @@ fun PlayerContent(
     onVideoClick: (Video) -> Unit
 ) {
     val context = LocalContext.current
+    val playerPrefs = remember { PlayerPreferences(context) }
+    val deArrowEnabled by playerPrefs.deArrowEnabled.collectAsState(initial = false)
+    val deArrowResult by produceState<DeArrowResult?>(
+        initialValue = null,
+        key1 = video.id,
+        key2 = deArrowEnabled
+    ) {
+        value = if (deArrowEnabled) DeArrowRepository.getDeArrowResult(video.id) else null
+    }
+    val resolvedVideoTitle = deArrowResult?.title ?: uiState.streamInfo?.name ?: video.title
+
     val density = LocalDensity.current
     val layoutDirection = LocalLayoutDirection.current
     val leftSafeInset = with(density) {
@@ -73,6 +90,9 @@ fun PlayerContent(
             WindowInsets.systemBars.getRight(this, layoutDirection)
         ).toDp()
     }
+    val leftGestureOverlayPadding = maxOf(leftSafeInset + 36.dp, 72.dp)
+    val rightGestureOverlayPadding = maxOf(rightSafeInset + 36.dp, 72.dp)
+
     Box(
         modifier = Modifier
             .fillMaxWidth()
@@ -136,7 +156,7 @@ fun PlayerContent(
             brightnessLevel = screenState.brightnessLevel,
             modifier = Modifier
                 .align(Alignment.CenterStart)
-                .padding(start = leftSafeInset + 24.dp)
+                .padding(start = leftGestureOverlayPadding)
         )
         
         // Volume overlay
@@ -145,7 +165,7 @@ fun PlayerContent(
             volumeLevel = screenState.volumeLevel,
             modifier = Modifier
                 .align(Alignment.CenterEnd)
-                .padding(end = rightSafeInset + 24.dp)
+                .padding(end = rightGestureOverlayPadding)
         )
         
         // Speed boost overlay
@@ -201,7 +221,7 @@ fun PlayerContent(
                 stringResource(R.string.quality_auto_template, playerState.effectiveQuality) 
             else 
                 playerState.currentQuality.toString(),
-            videoTitle = uiState.streamInfo?.name ?: video.title,
+            videoTitle = resolvedVideoTitle,
             resizeMode = screenState.resizeMode,
             onResizeClick = { screenState.cycleResizeMode() },
             onPlayPause = {

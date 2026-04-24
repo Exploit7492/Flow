@@ -87,6 +87,7 @@ fun SeekbarWithPreview(
     duration: Long = 0L,
     bufferedValue: Float = 0f
 ) {
+    val previewEnabled = false
     var previewPosition by remember { mutableFloatStateOf(0f) }
     var previewBitmap by remember { mutableStateOf<android.graphics.Bitmap?>(null) }
     val primaryColor = MaterialTheme.colorScheme.primary
@@ -115,7 +116,7 @@ fun SeekbarWithPreview(
 
     // Async thumbnail loading with debouncing and better responsiveness
     LaunchedEffect(internalValue, isInteracting) {
-        if (isInteracting && seekbarPreviewHelper != null) {
+        if (previewEnabled && isInteracting && seekbarPreviewHelper != null) {
             val durationMs = seekbarPreviewHelper.getPlayer().duration
             if (durationMs > 0) {
                 // Round to nearest 2 seconds for better cache hits during scrub
@@ -139,16 +140,12 @@ fun SeekbarWithPreview(
                 }
             }
         } else {
-            // Delay hiding to make it feel smoother
-            delay(300)
-            if (!isInteracting) {
-                previewBitmap = null
-            }
+            previewBitmap = null
         }
     }
 
     LaunchedEffect(isInteracting) {
-        if (isInteracting && sliderWidth > 0f) {
+        if (previewEnabled && isInteracting && sliderWidth > 0f) {
             previewPosition = with(density) { (internalValue * sliderWidth).toDp().value }
         }
     }
@@ -284,7 +281,7 @@ fun SeekbarWithPreview(
                 onValueChange(newValue)
 
                 // Update preview position
-                if (seekbarPreviewHelper != null) {
+                if (previewEnabled && seekbarPreviewHelper != null) {
                     previewPosition = with(density) { (newValue * sliderWidth).toDp().value }
                 }
             },
@@ -326,7 +323,7 @@ fun SeekbarWithPreview(
         val triangleH = 7.dp
 
         AnimatedVisibility(
-            visible = isInteracting,
+            visible = previewEnabled && isInteracting,
             enter = fadeIn(tween(150)) + slideInVertically(
                 initialOffsetY = { it / 2 }, animationSpec = tween(150)
             ),

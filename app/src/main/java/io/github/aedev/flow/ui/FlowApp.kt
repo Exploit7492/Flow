@@ -127,6 +127,7 @@ fun FlowApp(
         val playerSheetState = rememberPlayerDraggableState()
         val playerVisibleState = remember { mutableStateOf(false) }
         var playerVisible by playerVisibleState
+        var keepMiniOnQueueAutoAdvance by remember { mutableStateOf(false) }
 
         // ── Music player sheet state ─────────────────────────────────────────
         val miniPlayerHeightDp = 80.dp
@@ -159,15 +160,32 @@ fun FlowApp(
             }
         }
     }
+
+    LaunchedEffect(Unit) {
+        EnhancedPlayerManager.getInstance().queueAutoAdvanceEvent.collect {
+            keepMiniOnQueueAutoAdvance = playerSheetState.currentValue == PlayerSheetValue.Collapsed
+        }
+    }
     
     LaunchedEffect(playerUiState.cachedVideo) {
         if (playerUiState.cachedVideo != null) {
             playerVisible = true
-            if (playerUiState.isRestoredSession || playerUiState.resumedInMiniPlayer) {
+            val isQueueAutoAdvanceInMiniPlayer =
+                keepMiniOnQueueAutoAdvance &&
+                playerState.queueTitle != null &&
+                playerSheetState.currentValue == PlayerSheetValue.Collapsed
+
+            if (
+                playerUiState.isRestoredSession ||
+                playerUiState.resumedInMiniPlayer ||
+                isQueueAutoAdvanceInMiniPlayer
+            ) {
                 playerSheetState.collapse()
             } else {
                 playerSheetState.expand()
             }
+
+            keepMiniOnQueueAutoAdvance = false
         }
     }
     

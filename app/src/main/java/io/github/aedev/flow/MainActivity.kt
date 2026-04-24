@@ -29,6 +29,7 @@ import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import androidx.lifecycle.lifecycleScope
+import androidx.lifecycle.Lifecycle
 import android.util.Log
 import okhttp3.OkHttpClient
 import okhttp3.Request
@@ -42,6 +43,8 @@ import io.github.aedev.flow.ui.components.UpdateDialog
 import io.github.aedev.flow.BuildConfig
 import androidx.activity.SystemBarStyle
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
@@ -59,6 +62,8 @@ class MainActivity : ComponentActivity() {
 
     // Cached shorts background-play preference (default OFF — pause on background)
     private var cachedShortsBackgroundPlay = false
+
+    private var pipDismissCheckJob: Job? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         // the OS-level splash screen (camouflaged to match Compose splash background)
@@ -340,10 +345,24 @@ class MainActivity : ComponentActivity() {
     override fun onPictureInPictureModeChanged(isInPictureInPictureMode: Boolean, newConfig: android.content.res.Configuration) {
         super.onPictureInPictureModeChanged(isInPictureInPictureMode, newConfig)
         GlobalPlayerState.setPipMode(isInPictureInPictureMode)
+
+        pipDismissCheckJob?.cancel()
+        if (!isInPictureInPictureMode) {
+            pipDismissCheckJob = lifecycleScope.launch {
+                delay(350L)
+                val stillBackgrounded = !lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED)
+                if (stillBackgrounded && !isInPictureInPictureMode) {
+                    GlobalPlayerState.requestDismiss()
+                    io.github.aedev.flow.player.EnhancedPlayerManager.getInstance().stop()
+                    io.github.aedev.flow.player.EnhancedPlayerManager.getInstance().stopBackgroundService()
+                }
+            }
+        }
     }
 
     override fun onResume() {
         super.onResume()
+        pipDismissCheckJob?.cancel()
     }
 
     override fun onStop() {

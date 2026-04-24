@@ -132,6 +132,9 @@ class EnhancedPlayerManager private constructor() {
     private val _streamExpiredEvent = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
     val streamExpiredEvent: SharedFlow<Unit> = _streamExpiredEvent.asSharedFlow()
 
+    private val _queueAutoAdvanceEvent = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
+    val queueAutoAdvanceEvent: SharedFlow<Unit> = _queueAutoAdvanceEvent.asSharedFlow()
+
     private var audioFeaturesManager: AudioFeaturesManager? = null
     private var mediaLoader: MediaLoader? = null
     
@@ -323,6 +326,7 @@ class EnhancedPlayerManager private constructor() {
                         player?.seekTo(0)
                         player?.play()
                     } else if (hasNext()) {
+                        _queueAutoAdvanceEvent.tryEmit(Unit)
                         playNext()
                     }
                 }

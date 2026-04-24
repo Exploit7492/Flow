@@ -270,6 +270,12 @@ class VideoPlayerService : Service() {
      * and the service was not started in a sticky fashion.
      */
     override fun onTaskRemoved(rootIntent: Intent?) {
+        if (GlobalPlayerState.isInPipMode.value) {
+            GlobalPlayerState.requestDismiss()
+            stopPlayback()
+            return
+        }
+
         if (isPlaying) {
             updateNotification()
         }

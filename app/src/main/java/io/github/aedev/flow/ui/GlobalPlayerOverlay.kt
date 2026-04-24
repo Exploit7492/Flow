@@ -156,6 +156,7 @@ fun GlobalPlayerOverlay(
     val isDlnaDiscovering by DlnaCastManager.isDiscovering.collectAsState()
     
     var localIsInPipMode by remember { mutableStateOf(false) }
+    var keepMiniOnQueueAutoAdvance by remember { mutableStateOf(false) }
     
     val progress = if (screenState.duration > 0) {
         (screenState.currentPosition.toFloat() / screenState.duration.toFloat()).coerceIn(0f, 1f)
@@ -194,13 +195,32 @@ fun GlobalPlayerOverlay(
             playerViewModel.resetDismissState()
         }
     }
+
+    LaunchedEffect(Unit) {
+        EnhancedPlayerManager.getInstance().queueAutoAdvanceEvent.collect {
+            keepMiniOnQueueAutoAdvance = playerSheetState.currentValue == PlayerSheetValue.Collapsed
+        }
+    }
     
     LaunchedEffect(playerUiState.isLoading) {
-        if (playerUiState.isLoading && !playerUiState.isRestoredSession && !playerUiState.resumedInMiniPlayer) {
+        val isQueueAutoAdvanceInMiniPlayer =
+            keepMiniOnQueueAutoAdvance &&
+            playerState.queueTitle != null &&
+            playerSheetState.currentValue == PlayerSheetValue.Collapsed
+
+        if (
+            playerUiState.isLoading &&
+            !playerUiState.isRestoredSession &&
+            !playerUiState.resumedInMiniPlayer &&
+            !isQueueAutoAdvanceInMiniPlayer
+        ) {
             playerSheetState.expand()
         }
-        if (!playerUiState.isLoading && playerUiState.resumedInMiniPlayer) {
-            playerViewModel.clearResumedInMiniPlayer()
+        if (!playerUiState.isLoading) {
+            if (playerUiState.resumedInMiniPlayer) {
+                playerViewModel.clearResumedInMiniPlayer()
+            }
+            keepMiniOnQueueAutoAdvance = false
         }
     }
 
@@ -227,6 +247,7 @@ fun GlobalPlayerOverlay(
     AutoHideControlsEffect(
         showControls = screenState.showControls,
         isPlaying = playerState.playWhenReady,
+        hasEnded = playerState.hasEnded,
         lastInteractionTimestamp = screenState.lastInteractionTimestamp,
         onHideControls = { screenState.showControls = false }
     )
@@ -336,6 +357,12 @@ fun GlobalPlayerOverlay(
         activity = activity,
         lifecycleOwner = lifecycleOwner
     )
+
+    LaunchedEffect(playerState.hasEnded, playerSheetState.fraction, localIsInPipMode) {
+        if (playerState.hasEnded && playerSheetState.fraction <= 0.5f && !localIsInPipMode) {
+            screenState.showControls = true
+        }
+    }
     
     // Video cleanup on dispose
     DisposableEffect(video.id) {
@@ -362,7 +389,6 @@ fun GlobalPlayerOverlay(
         }
     }
     
-    // ===== UI =====
     // ===== UI =====
     val isMinimized = playerSheetState.fraction > 0.5f
 
@@ -559,7 +585,7 @@ fun GlobalPlayerOverlay(
                                 brightnessLevel = screenState.brightnessLevel,
                                 modifier = Modifier
                                     .align(Alignment.CenterEnd)
-                                    .padding(end = 32.dp)
+                                    .padding(end = 44.dp)
                             )
                             
                             // Volume overlay
@@ -568,7 +594,7 @@ fun GlobalPlayerOverlay(
                                 volumeLevel = screenState.volumeLevel,
                                 modifier = Modifier
                                     .align(Alignment.CenterStart)
-                                    .padding(start = 32.dp)
+                                    .padding(start = 44.dp)
                             )
                             
                                // 2x Speed overlay  

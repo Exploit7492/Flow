@@ -232,11 +232,12 @@ fun WatchProgressSaveEffect(
 fun AutoHideControlsEffect(
     showControls: Boolean,
     isPlaying: Boolean,
+    hasEnded: Boolean,
     lastInteractionTimestamp: Long,
     onHideControls: () -> Unit
 ) {
-    LaunchedEffect(showControls, isPlaying, lastInteractionTimestamp) {
-        if (showControls && isPlaying) {
+    LaunchedEffect(showControls, isPlaying, hasEnded, lastInteractionTimestamp) {
+        if (showControls && isPlaying && !hasEnded) {
             delay(3000)
             onHideControls()
         }

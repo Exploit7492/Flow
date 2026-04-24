@@ -18,6 +18,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -28,8 +29,11 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import io.github.aedev.flow.R
 import io.github.aedev.flow.player.error.PlayerDiagnostics
+import io.github.aedev.flow.data.local.PlayerPreferences
 import io.github.aedev.flow.data.local.PlayerRelatedCardStyle
 import io.github.aedev.flow.data.model.Video
+import io.github.aedev.flow.data.model.DeArrowResult
+import io.github.aedev.flow.data.repository.DeArrowRepository
 import io.github.aedev.flow.player.EnhancedPlayerManager
 import io.github.aedev.flow.ui.components.CommentsPreview
 import io.github.aedev.flow.ui.components.CompactVideoCard
@@ -54,6 +58,17 @@ fun VideoInfoContent(
     snackbarHostState: SnackbarHostState,
     onChannelClick: (String) -> Unit
 ) {
+    val playerPrefs = remember { PlayerPreferences(context) }
+    val deArrowEnabled by playerPrefs.deArrowEnabled.collectAsState(initial = false)
+    val deArrowResult by produceState<DeArrowResult?>(
+        initialValue = null,
+        key1 = video.id,
+        key2 = deArrowEnabled
+    ) {
+        value = if (deArrowEnabled) DeArrowRepository.getDeArrowResult(video.id) else null
+    }
+    val resolvedVideoTitle = deArrowResult?.title ?: uiState.streamInfo?.name ?: video.title
+
     // ── Error details panel ─────────────────────────────────────────────────
     if (uiState.error != null) {
         Surface(
@@ -150,7 +165,7 @@ fun VideoInfoContent(
 
     VideoInfoSection(
         video = video,
-        title = uiState.streamInfo?.name ?: video.title,
+        title = resolvedVideoTitle,
         viewCount = uiState.streamInfo?.viewCount ?: video.viewCount,
         uploadDate = uiState.streamInfo?.uploadDate?.let { 
             try { 
@@ -176,7 +191,7 @@ fun VideoInfoContent(
                 "LIKED" -> viewModel.removeLikeState(video.id)
                 else -> viewModel.likeVideo(
                     video.id,
-                    streamInfo?.name ?: video.title,
+                    resolvedVideoTitle,
                     thumbnailUrl,
                     streamInfo?.uploaderName ?: video.channelName
                 )
@@ -246,8 +261,8 @@ fun VideoInfoContent(
         onShareClick = {
             val shareIntent = Intent(Intent.ACTION_SEND).apply {
                 type = "text/plain"
-                putExtra(Intent.EXTRA_SUBJECT, video.title)
-                putExtra(Intent.EXTRA_TEXT, context.getString(R.string.check_out_video_template, video.title, video.id))
+                putExtra(Intent.EXTRA_SUBJECT, resolvedVideoTitle)
+                putExtra(Intent.EXTRA_TEXT, context.getString(R.string.check_out_video_template, resolvedVideoTitle, video.id))
             }
             context.startActivity(Intent.createChooser(shareIntent, context.getString(R.string.share_video)))
         },
