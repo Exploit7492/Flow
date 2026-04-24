@@ -1308,4 +1308,6 @@
     <string name="player_appearance_volume_gesture_title">Gesto volume</string>
     <string name="player_appearance_volume_gesture_subtitle">Scorri il bordo destro a schermo intero per regolare il volume</string>
     <string name="player_appearance_brightness_gesture_title">Gesto luminosità</string>
+    <string name="copy_video_link">Copia link video</string>
+    <string name="copy_channel_link">Copia link canale</string>
 </resources>
