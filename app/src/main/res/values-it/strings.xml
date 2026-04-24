@@ -1296,4 +1296,12 @@
     <string name="sb_settings_title">SponsorBlock</string>
     <string name="sb_settings_subtitle">Azioni sui segmenti, colori e contributi</string>
     <string name="sb_settings_general_header">Generale</string>
+    <string name="tap_to_close">Tocca per chiudere</string>
+    <string name="channel_search_hint">Cerca nel canale</string>
+    <string name="channel_search_open">Cerca nel canale</string>
+    <string name="channel_search_close">Chiudi ricerca</string>
+    <string name="channel_search_no_results">Nessun risultato trovato per %1$s</string>
+    <string name="player_appearance_fullscreen_header">Schermo intero</string>
+    <string name="player_show_title_title">Mostra titolo video</string>
+    <string name="player_show_title_subtitle">Mostra il titolo del video sotto la barra superiore in modalità schermo intero</string>
 </resources>
