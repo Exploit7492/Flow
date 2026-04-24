@@ -43,7 +43,8 @@ fun Modifier.videoPlayerControls(
     maxVolume: Int,
     audioManager: AudioManager?,
     activity: Activity?,
-    swipeGesturesEnabled: Boolean = true,
+    brightnessSwipeGesturesEnabled: Boolean = true,
+    volumeSwipeGesturesEnabled: Boolean = true,
     doubleTapSeekMs: Long = 10_000L,
     onExitFullscreen: (() -> Unit)? = null
 ): Modifier = composed {
@@ -67,7 +68,8 @@ fun Modifier.videoPlayerControls(
     val currentMaxVolume by rememberUpdatedState(maxVolume)
     val currentAudioManager by rememberUpdatedState(audioManager)
     val currentActivity by rememberUpdatedState(activity)
-    val currentSwipeGesturesEnabled by rememberUpdatedState(swipeGesturesEnabled)
+    val currentBrightnessSwipeGesturesEnabled by rememberUpdatedState(brightnessSwipeGesturesEnabled)
+    val currentVolumeSwipeGesturesEnabled by rememberUpdatedState(volumeSwipeGesturesEnabled)
     val currentDoubleTapSeekMs by rememberUpdatedState(doubleTapSeekMs)
     val currentOnSeekAccumulate by rememberUpdatedState(onSeekAccumulate)
     val currentOnExitFullscreen by rememberUpdatedState(onExitFullscreen)
@@ -139,7 +141,9 @@ fun Modifier.videoPlayerControls(
                         // Center double tap - play/pause
                         val player = EnhancedPlayerManager.getInstance().getPlayer()
                         if (player != null) {
-                            if (player.isPlaying) {
+                            if (player.playbackState == androidx.media3.common.Player.STATE_ENDED) {
+                                EnhancedPlayerManager.getInstance().replay()
+                            } else if (player.isPlaying) {
                                 EnhancedPlayerManager.getInstance().pause()
                             } else {
                                 EnhancedPlayerManager.getInstance().play()
@@ -249,8 +253,8 @@ fun Modifier.videoPlayerControls(
                                  if (dragAmount.y > 0) {
                                      exitDragAccum += dragAmount.y
                                  }
-                             } else if (screenHeight > 0 && currentSwipeGesturesEnabled) {
-                                 if (dragPosition < screenWidth / 2) {
+                             } else if (screenHeight > 0) {
+                                 if (dragPosition < screenWidth / 2 && currentBrightnessSwipeGesturesEnabled) {
                                      // Left side - brightness
                                      val sensitivity = 1.5f 
                                      val delta = -dragAmount.y / screenHeight * sensitivity
@@ -275,7 +279,7 @@ fun Modifier.videoPlayerControls(
                                          }
                                      } catch (e: Exception) {}
                                      currentOnShowBrightnessChange(true)
-                                 } else {
+                                 } else if (dragPosition >= screenWidth / 2 && currentVolumeSwipeGesturesEnabled) {
                                      // Right side - volume
                                      val sensitivity = 1.5f
                                      val delta = -dragAmount.y / screenHeight * sensitivity

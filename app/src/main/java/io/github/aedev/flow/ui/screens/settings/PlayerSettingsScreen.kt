@@ -209,7 +209,11 @@ fun PlayerSettingsScreen(
                         title = stringResource(R.string.global_loop),
                         subtitle = stringResource(R.string.global_loop_subtitle),
                         checked = videoLoopEnabled,
-                        onCheckedChange = { coroutineScope.launch { playerPreferences.setVideoLoopEnabled(it) } }
+                        onCheckedChange = {
+                            coroutineScope.launch {
+                                playerPreferences.setVideoLoopEnabled(it)
+                            }
+                        }
                     )
                 }
             }
@@ -247,7 +251,12 @@ fun PlayerSettingsScreen(
                         title = stringResource(R.string.player_settings_autoplay),
                         subtitle = stringResource(R.string.player_settings_autoplay_subtitle),
                         checked = autoplayEnabled,
-                        onCheckedChange = { coroutineScope.launch { playerPreferences.setAutoplayEnabled(it) } }
+                        enabled = !videoLoopEnabled,
+                        onCheckedChange = {
+                            coroutineScope.launch {
+                                playerPreferences.setAutoplayEnabled(it && !videoLoopEnabled)
+                            }
+                        }
                     )
                     HorizontalDivider(Modifier.padding(start = 56.dp), color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
                     SettingsSwitchItem(

@@ -90,6 +90,8 @@ class EnhancedPlayerManager private constructor() {
     private var playbackQueue: List<io.github.aedev.flow.data.model.Video> = emptyList()
     private var currentQueueIndex: Int = -1
     private var queueTitle: String? = null
+    private var manualLoopEnabled: Boolean = false
+    private var globalLoopEnabled: Boolean = false
     
     // Application context
     private var appContext: Context? = null
@@ -280,7 +282,9 @@ class EnhancedPlayerManager private constructor() {
 
         scope.launch {
             prefs.videoLoopEnabled.collect { isEnabled ->
+                globalLoopEnabled = isEnabled
                 player?.repeatMode = if (isEnabled) Player.REPEAT_MODE_ONE else Player.REPEAT_MODE_OFF
+                updateEffectiveLoopState()
             }
         }
 
@@ -671,9 +675,26 @@ class EnhancedPlayerManager private constructor() {
     fun play() = player?.play()
     fun pause() = player?.pause()
     fun seekTo(position: Long) = player?.seekTo(position)
+
+    fun replay() {
+        player?.let { exoPlayer ->
+            if (exoPlayer.currentMediaItem != null) {
+                exoPlayer.seekToDefaultPosition(exoPlayer.currentMediaItemIndex)
+            } else {
+                exoPlayer.seekTo(0L)
+            }
+            _playerState.value = _playerState.value.copy(hasEnded = false)
+            exoPlayer.play()
+        }
+    }
     
     fun toggleLoop(enabled: Boolean) {
-        _playerState.value = _playerState.value.copy(isLooping = enabled)
+        manualLoopEnabled = enabled
+        updateEffectiveLoopState()
+    }
+
+    private fun updateEffectiveLoopState() {
+        _playerState.value = _playerState.value.copy(isLooping = manualLoopEnabled || globalLoopEnabled)
     }
     
     fun stop() {
@@ -863,13 +884,15 @@ class EnhancedPlayerManager private constructor() {
 
     fun clearAll() {
         clearCurrentVideo()
+        manualLoopEnabled = false
         playbackQueue = emptyList()
         currentQueueIndex = -1
         _queueVideos.value = emptyList()
         _currentQueueIndex.value = -1
         queueTitle = null
         _playerState.value = _playerState.value.copy(
-            hasNext = false, hasPrevious = false, queueTitle = null, queueSize = 0
+            hasNext = false, hasPrevious = false, queueTitle = null, queueSize = 0,
+            isLooping = globalLoopEnabled
         )
     }
 

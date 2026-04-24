@@ -34,6 +34,12 @@ import io.github.aedev.flow.player.sponsorblock.SponsorBlockHandler
 
 private const val TAG = "PlayerEffects"
 
+private fun shouldRestartCompletedPlayback(savedPosition: Long, durationMs: Long): Boolean {
+    if (savedPosition <= 0L || durationMs <= 0L) return false
+    val remainingMs = durationMs - savedPosition
+    return remainingMs <= 1_500L || savedPosition >= (durationMs * 0.98f).toLong()
+}
+
 @Composable
 fun PositionTrackingEffect(
     isPlaying: Boolean,
@@ -241,12 +247,13 @@ fun AutoHideControlsEffect(
 fun AutoPlayNextEffect(
     hasEnded: Boolean,
     autoplayEnabled: Boolean,
+    isLooping: Boolean,
     hasNextInQueue: Boolean,
     relatedVideos: List<Video>,
     onVideoClick: (Video) -> Unit
 ) {
-    LaunchedEffect(hasEnded, autoplayEnabled, hasNextInQueue) {
-        if (hasEnded && autoplayEnabled && !hasNextInQueue) {
+    LaunchedEffect(hasEnded, autoplayEnabled, isLooping, hasNextInQueue) {
+        if (hasEnded && autoplayEnabled && !isLooping && !hasNextInQueue) {
             relatedVideos.firstOrNull()?.let { nextVideo ->
                 onVideoClick(nextVideo)
             }
@@ -344,14 +351,37 @@ fun FullscreenEffect(
 @Composable
 fun KeepScreenOnEffect(
     isPlaying: Boolean,
-    activity: Activity?
+    activity: Activity?,
+    lifecycleOwner: LifecycleOwner? = null
 ) {
-    DisposableEffect(isPlaying) {
+    DisposableEffect(activity, isPlaying, lifecycleOwner) {
+        val clearScreenOn = {
+            activity?.window?.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        }
+
         if (isPlaying) {
             activity?.window?.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        } else {
+            clearScreenOn()
         }
+
+        val observer = lifecycleOwner?.let {
+            LifecycleEventObserver { _, event ->
+                when (event) {
+                    Lifecycle.Event.ON_STOP -> clearScreenOn()
+                    Lifecycle.Event.ON_START -> if (isPlaying) {
+                        activity?.window?.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+                    }
+                    else -> Unit
+                }
+            }.also(it.lifecycle::addObserver)
+        }
+
         onDispose {
-            activity?.window?.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+            if (observer != null && lifecycleOwner != null) {
+                lifecycleOwner.lifecycle.removeObserver(observer)
+            }
+            clearScreenOn()
         }
     }
 }
@@ -422,11 +452,16 @@ fun PlayerInitEffect(
                     .getInstance(context)
                     .getPlaybackPosition(videoId)
                     .first()
+            val queueSize = EnhancedPlayerManager.getInstance().playerState.value.queueSize
             EnhancedPlayerManager.getInstance().playLocalFile(
                 videoId,
                 localFilePath,
                 savedSegments = uiState.offlineSponsorBlockSegments,
-                preservePosition = savedPos.takeIf { it > 500L }
+                preservePosition = savedPos
+                    .takeIf { it > 500L }
+                    ?.takeUnless {
+                        queueSize > 1 && shouldRestartCompletedPlayback(it, screenState.duration)
+                    }
             )
             applyRememberedSpeed(context, screenState)
             return@LaunchedEffect
@@ -457,6 +492,9 @@ fun PlayerInitEffect(
             // Read saved position BEFORE setStreams (DB is correct here because touchHistoryEntry
             // preserves any existing progress instead of wiping it to 0)
             val savedPos = uiState.savedPosition?.first() ?: 0L
+            val resumePosition = savedPos.takeUnless {
+                currentPlayerState.queueSize > 1 && shouldRestartCompletedPlayback(it, screenState.duration)
+            } ?: 0L
 
             EnhancedPlayerManager.getInstance().setStreams(
                 videoId = videoId,
@@ -469,7 +507,7 @@ fun PlayerInitEffect(
                 dashManifestUrl = streamInfo?.dashMpdUrl,
                 localFilePath = uiState.localFilePath,
                 hlsUrl = uiState.hlsUrl,
-                startPosition = savedPos
+                startPosition = resumePosition
             )
             
             EnhancedPlayerManager.getInstance().play()
@@ -495,6 +533,9 @@ fun PlayerInitEffect(
             val audioStreams = streamInfo.audioStreams
             val subtitles = streamInfo.subtitles ?: emptyList()
             val savedPos = uiState.savedPosition?.first() ?: 0L
+            val resumePosition = savedPos.takeUnless {
+                currentPlayerState.queueSize > 1 && shouldRestartCompletedPlayback(it, screenState.duration)
+            } ?: 0L
 
             EnhancedPlayerManager.getInstance().setStreams(
                 videoId = videoId,
@@ -507,7 +548,7 @@ fun PlayerInitEffect(
                 dashManifestUrl = streamInfo.dashMpdUrl,
                 localFilePath = uiState.localFilePath,
                 hlsUrl = uiState.hlsUrl,
-                startPosition = savedPos
+                startPosition = resumePosition
             )
 
             EnhancedPlayerManager.getInstance().play()

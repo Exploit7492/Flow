@@ -1,5 +1,6 @@
 package io.github.aedev.flow.service
 
+import android.app.ActivityManager
 import android.app.PendingIntent
 import android.content.Intent
 import android.util.Log
@@ -44,6 +45,7 @@ import javax.inject.Inject
 import android.os.PowerManager
 import android.net.wifi.WifiManager
 import android.content.Context
+import android.os.Process
 import kotlin.math.min
 
 @AndroidEntryPoint
@@ -224,11 +226,15 @@ class Media3MusicService : MediaLibraryService() {
                     lockReleaseJob?.cancel()
                     lockReleaseJob = null
                     acquireLocks()
+                    if (!isAppInForeground()) {
+                        releaseWakeLock()
+                    }
                 } else {
+                    releaseWakeLock()
                     lockReleaseJob?.cancel()
                     lockReleaseJob = serviceScope.launch {
                         delay(30_000L)
-                        releaseLocks()
+                        releaseWifiLock()
                         stopSelf()
                     }
                 }
@@ -495,20 +501,38 @@ class Media3MusicService : MediaLibraryService() {
     }
     
     private fun acquireLocks() {
-        if (wakeLock?.isHeld != true) {
+        if (isAppInForeground() && wakeLock?.isHeld != true) {
             wakeLock?.acquire()
         }
         if (wifiLock?.isHeld != true) {
             wifiLock?.acquire()
         }
     }
-    
-    private fun releaseLocks() {
+
+    private fun releaseWakeLock() {
         if (wakeLock?.isHeld == true) {
             wakeLock?.release()
         }
+    }
+
+    private fun releaseWifiLock() {
         if (wifiLock?.isHeld == true) {
             wifiLock?.release()
+        }
+    }
+
+    private fun releaseLocks() {
+        releaseWakeLock()
+        releaseWifiLock()
+    }
+
+    private fun isAppInForeground(): Boolean {
+        val activityManager = getSystemService(Context.ACTIVITY_SERVICE) as? ActivityManager ?: return false
+        val runningProcess = activityManager.runningAppProcesses?.firstOrNull { it.pid == Process.myPid() }
+        return when (runningProcess?.importance) {
+            ActivityManager.RunningAppProcessInfo.IMPORTANCE_FOREGROUND,
+            ActivityManager.RunningAppProcessInfo.IMPORTANCE_VISIBLE -> true
+            else -> false
         }
     }
 

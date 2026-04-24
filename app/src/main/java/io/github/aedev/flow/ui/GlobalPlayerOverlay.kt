@@ -14,6 +14,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.Pause
 import androidx.compose.material.icons.rounded.PlayArrow
+import androidx.compose.material.icons.rounded.Replay
 import androidx.compose.material.icons.rounded.SkipPrevious
 import androidx.compose.material.icons.rounded.SkipNext
 import androidx.compose.material.icons.rounded.Replay10
@@ -135,7 +136,8 @@ fun GlobalPlayerOverlay(
     val isLoadingMoreComments by playerViewModel.isLoadingMoreComments.collectAsStateWithLifecycle()
 
     val playerPreferences = remember { PlayerPreferences(context) }
-    val swipeGesturesEnabled by playerPreferences.swipeGesturesEnabled.collectAsState(initial = true)
+    val brightnessSwipeGesturesEnabled by playerPreferences.brightnessSwipeGesturesEnabled.collectAsState(initial = true)
+    val volumeSwipeGesturesEnabled by playerPreferences.volumeSwipeGesturesEnabled.collectAsState(initial = true)
     val sbSubmitEnabled by playerPreferences.sbSubmitEnabled.collectAsState(initial = false)
     val doubleTapSeekSeconds by playerPreferences.doubleTapSeekSeconds.collectAsState(initial = 10)
 
@@ -265,6 +267,7 @@ fun GlobalPlayerOverlay(
     AutoPlayNextEffect(
         hasEnded = playerState.hasEnded,
         autoplayEnabled = playerUiState.autoplayEnabled,
+        isLooping = playerState.isLooping,
         hasNextInQueue = playerState.hasNext,
         relatedVideos = playerUiState.relatedVideos,
         onVideoClick = { nextVideo ->
@@ -330,7 +333,8 @@ fun GlobalPlayerOverlay(
     
     KeepScreenOnEffect(
         isPlaying = playerState.playWhenReady && !playerState.hasEnded,
-        activity = activity
+        activity = activity,
+        lifecycleOwner = lifecycleOwner
     )
     
     // Video cleanup on dispose
@@ -398,7 +402,6 @@ fun GlobalPlayerOverlay(
                 },
                 videoContent = { modifier ->
                     // ALWAYS use the same video surface
-                    val effectiveSwipeGesturesEnabled = swipeGesturesEnabled
                     val gestureModifier = if (!isMinimized) {
                         modifier.videoPlayerControls(
                             isSpeedBoostActive = screenState.isSpeedBoostActive,
@@ -429,7 +432,8 @@ fun GlobalPlayerOverlay(
                             maxVolume = audioSystemInfo.maxVolume,
                             audioManager = audioSystemInfo.audioManager,
                             activity = activity,
-                            swipeGesturesEnabled = effectiveSwipeGesturesEnabled,
+                            brightnessSwipeGesturesEnabled = brightnessSwipeGesturesEnabled,
+                            volumeSwipeGesturesEnabled = volumeSwipeGesturesEnabled,
                             doubleTapSeekMs = doubleTapSeekSeconds * 1000L,
                             onExitFullscreen = { screenState.isFullscreen = false }
                         )
@@ -628,6 +632,7 @@ fun GlobalPlayerOverlay(
                             PremiumControlsOverlay(
                                 isVisible = true,
                                 isPlaying = playerState.playWhenReady,
+                                hasEnded = playerState.hasEnded,
                                 isBuffering = playerState.isBuffering,
                                 currentPosition = screenState.currentPosition,
                                 duration = screenState.duration,
@@ -643,7 +648,10 @@ fun GlobalPlayerOverlay(
                                 },
                                 onPlayPause = {
                                     screenState.onInteraction()
-                                    if (playerState.playWhenReady) {
+                                    if (playerState.hasEnded) {
+                                        EnhancedPlayerManager.getInstance().replay()
+                                        playerViewModel.ensureNotificationServiceRunning()
+                                    } else if (playerState.playWhenReady) {
                                         EnhancedPlayerManager.getInstance().pause()
                                     } else {
                                         EnhancedPlayerManager.getInstance().play()
@@ -692,6 +700,7 @@ fun GlobalPlayerOverlay(
                                 },
                                 isSubtitlesEnabled = screenState.subtitlesEnabled,
                                 autoplayEnabled = playerUiState.autoplayEnabled,
+                                isLooping = playerState.isLooping,
                                 onAutoplayToggle = { playerViewModel.toggleAutoplay(it) },
                                 onPrevious = {
                                     playerViewModel.playPrevious()
@@ -755,6 +764,9 @@ fun GlobalPlayerOverlay(
                         onPlayPause = {
                             if (playerUiState.isRestoredSession) {
                                 playerViewModel.resumeRestoredSession(stayMini = true)
+                            } else if (playerState.hasEnded) {
+                                EnhancedPlayerManager.getInstance().replay()
+                                playerViewModel.ensureNotificationServiceRunning()
                             } else if (playerState.playWhenReady) {
                                 EnhancedPlayerManager.getInstance().pause()
                             } else {
@@ -943,8 +955,16 @@ private fun MiniPlayerControls(
                 )
             } else {
                 Icon(
-                    imageVector = if (playerState.playWhenReady) Icons.Rounded.Pause else Icons.Rounded.PlayArrow,
-                    contentDescription = if (playerState.playWhenReady) "Pause" else "Play",
+                    imageVector = when {
+                        playerState.hasEnded -> Icons.Rounded.Replay
+                        playerState.playWhenReady -> Icons.Rounded.Pause
+                        else -> Icons.Rounded.PlayArrow
+                    },
+                    contentDescription = when {
+                        playerState.hasEnded -> "Replay"
+                        playerState.playWhenReady -> "Pause"
+                        else -> "Play"
+                    },
                     tint = Color.White,
                     modifier = Modifier.size(if (isTablet) 40.dp else 32.dp)
                 )

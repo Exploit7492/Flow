@@ -49,6 +49,7 @@ import org.schabi.newpipe.extractor.stream.StreamSegment
 fun PremiumControlsOverlay(
     isVisible: Boolean,
     isPlaying: Boolean,
+    hasEnded: Boolean,
     isBuffering: Boolean,
     currentPosition: Long,
     duration: Long,
@@ -71,6 +72,7 @@ fun PremiumControlsOverlay(
     onSubtitleClick: () -> Unit = {},
     isSubtitlesEnabled: Boolean = false,
     autoplayEnabled: Boolean = true,
+    isLooping: Boolean = false,
     onAutoplayToggle: (Boolean) -> Unit = {},
     onPrevious: () -> Unit = {},
     onNext: () -> Unit = {},
@@ -274,13 +276,18 @@ fun PremiumControlsOverlay(
                     // Autoplay Toggle Icon
                     if (overlayAutoplayEnabled) {
                         IconButton(
-                            onClick = { onAutoplayToggle(!autoplayEnabled) },
+                            onClick = { if (!isLooping) onAutoplayToggle(!autoplayEnabled) },
+                            enabled = !isLooping,
                             modifier = Modifier.size(40.dp)
                         ) {
                             Icon(
                                 imageVector = Icons.Rounded.SlowMotionVideo,
                                 contentDescription = stringResource(R.string.autoplay),
-                                tint = if (autoplayEnabled) primaryColor else Color.White.copy(alpha = 0.7f),
+                                tint = when {
+                                    isLooping -> Color.White.copy(alpha = 0.35f)
+                                    autoplayEnabled -> primaryColor
+                                    else -> Color.White.copy(alpha = 0.7f)
+                                },
                                 modifier = Modifier.size(24.dp)
                             )
                         }
@@ -377,8 +384,16 @@ fun PremiumControlsOverlay(
                             SleekLoadingAnimation(modifier = Modifier.size(48.dp))
                         } else {
                             Icon(
-                                imageVector = if (isPlaying) Icons.Rounded.Pause else Icons.Rounded.PlayArrow,
-                                contentDescription = if (isPlaying) stringResource(R.string.pause) else stringResource(R.string.play),
+                                imageVector = when {
+                                    hasEnded -> Icons.Rounded.Replay
+                                    isPlaying -> Icons.Rounded.Pause
+                                    else -> Icons.Rounded.PlayArrow
+                                },
+                                contentDescription = when {
+                                    hasEnded -> "Replay"
+                                    isPlaying -> stringResource(R.string.pause)
+                                    else -> stringResource(R.string.play)
+                                },
                                 tint = Color.White,
                                 modifier = Modifier.size(54.dp)
                             )

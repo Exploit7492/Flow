@@ -64,6 +64,8 @@ class PlayerPreferences(private val context: Context) {
         val CATEGORIES_NAV_TAB_ENABLED = booleanPreferencesKey("categories_nav_tab_enabled")
         val PREFERRED_LYRICS_PROVIDER = stringPreferencesKey("preferred_lyrics_provider")
         val SWIPE_GESTURES_ENABLED = booleanPreferencesKey("swipe_gestures_enabled")
+        val BRIGHTNESS_SWIPE_GESTURES_ENABLED = booleanPreferencesKey("brightness_swipe_gestures_enabled")
+        val VOLUME_SWIPE_GESTURES_ENABLED = booleanPreferencesKey("volume_swipe_gestures_enabled")
         val CONTINUE_WATCHING_ENABLED = booleanPreferencesKey("continue_watching_enabled")
         val SHOW_RELATED_VIDEOS = booleanPreferencesKey("show_related_videos")
         val DOUBLE_TAP_SEEK_SECONDS = intPreferencesKey("double_tap_seek_seconds")
@@ -206,9 +208,35 @@ class PlayerPreferences(private val context: Context) {
             preferences[Keys.SWIPE_GESTURES_ENABLED] ?: true
         }
 
+    val brightnessSwipeGesturesEnabled: Flow<Boolean> = context.playerPreferencesDataStore.data
+        .map { preferences ->
+            preferences[Keys.BRIGHTNESS_SWIPE_GESTURES_ENABLED]
+                ?: preferences[Keys.SWIPE_GESTURES_ENABLED]
+                ?: true
+        }
+
+    val volumeSwipeGesturesEnabled: Flow<Boolean> = context.playerPreferencesDataStore.data
+        .map { preferences ->
+            preferences[Keys.VOLUME_SWIPE_GESTURES_ENABLED]
+                ?: preferences[Keys.SWIPE_GESTURES_ENABLED]
+                ?: true
+        }
+
     suspend fun setSwipeGesturesEnabled(enabled: Boolean) {
         context.playerPreferencesDataStore.edit { preferences ->
             preferences[Keys.SWIPE_GESTURES_ENABLED] = enabled
+        }
+    }
+
+    suspend fun setBrightnessSwipeGesturesEnabled(enabled: Boolean) {
+        context.playerPreferencesDataStore.edit { preferences ->
+            preferences[Keys.BRIGHTNESS_SWIPE_GESTURES_ENABLED] = enabled
+        }
+    }
+
+    suspend fun setVolumeSwipeGesturesEnabled(enabled: Boolean) {
+        context.playerPreferencesDataStore.edit { preferences ->
+            preferences[Keys.VOLUME_SWIPE_GESTURES_ENABLED] = enabled
         }
     }
 
@@ -585,6 +613,9 @@ class PlayerPreferences(private val context: Context) {
     suspend fun setVideoLoopEnabled(enabled: Boolean) {
         context.playerPreferencesDataStore.edit { preferences ->
             preferences[Keys.VIDEO_LOOP_ENABLED] = enabled
+            if (enabled) {
+                preferences[Keys.AUTOPLAY_ENABLED] = false
+            }
         }
     }
 

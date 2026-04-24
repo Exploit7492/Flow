@@ -23,8 +23,10 @@ import io.github.aedev.flow.player.GlobalPlayerState
 import io.github.aedev.flow.data.model.Video
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.collectLatest
+import android.app.ActivityManager
 import android.content.Context
 import android.net.wifi.WifiManager
+import android.os.Process
 import android.os.PowerManager
 
 /**
@@ -99,7 +101,11 @@ class VideoPlayerService : Service() {
             )
             setCallback(object : MediaSessionCompat.Callback() {
                 override fun onPlay() {
-                    EnhancedPlayerManager.getInstance().play()
+                    if (EnhancedPlayerManager.getInstance().playerState.value.hasEnded) {
+                        EnhancedPlayerManager.getInstance().replay()
+                    } else {
+                        EnhancedPlayerManager.getInstance().play()
+                    }
                 }
                 
                 override fun onPause() {
@@ -171,26 +177,11 @@ class VideoPlayerService : Service() {
             EnhancedPlayerManager.getInstance().playerState.collectLatest { state ->
                 isPlaying = state.isPlaying
                 val isPlaybackActive = state.isPlaying || state.isBuffering
-                
-                if (isPlaybackActive) {
-                    lockReleaseJob?.cancel()
-                    lockReleaseJob = null
-                    acquireLocks()
-                } else {
-                    lockReleaseJob?.cancel()
-                    lockReleaseJob = serviceScope.launch {
-                        delay(30_000L)
-                        releaseLocks()
-                    }
-                }
+
+                updateLocks(isPlaybackActive)
                 
                 updatePlaybackState(state.isPlaying, EnhancedPlayerManager.getInstance().getCurrentPosition())
-                
-                // Stop service if playback ended
-                if (state.hasEnded) {
-                    stopPlayback()
-                }
-                
+
                 updateNotification()
             }
         }
@@ -224,7 +215,9 @@ class VideoPlayerService : Service() {
     private fun handleIntent(intent: Intent) {
         when (intent.action) {
             ACTION_PLAY_PAUSE -> {
-                if (isPlaying) {
+                if (EnhancedPlayerManager.getInstance().playerState.value.hasEnded) {
+                    EnhancedPlayerManager.getInstance().replay()
+                } else if (isPlaying) {
                     EnhancedPlayerManager.getInstance().pause()
                 } else {
                     EnhancedPlayerManager.getInstance().play()
@@ -540,20 +533,57 @@ class VideoPlayerService : Service() {
     }
     
     private fun acquireLocks() {
-        if (wakeLock?.isHeld != true) {
+        if (isAppInForeground() && wakeLock?.isHeld != true) {
             wakeLock?.acquire()
         }
         if (wifiLock?.isHeld != true) {
             wifiLock?.acquire()
         }
     }
-    
-    private fun releaseLocks() {
+
+    private fun updateLocks(isPlaybackActive: Boolean) {
+        lockReleaseJob?.cancel()
+        lockReleaseJob = null
+
+        if (isPlaybackActive) {
+            acquireLocks()
+            if (!isAppInForeground()) {
+                releaseWakeLock()
+            }
+            return
+        }
+
+        releaseWakeLock()
+        lockReleaseJob = serviceScope.launch {
+            delay(30_000L)
+            releaseWifiLock()
+        }
+    }
+
+    private fun releaseWakeLock() {
         if (wakeLock?.isHeld == true) {
             wakeLock?.release()
         }
+    }
+
+    private fun releaseWifiLock() {
         if (wifiLock?.isHeld == true) {
             wifiLock?.release()
+        }
+    }
+
+    private fun releaseLocks() {
+        releaseWakeLock()
+        releaseWifiLock()
+    }
+
+    private fun isAppInForeground(): Boolean {
+        val activityManager = getSystemService(Context.ACTIVITY_SERVICE) as? ActivityManager ?: return false
+        val runningProcess = activityManager.runningAppProcesses?.firstOrNull { it.pid == Process.myPid() }
+        return when (runningProcess?.importance) {
+            ActivityManager.RunningAppProcessInfo.IMPORTANCE_FOREGROUND,
+            ActivityManager.RunningAppProcessInfo.IMPORTANCE_VISIBLE -> true
+            else -> false
         }
     }
     

@@ -472,6 +472,10 @@
     <string name="player_appearance_gestures_header">Gestures</string>
     <string name="player_appearance_swipe_gestures_title">Brightness &amp; Volume Gestures</string>
     <string name="player_appearance_swipe_gestures_subtitle">Swipe left/right edge to adjust brightness and volume in fullscreen</string>
+    <string name="player_appearance_brightness_gesture_title">Brightness Gesture</string>
+    <string name="player_appearance_brightness_gesture_subtitle">Swipe the left edge in fullscreen to adjust brightness</string>
+    <string name="player_appearance_volume_gesture_title">Volume Gesture</string>
+    <string name="player_appearance_volume_gesture_subtitle">Swipe the right edge in fullscreen to adjust volume</string>
     <string name="mini_player_header">Mini Player Customizations</string>
     <string name="mini_player_size">Mini Player Size</string>
     <string name="mini_player_small">Small</string>

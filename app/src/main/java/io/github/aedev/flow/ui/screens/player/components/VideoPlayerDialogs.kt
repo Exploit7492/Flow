@@ -735,6 +735,7 @@ fun SettingsMenuDialog(
                 icon = Icons.Filled.SkipNext,
                 label = stringResource(R.string.autoplay_next),
                 checked = autoplayEnabled,
+                enabled = !playerState.isLooping,
                 onToggle = onAutoplayToggle
             )
 
@@ -808,10 +809,11 @@ private fun PlayerSettingsToggleRow(
     icon: androidx.compose.ui.graphics.vector.ImageVector,
     label: String,
     checked: Boolean,
+    enabled: Boolean = true,
     onToggle: (Boolean) -> Unit
 ) {
     Surface(
-        onClick = { onToggle(!checked) },
+        onClick = { if (enabled) onToggle(!checked) },
         color = Color.Transparent,
         modifier = Modifier.fillMaxWidth()
     ) {
@@ -825,16 +827,18 @@ private fun PlayerSettingsToggleRow(
                 imageVector = icon,
                 contentDescription = null,
                 modifier = Modifier.size(22.dp),
-                tint = MaterialTheme.colorScheme.onSurfaceVariant
+                tint = if (enabled) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)
             )
             Spacer(Modifier.width(16.dp))
             Text(
                 text = label,
                 style = MaterialTheme.typography.bodyLarge,
+                color = if (enabled) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f),
                 modifier = Modifier.weight(1f)
             )
             Switch(
                 checked = checked,
+                enabled = enabled,
                 onCheckedChange = null
             )
         }

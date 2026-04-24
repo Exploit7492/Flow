@@ -193,6 +193,7 @@ fun PlayerContent(
         PremiumControlsOverlay(
             isVisible = screenState.showControls && !screenState.isInPipMode,
             isPlaying = playerState.isPlaying,
+            hasEnded = playerState.hasEnded,
             isBuffering = playerState.isBuffering,
             currentPosition = screenState.currentPosition,
             duration = screenState.duration,
@@ -204,7 +205,9 @@ fun PlayerContent(
             resizeMode = screenState.resizeMode,
             onResizeClick = { screenState.cycleResizeMode() },
             onPlayPause = {
-                if (playerState.isPlaying) {
+                if (playerState.hasEnded) {
+                    EnhancedPlayerManager.getInstance().replay()
+                } else if (playerState.isPlaying) {
                     EnhancedPlayerManager.getInstance().pause()
                 } else {
                     EnhancedPlayerManager.getInstance().play()
@@ -256,6 +259,7 @@ fun PlayerContent(
             },
             isSubtitlesEnabled = screenState.subtitlesEnabled,
             autoplayEnabled = uiState.autoplayEnabled,
+            isLooping = playerState.isLooping,
             onAutoplayToggle = { viewModel.toggleAutoplay(it) },
             onPrevious = {
                 viewModel.getPreviousVideoId()?.let { prevId ->

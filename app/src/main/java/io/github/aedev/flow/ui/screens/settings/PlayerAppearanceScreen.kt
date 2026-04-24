@@ -51,7 +51,8 @@ fun PlayerAppearanceScreen(
     val playerPreferences = remember { PlayerPreferences(context) }
     
     val currentSliderStyle by playerPreferences.sliderStyle.collectAsState(initial = SliderStyle.DEFAULT)
-    val swipeGesturesEnabled by playerPreferences.swipeGesturesEnabled.collectAsState(initial = true)
+    val brightnessSwipeGesturesEnabled by playerPreferences.brightnessSwipeGesturesEnabled.collectAsState(initial = true)
+    val volumeSwipeGesturesEnabled by playerPreferences.volumeSwipeGesturesEnabled.collectAsState(initial = true)
     val showFullscreenTitle by playerPreferences.showFullscreenTitle.collectAsState(initial = false)
 
     var showStyleSheet by remember { mutableStateOf(false) }
@@ -200,12 +201,29 @@ fun PlayerAppearanceScreen(
                 SettingsGroup {
                     SettingsToggleItem(
                         icon = painterResource(R.drawable.ic_swipe_gesture),
-                        title = stringResource(R.string.player_appearance_swipe_gestures_title),
-                        subtitle = stringResource(R.string.player_appearance_swipe_gestures_subtitle),
-                        checked = swipeGesturesEnabled,
+                        title = stringResource(R.string.player_appearance_brightness_gesture_title),
+                        subtitle = stringResource(R.string.player_appearance_brightness_gesture_subtitle),
+                        checked = brightnessSwipeGesturesEnabled,
                         onCheckedChange = { enabled ->
                             coroutineScope.launch {
-                                playerPreferences.setSwipeGesturesEnabled(enabled)
+                                playerPreferences.setBrightnessSwipeGesturesEnabled(enabled)
+                            }
+                        }
+                    )
+
+                    HorizontalDivider(
+                        modifier = Modifier.padding(horizontal = 16.dp),
+                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+                    )
+
+                    SettingsToggleItem(
+                        icon = painterResource(R.drawable.ic_swipe_gesture),
+                        title = stringResource(R.string.player_appearance_volume_gesture_title),
+                        subtitle = stringResource(R.string.player_appearance_volume_gesture_subtitle),
+                        checked = volumeSwipeGesturesEnabled,
+                        onCheckedChange = { enabled ->
+                            coroutineScope.launch {
+                                playerPreferences.setVolumeSwipeGesturesEnabled(enabled)
                             }
                         }
                     )

@@ -1075,12 +1075,19 @@ class VideoPlayerViewModel @Inject constructor(
 
     fun toggleAutoplay(enabled: Boolean) {
         viewModelScope.launch {
-            playerPreferences.setAutoplayEnabled(enabled)
-            _uiState.value = _uiState.value.copy(autoplayEnabled = enabled)
+            val resolvedEnabled = enabled && !EnhancedPlayerManager.getInstance().playerState.value.isLooping
+            playerPreferences.setAutoplayEnabled(resolvedEnabled)
+            _uiState.value = _uiState.value.copy(autoplayEnabled = resolvedEnabled)
         }
     }
 
     fun toggleLoop(enabled: Boolean) {
+        if (enabled) {
+            viewModelScope.launch {
+                playerPreferences.setAutoplayEnabled(false)
+                _uiState.update { it.copy(autoplayEnabled = false) }
+            }
+        }
         EnhancedPlayerManager.getInstance().toggleLoop(enabled)
     }
 
