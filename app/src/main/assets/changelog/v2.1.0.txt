@@ -101,3 +101,4 @@ FIXES AND STABILITY
 - Fix Music player UI colors #303
 - Fix Depricated DeArrow endpoint #320
 - Fix Video playback issues #324
+- Fix Pul-to-refresh in music screen #335 by @Amruth-hiremath

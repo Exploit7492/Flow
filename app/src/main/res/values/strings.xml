@@ -336,6 +336,11 @@
     <string name="deep_flow_expire_duration_subtitle">Learning resumes automatically after %s</string>
     <string name="deep_flow_dialog_title">Pause Duration</string>
     <string name="deep_flow_dialog_body">How long should learning stay paused?</string>
+    <string name="deep_flow_enabled_message">Deep Flow enabled</string>
+    <string name="deep_flow_disabled_message">Deep Flow disabled</string>
+    <string name="deep_flow_expired_message">Deep Flow timer ended</string>
+    <string name="deep_flow_active_until_disabled">Deep Flow stays active until you turn it off</string>
+    <string name="deep_flow_duration_never">Never</string>
     <string name="deep_flow_duration_1h">1 hour</string>
     <string name="deep_flow_duration_2h">2 hours</string>
     <string name="deep_flow_duration_4h">4 hours</string>

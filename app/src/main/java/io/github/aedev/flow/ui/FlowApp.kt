@@ -26,6 +26,7 @@ import androidx.navigation.compose.rememberNavController
 import androidx.media3.common.util.UnstableApi
 import io.github.aedev.flow.data.model.Video
 import io.github.aedev.flow.data.recommendation.FlowNeuroEngine
+import io.github.aedev.flow.player.DeepFlowManager
 import io.github.aedev.flow.player.EnhancedMusicPlayerManager
 import io.github.aedev.flow.player.EnhancedPlayerManager
 import io.github.aedev.flow.player.GlobalPlayerState
@@ -40,6 +41,7 @@ import io.github.aedev.flow.ui.screens.music.EnhancedMusicPlayerScreen
 import io.github.aedev.flow.ui.screens.player.VideoPlayerViewModel
 import io.github.aedev.flow.ui.theme.CustomThemeColors
 import io.github.aedev.flow.ui.theme.ThemeMode
+import kotlinx.coroutines.flow.collectLatest
 
 @UnstableApi
 @Composable
@@ -82,7 +84,18 @@ fun FlowApp(
     
     LaunchedEffect(Unit) {
         FlowNeuroEngine.initialize(context)
+        DeepFlowManager.initialize(context)
         needsOnboarding = FlowNeuroEngine.needsOnboarding()
+    }
+
+    LaunchedEffect(snackbarHostState) {
+        DeepFlowManager.messages.collectLatest { message ->
+            snackbarHostState.currentSnackbarData?.dismiss()
+            snackbarHostState.showSnackbar(
+                message = message,
+                duration = androidx.compose.material3.SnackbarDuration.Short
+            )
+        }
     }
 
     HandleDeepLinks(deeplinkVideoId, isShort, navController, onDeeplinkConsumed)
@@ -121,7 +134,6 @@ fun FlowApp(
         val navBarBottomInset = WindowInsets.navigationBars.getBottom(density)
         
         val bottomNavContentHeightDp = 48.dp
-        val bottomNavContentHeightPx = with(density) { bottomNavContentHeightDp.toPx() }
         
         // Draggable player state
         val playerSheetState = rememberPlayerDraggableState()
@@ -242,7 +254,6 @@ fun FlowApp(
     Box(modifier = Modifier.fillMaxSize()) {
         Scaffold(
             modifier = Modifier.fillMaxSize(),
-            snackbarHost = { androidx.compose.material3.SnackbarHost(hostState = snackbarHostState) },
             containerColor = if (isInPipMode) androidx.compose.ui.graphics.Color.Black else androidx.compose.material3.MaterialTheme.colorScheme.background,
             contentWindowInsets = WindowInsets.systemBars,
             bottomBar = {} 
@@ -377,6 +388,7 @@ fun FlowApp(
         label = "globalBottomPadding"
     )
     val animatedBottomPadding = animatedBottomPaddingRaw.coerceAtLeast(0.dp)
+    val snackbarBottomPadding = (animatedBottomPadding + 12.dp).coerceAtLeast(12.dp)
 
     // ===== GLOBAL PLAYER OVERLAY =====
     GlobalPlayerOverlay(
@@ -452,5 +464,16 @@ fun FlowApp(
             }
         )
     }
+
+    androidx.compose.material3.SnackbarHost(
+        hostState = snackbarHostState,
+        modifier = Modifier
+            .align(Alignment.BottomCenter)
+            .padding(
+                start = 16.dp,
+                end = 16.dp,
+                bottom = snackbarBottomPadding
+            )
+    )
   } 
 }

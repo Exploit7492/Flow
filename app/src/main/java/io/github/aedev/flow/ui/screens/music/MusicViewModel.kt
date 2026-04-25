@@ -592,6 +592,7 @@ class MusicViewModel @Inject constructor(
     }
 
     fun refresh() {
+        _uiState.update { it.copy(isLoading = true) }
         loadMusicContent()
     }
     

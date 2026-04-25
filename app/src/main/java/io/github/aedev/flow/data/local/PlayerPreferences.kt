@@ -10,6 +10,8 @@ import kotlinx.coroutines.flow.map
 
 private val Context.playerPreferencesDataStore: DataStore<Preferences> by preferencesDataStore(name = "player_preferences")
 
+const val DEEP_FLOW_NEVER_EXPIRES_HOURS = 0
+
 class PlayerPreferences(private val context: Context) {
     
     private object Keys {
@@ -1288,6 +1290,8 @@ class PlayerPreferences(private val context: Context) {
             preferences[Keys.DEEP_FLOW_ACTIVE] = enabled
             if (enabled) {
                 preferences[Keys.DEEP_FLOW_ACTIVATED_AT] = System.currentTimeMillis()
+            } else {
+                preferences[Keys.DEEP_FLOW_ACTIVATED_AT] = 0L
             }
         }
     }
@@ -1346,6 +1350,7 @@ class PlayerPreferences(private val context: Context) {
         if (!active) return false
         val activatedAt = prefs[Keys.DEEP_FLOW_ACTIVATED_AT] ?: 0L
         val expireHours = prefs[Keys.DEEP_FLOW_EXPIRE_HOURS] ?: 4
+        if (expireHours == DEEP_FLOW_NEVER_EXPIRES_HOURS) return true
         val elapsedHours = (System.currentTimeMillis() - activatedAt) / 3_600_000.0
         val stillActive = elapsedHours < expireHours
         if (!stillActive) {

@@ -36,14 +36,15 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import io.github.aedev.flow.BuildConfig
+import io.github.aedev.flow.data.local.DEEP_FLOW_NEVER_EXPIRES_HOURS
 import io.github.aedev.flow.data.recommendation.FlowNeuroEngine
 import io.github.aedev.flow.data.recommendation.UserBrain
+import io.github.aedev.flow.player.DeepFlowManager
 import io.github.aedev.flow.ui.theme.ThemeMode
 import io.github.aedev.flow.ui.theme.extendedColors
 import io.github.aedev.flow.data.local.PlayerPreferences
 import com.google.gson.JsonParser
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
@@ -116,24 +117,12 @@ fun SettingsScreen(
     var showDeepFlowDurationDialog by remember { mutableStateOf(false) }
 
     val deepFlowRemainingLabel: String? = remember(deepFlowActive, deepFlowActivatedAt, deepFlowExpireHours) {
-        if (!deepFlowActive || deepFlowActivatedAt == 0L) return@remember null
+        if (!deepFlowActive || deepFlowActivatedAt == 0L || deepFlowExpireHours == DEEP_FLOW_NEVER_EXPIRES_HOURS) return@remember null
         val expiresAt = deepFlowActivatedAt + deepFlowExpireHours * 3_600_000L
         val remainingMs = expiresAt - System.currentTimeMillis()
         if (remainingMs <= 0) return@remember null
         val remainingMins = remainingMs / 60_000
         if (remainingMins < 60) "${remainingMins}m" else "${remainingMins / 60}h ${remainingMins % 60}m"
-    }
-
-    LaunchedEffect(deepFlowActive, deepFlowActivatedAt, deepFlowExpireHours) {
-        if (!deepFlowActive || deepFlowActivatedAt == 0L) return@LaunchedEffect
-        val expiresAt = deepFlowActivatedAt + deepFlowExpireHours * 3_600_000L
-        val remainingMs = expiresAt - System.currentTimeMillis()
-        if (remainingMs <= 0L) {
-            playerPreferences.setDeepFlowActive(false)
-            return@LaunchedEffect
-        }
-        delay(remainingMs)
-        playerPreferences.setDeepFlowActive(false)
     }
 
     // Optimize Region Dialog: compute list only once
@@ -533,7 +522,7 @@ item {
                             .fillMaxWidth()
                             .clickable {
                                 coroutineScope.launch {
-                                    playerPreferences.setDeepFlowActive(!deepFlowActive)
+                                    DeepFlowManager.toggle(context)
                                 }
                             }
                             .padding(16.dp),
@@ -573,13 +562,16 @@ item {
                                 }
                             }
                             Text(
-                                text = if (deepFlowActive && deepFlowRemainingLabel != null)
-                                    androidx.compose.ui.res.stringResource(
+                                text = when {
+                                    deepFlowActive && deepFlowRemainingLabel != null -> androidx.compose.ui.res.stringResource(
                                         io.github.aedev.flow.R.string.deep_flow_expires_in,
                                         deepFlowRemainingLabel
                                     )
-                                else
-                                    androidx.compose.ui.res.stringResource(io.github.aedev.flow.R.string.deep_flow_mode_subtitle),
+                                    deepFlowActive && deepFlowExpireHours == DEEP_FLOW_NEVER_EXPIRES_HOURS -> androidx.compose.ui.res.stringResource(
+                                        io.github.aedev.flow.R.string.deep_flow_active_until_disabled
+                                    )
+                                    else -> androidx.compose.ui.res.stringResource(io.github.aedev.flow.R.string.deep_flow_mode_subtitle)
+                                },
                                 style = MaterialTheme.typography.bodyMedium,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
@@ -588,7 +580,7 @@ item {
                             checked = deepFlowActive,
                             onCheckedChange = { enabled ->
                                 coroutineScope.launch {
-                                    playerPreferences.setDeepFlowActive(enabled)
+                                    DeepFlowManager.setEnabled(context, enabled)
                                 }
                             }
                         )
@@ -619,8 +611,18 @@ item {
                             Text(
                                 text = androidx.compose.ui.res.stringResource(
                                     io.github.aedev.flow.R.string.deep_flow_expire_duration_subtitle,
-                                    deepFlowExpireHours.let { h ->
-                                        if (h == 1) "1 hour" else "$h hours"
+                                    deepFlowExpireHours.let { hours ->
+                                        when (hours) {
+                                            DEEP_FLOW_NEVER_EXPIRES_HOURS -> context.getString(io.github.aedev.flow.R.string.deep_flow_duration_never)
+                                            1 -> context.getString(io.github.aedev.flow.R.string.deep_flow_duration_1h)
+                                            2 -> context.getString(io.github.aedev.flow.R.string.deep_flow_duration_2h)
+                                            4 -> context.getString(io.github.aedev.flow.R.string.deep_flow_duration_4h)
+                                            6 -> context.getString(io.github.aedev.flow.R.string.deep_flow_duration_6h)
+                                            8 -> context.getString(io.github.aedev.flow.R.string.deep_flow_duration_8h)
+                                            12 -> context.getString(io.github.aedev.flow.R.string.deep_flow_duration_12h)
+                                            24 -> context.getString(io.github.aedev.flow.R.string.deep_flow_duration_24h)
+                                            else -> "$hours hours"
+                                        }
                                     }
                                 ),
                                 style = MaterialTheme.typography.bodyMedium,
@@ -843,7 +845,16 @@ item {
     }
 
     if (showDeepFlowDurationDialog) {
-        val durationOptions = listOf(1 to "1 hour", 2 to "2 hours", 4 to "4 hours", 6 to "6 hours", 8 to "8 hours", 12 to "12 hours", 24 to "24 hours")
+        val durationOptions = listOf(
+            DEEP_FLOW_NEVER_EXPIRES_HOURS to androidx.compose.ui.res.stringResource(io.github.aedev.flow.R.string.deep_flow_duration_never),
+            1 to androidx.compose.ui.res.stringResource(io.github.aedev.flow.R.string.deep_flow_duration_1h),
+            2 to androidx.compose.ui.res.stringResource(io.github.aedev.flow.R.string.deep_flow_duration_2h),
+            4 to androidx.compose.ui.res.stringResource(io.github.aedev.flow.R.string.deep_flow_duration_4h),
+            6 to androidx.compose.ui.res.stringResource(io.github.aedev.flow.R.string.deep_flow_duration_6h),
+            8 to androidx.compose.ui.res.stringResource(io.github.aedev.flow.R.string.deep_flow_duration_8h),
+            12 to androidx.compose.ui.res.stringResource(io.github.aedev.flow.R.string.deep_flow_duration_12h),
+            24 to androidx.compose.ui.res.stringResource(io.github.aedev.flow.R.string.deep_flow_duration_24h)
+        )
         AlertDialog(
             onDismissRequest = { showDeepFlowDurationDialog = false },
             icon = { Icon(Icons.Outlined.Timer, null, tint = MaterialTheme.colorScheme.primary) },
