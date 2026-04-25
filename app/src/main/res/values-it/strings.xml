@@ -1304,4 +1304,8 @@
     <string name="player_appearance_fullscreen_header">Schermo intero</string>
     <string name="player_show_title_title">Mostra titolo video</string>
     <string name="player_show_title_subtitle">Mostra il titolo del video sotto la barra superiore in modalità schermo intero</string>
+    <string name="player_appearance_brightness_gesture_subtitle">Scorri il bordo sinistro a schermo intero per regolare la luminosità</string>
+    <string name="player_appearance_volume_gesture_title">Gesto volume</string>
+    <string name="player_appearance_volume_gesture_subtitle">Scorri il bordo destro a schermo intero per regolare il volume</string>
+    <string name="player_appearance_brightness_gesture_title">Gesto luminosità</string>
 </resources>
