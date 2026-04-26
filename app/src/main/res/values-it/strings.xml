@@ -1310,4 +1310,9 @@
     <string name="player_appearance_brightness_gesture_title">Gesto luminosità</string>
     <string name="copy_video_link">Copia link video</string>
     <string name="copy_channel_link">Copia link canale</string>
+    <string name="deep_flow_enabled_message">Deep Flow abilitato</string>
+    <string name="deep_flow_disabled_message">Deep Flow disabilitato</string>
+    <string name="deep_flow_expired_message">Timer Deep Flow scaduto</string>
+    <string name="deep_flow_active_until_disabled">Deep Flow rimane attivo finché non lo disattivi</string>
+    <string name="deep_flow_duration_never">Mai</string>
 </resources>
