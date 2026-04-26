@@ -33,6 +33,6 @@ class CustomMediaCodecVideoRenderer(
 ) {
 
     override fun codecNeedsSetOutputSurfaceWorkaround(name: String): Boolean {
-        return super.codecNeedsSetOutputSurfaceWorkaround(name)
+         return true
     }
 }

@@ -965,7 +965,7 @@ fun CompactVideoCard(
         Column(
             modifier = Modifier.align(Alignment.Top),
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(4.dp)
+            verticalArrangement = Arrangement.spacedBy(24.dp)
         ) {
             IconButton(
                 onClick = { showQuickActions = true },

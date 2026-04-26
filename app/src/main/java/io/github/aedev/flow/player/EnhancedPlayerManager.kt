@@ -32,7 +32,9 @@ import io.github.aedev.flow.player.tracker.PlaybackTracker
 
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.SharedFlow
@@ -98,6 +100,7 @@ class EnhancedPlayerManager private constructor() {
     
     // Coroutine scope
     private val scope = CoroutineScope(Dispatchers.Main + SupervisorJob())
+    private var pendingReloadJob: Job? = null
 
     /**
      * Set to true while PlaybackRefocusEffect is recovering from a screen-off/on cycle.
@@ -904,6 +907,8 @@ class EnhancedPlayerManager private constructor() {
 
     fun release() {
         Log.d(TAG, "release() called")
+        pendingReloadJob?.cancel()
+        pendingReloadJob = null
         playbackTracker?.stop()
         audioFeaturesManager?.clearPlayer()
         surfaceManager?.release(player)
@@ -930,34 +935,40 @@ class EnhancedPlayerManager private constructor() {
     }
     
     private fun reloadPlaybackManager() {
-        try {
-            Thread.sleep(PlayerConfig.ERROR_RETRY_DELAY_MS)
-            val pos = player?.currentPosition ?: 0L
-            player?.stop()
-            player?.clearMediaItems()
+        pendingReloadJob?.cancel()
+        pendingReloadJob = scope.launch {
+            try {
+                delay(PlayerConfig.ERROR_RETRY_DELAY_MS)
 
-            if (qualityManager?.isAdaptiveQualityEnabled == false) {
-                reloadCurrentStream(pos, "manual-quality-reload")
-                return
-            }
+                val pos = player?.currentPosition ?: 0L
+                player?.stop()
+                player?.clearMediaItems()
 
-            currentVideoStream?.let { stream ->
-                if (qualityManager?.hasStreamFailed(stream.getContent()) == true) {
-                    val working = qualityManager?.getWorkingStreams()?.maxByOrNull { it.height }
-                    if (working != null) {
-                        currentVideoStream = working
-                        qualityManager?.resetStreamErrors()
-                    } else {
-                        onPlaybackShutdown()
-                        return
+                if (qualityManager?.isAdaptiveQualityEnabled == false) {
+                    reloadCurrentStream(pos, "manual-quality-reload")
+                    return@launch
+                }
+
+                currentVideoStream?.let { stream ->
+                    if (qualityManager?.hasStreamFailed(stream.getContent()) == true) {
+                        val working = qualityManager?.getWorkingStreams()?.maxByOrNull { it.height }
+                        if (working != null) {
+                            currentVideoStream = working
+                            qualityManager?.resetStreamErrors()
+                        } else {
+                            onPlaybackShutdown()
+                            return@launch
+                        }
                     }
                 }
-            }
 
-            currentVideoStream?.let { loadMediaInternal(it, currentAudioStream, pos) }
-        } catch (e: Exception) {
-            Log.e(TAG, "Error reloading", e)
-            onPlaybackShutdown()
+                currentVideoStream?.let { loadMediaInternal(it, currentAudioStream, pos) }
+            } catch (e: Exception) {
+                Log.e(TAG, "Error reloading", e)
+                onPlaybackShutdown()
+            } finally {
+                pendingReloadJob = null
+            }
         }
     }
     

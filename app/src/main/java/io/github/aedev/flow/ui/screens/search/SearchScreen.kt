@@ -30,6 +30,8 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.ui.text.*
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.TextFieldValue
+import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.*
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
@@ -68,7 +70,7 @@ fun SearchScreen(
     val interestProfile = remember { InterestProfile.getInstance(context) }
     val preferences = remember { io.github.aedev.flow.data.local.PlayerPreferences(context) }
 
-    var searchQuery by remember { mutableStateOf("") }
+    var searchQuery by remember { mutableStateOf(TextFieldValue("")) }
     var isSearchFocused by remember { mutableStateOf(false) }
     val isGridMode by preferences.searchIsGridMode.collectAsState(initial = false)
     var selectedTabIndex by remember { mutableIntStateOf(0) }
@@ -101,6 +103,12 @@ fun SearchScreen(
         }
     }
 
+    val setSearchQueryToEnd: (String) -> Unit = remember {
+        { value ->
+            searchQuery = TextFieldValue(value, selection = TextRange(value.length))
+        }
+    }
+
     val voiceSearchLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.StartActivityForResult()
     ) { result ->
@@ -109,7 +117,7 @@ fun SearchScreen(
                 ?.getStringArrayListExtra(android.speech.RecognizerIntent.EXTRA_RESULTS)
                 ?.firstOrNull()
             if (!spokenText.isNullOrBlank()) {
-                searchQuery = spokenText
+                setSearchQueryToEnd(spokenText)
                 dismissKeyboard()
                 selectedTabIndex = 0
                 viewModel.search(spokenText)
@@ -178,16 +186,17 @@ fun SearchScreen(
     }
 
     LaunchedEffect(searchQuery, isSearchFocused) {
-        if (searchQuery.length >= 2 && isSearchFocused && suggestionsEnabled) {
+        val queryText = searchQuery.text
+        if (queryText.length >= 2 && isSearchFocused && suggestionsEnabled) {
             isLoadingSuggestions = true
             delay(280)
             try {
-                liveSuggestions = SearchSuggestionsService.getSuggestions(searchQuery)
+                liveSuggestions = SearchSuggestionsService.getSuggestions(queryText)
             } catch (_: Exception) {
                 liveSuggestions = emptyList()
             }
             isLoadingSuggestions = false
-        } else if (searchQuery.length < 2) {
+        } else if (queryText.length < 2) {
             liveSuggestions = emptyList()
         }
     }
@@ -230,12 +239,13 @@ fun SearchScreen(
                 }
             },
             onSearch = {
-                if (searchQuery.isNotBlank()) {
+                val queryText = searchQuery.text
+                if (queryText.isNotBlank()) {
                     dismissKeyboard()
                     liveSuggestions = emptyList()
                     selectedTabIndex = 0
 
-                    val videoId = extractVideoId(searchQuery)
+                    val videoId = extractVideoId(queryText)
                     if (videoId != null) {
                         navigateToVideo(
                             Video(
@@ -253,11 +263,11 @@ fun SearchScreen(
                         return@SearchBarRow
                     }
 
-                    viewModel.search(searchQuery)
+                    viewModel.search(queryText)
                 }
             },
             onClear = {
-                searchQuery = ""
+                setSearchQueryToEnd("")
                 liveSuggestions = emptyList()
                 viewModel.clearSearch()
             },
@@ -272,18 +282,18 @@ fun SearchScreen(
         )
 
         AnimatedVisibility(
-            visible = isSearchFocused && searchQuery.isNotEmpty() &&
+            visible = isSearchFocused && searchQuery.text.isNotEmpty() &&
                     (liveSuggestions.isNotEmpty() || isLoadingSuggestions),
             enter = expandVertically() + fadeIn(),
             exit = shrinkVertically() + fadeOut()
         ) {
             SuggestionsCard(
-                query = searchQuery,
+                query = searchQuery.text,
                 suggestions = liveSuggestions,
                 isLoading = isLoadingSuggestions,
                 onSuggestionClick = { s ->
                     dismissKeyboard()
-                    searchQuery = s
+                    setSearchQueryToEnd(s)
                     liveSuggestions = emptyList()
                     selectedTabIndex = 0
 
@@ -306,7 +316,7 @@ fun SearchScreen(
                         viewModel.search(s)
                     }
                 },
-                onFillClick = { searchQuery = it },
+                onFillClick = { setSearchQueryToEnd(it) },
                 modifier = Modifier.padding(horizontal = 16.dp)
             )
         }
@@ -318,7 +328,7 @@ fun SearchScreen(
                 searchHistory = searchHistory,
                 onHistoryClick = { q ->
                     dismissKeyboard()
-                    searchQuery = q
+                    setSearchQueryToEnd(q)
                     selectedTabIndex = 0
                     viewModel.search(q)
                 },
@@ -420,8 +430,8 @@ private fun extractVideoId(url: String): String? {
 
 @Composable
 private fun SearchBarRow(
-    query: String,
-    onQueryChange: (String) -> Unit,
+    query: TextFieldValue,
+    onQueryChange: (TextFieldValue) -> Unit,
     onSearch: () -> Unit,
     onClear: () -> Unit,
     onVoiceSearch: () -> Unit,
@@ -508,7 +518,7 @@ private fun SearchBarRow(
                 singleLine = true,
                 keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
                 keyboardActions = KeyboardActions(
-                    onSearch = { if (query.isNotBlank()) onSearch() }
+                    onSearch = { if (query.text.isNotBlank()) onSearch() }
                 ),
                 cursorBrush = SolidColor(primary),
                 decorationBox = { innerTextField ->
@@ -516,7 +526,7 @@ private fun SearchBarRow(
                         modifier = Modifier.fillMaxWidth(),
                         contentAlignment = Alignment.CenterStart
                     ) {
-                        if (query.isEmpty()) {
+                        if (query.text.isEmpty()) {
                             Text(
                                 "Search videos, channels\u2026",
                                 style = MaterialTheme.typography.bodyMedium,
@@ -531,7 +541,7 @@ private fun SearchBarRow(
                 }
             )
 
-            if (query.isEmpty()) {
+            if (query.text.isEmpty()) {
                 Box(
                     modifier = Modifier
                         .padding(end = 2.dp)

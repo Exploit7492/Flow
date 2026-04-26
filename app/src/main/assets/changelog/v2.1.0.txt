@@ -35,6 +35,7 @@ FEATURES
 - Add channel avatar expanded preview #318
 - Add new copy video and channel urls in video quick actions #325
 - Add new mark as watched quick access button #340
+- Add new Subscriptions export for newpipe #317
 
 IMPROVEMENTS
 - New miniplayer secondary action buttons layout #225
@@ -106,3 +107,5 @@ FIXES AND STABILITY
 - Fix Pul-to-refresh in music screen #335 by @Amruth-hiremath
 - Fix Status bar colors #333
 - Fix Blurry app icon #336
+- Fix AV1 4K download #342
+- Fix Video crash #345

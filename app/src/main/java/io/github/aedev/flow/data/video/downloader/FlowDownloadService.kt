@@ -200,8 +200,11 @@ class FlowDownloadService : Service() {
         try {
             Log.d(TAG, "handleStartDownload: Checking directories...")
             val fileType = if (audioOnly) DownloadFileType.AUDIO else DownloadFileType.VIDEO
-            val isWebMCodec = videoCodec?.lowercase()?.let { it == "vp9" || it == "vp8" } ?: false
-            val isAv1Codec = videoCodec?.lowercase() == "av1"
+            val codecHint = videoCodec?.trim()?.lowercase()
+            val isWebMCodec = codecHint?.let {
+                it == "vp9" || it == "vp8" || it.startsWith("vp09") || it.startsWith("vp08")
+            } ?: false
+            val isAv1Codec = codecHint?.let { it == "av1" || it.startsWith("av01") || it.startsWith("av1") } ?: false
             val av1NeedsMkv = isAv1Codec
             val extension = when {
                 audioOnly  -> "m4a"

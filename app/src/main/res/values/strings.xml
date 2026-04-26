@@ -1366,6 +1366,10 @@
     <string name="export_data_screen_title">Export Data</string>
     <string name="export_data_section_header">Choose Export Type</string>
     <string name="export_data_section_subtitle">Select what you want to export and save to your device</string>
+    <string name="export_newpipe_subs_title">Export subscriptions (NewPipe format)</string>
+    <string name="export_newpipe_subs_desc">Export your subscriptions as a NewPipe-compatible JSON file.</string>
+    <string name="export_newpipe_subs_success">NewPipe subscriptions exported successfully</string>
+    <string name="export_newpipe_subs_failed">Failed to export NewPipe subscriptions</string>
     <string name="export_app_data_title">App Data Backup</string>
     <string name="export_app_data_desc">Export your subscriptions, watch history, playlists, and settings</string>
 

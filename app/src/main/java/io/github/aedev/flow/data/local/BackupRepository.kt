@@ -6,11 +6,14 @@ import android.content.pm.PackageManager
 import android.net.Uri
 import android.provider.DocumentsContract
 import android.provider.OpenableColumns
+import io.github.aedev.flow.BuildConfig
 import io.github.aedev.flow.data.local.entity.PlaylistEntity
 import io.github.aedev.flow.data.local.entity.PlaylistVideoCrossRef
+import io.github.aedev.flow.data.local.entity.SubscriptionGroupEntity
 import io.github.aedev.flow.data.local.entity.VideoEntity
 import com.google.gson.GsonBuilder
 import com.google.gson.Strictness
+import com.google.gson.annotations.SerializedName
 import com.google.gson.stream.JsonReader
 import java.io.StringReader
 import androidx.room.withTransaction
@@ -53,8 +56,24 @@ data class BackupData(
     val playlists: List<PlaylistEntity>? = emptyList(),
     val playlistVideos: List<PlaylistVideoCrossRef>? = emptyList(),
     val videos: List<VideoEntity>? = emptyList(),
+    val subscriptionGroups: List<SubscriptionGroupEntity>? = emptyList(),
     val likedVideos: List<LikedVideoInfo>? = emptyList(),
     val settings: SettingsBackup? = null
+)
+
+data class NewPipeSubscriptionItem(
+    @SerializedName("service_id")
+    val serviceId: Int,
+    val url: String,
+    val name: String
+)
+
+data class NewPipeSubscriptionExport(
+    val subscriptions: List<NewPipeSubscriptionItem>,
+    @SerializedName("app_version")
+    val appVersion: String = BuildConfig.VERSION_NAME,
+    @SerializedName("app_version_int")
+    val appVersionInt: Int = BuildConfig.VERSION_CODE
 )
 
 class BackupRepository(private val context: Context) {
@@ -114,6 +133,7 @@ class BackupRepository(private val context: Context) {
                 playlists = database.playlistDao().getAllPlaylists().first(),
                 playlistVideos = database.playlistDao().getAllPlaylistVideoCrossRefs(),
                 videos = database.videoDao().getAllVideos(),
+                subscriptionGroups = database.subscriptionGroupDao().getAllGroupsOnce(),
                 likedVideos = likedVideosRepo.getAllLikedVideos().first(),
                 settings = mergedSettings
             )
@@ -142,6 +162,35 @@ class BackupRepository(private val context: Context) {
                 ?: return@withContext Result.failure(Exception("Invalid backup file"))
 
             importBackupData(backupData)
+
+            Result.success(Unit)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    suspend fun exportSubscriptionsAsNewPipe(uri: Uri): Result<Unit> = withContext(Dispatchers.IO) {
+        try {
+            val subscriptions = subscriptionRepo.getAllSubscriptions().first()
+            val payload = NewPipeSubscriptionExport(
+                subscriptions = subscriptions.mapNotNull { sub ->
+                    val channelId = sub.channelId.trim()
+                    if (channelId.isEmpty()) return@mapNotNull null
+
+                    NewPipeSubscriptionItem(
+                        serviceId = 0,
+                        url = toNewPipeChannelUrl(channelId),
+                        name = sub.channelName.ifBlank { channelId }
+                    )
+                }
+            )
+
+            val json = gson.toJson(payload)
+            context.contentResolver.openOutputStream(uri)?.use { outputStream ->
+                OutputStreamWriter(outputStream).use { writer ->
+                    writer.write(json)
+                }
+            } ?: return@withContext Result.failure(Exception("Could not open output stream"))
 
             Result.success(Unit)
         } catch (e: Exception) {
@@ -781,6 +830,7 @@ class BackupRepository(private val context: Context) {
                 playlists = database.playlistDao().getAllPlaylists().first(),
                 playlistVideos = database.playlistDao().getAllPlaylistVideoCrossRefs(),
                 videos = database.videoDao().getAllVideos(),
+                subscriptionGroups = database.subscriptionGroupDao().getAllGroupsOnce(),
                 likedVideos = likedVideosRepo.getAllLikedVideos().first(),
                 settings = mergedSettings
             )
@@ -866,6 +916,11 @@ class BackupRepository(private val context: Context) {
             backupData.videos?.forEach { database.videoDao().insertVideoOrIgnore(it) }
             backupData.playlists?.forEach { database.playlistDao().insertPlaylist(it) }
             backupData.playlistVideos?.forEach { database.playlistDao().insertPlaylistVideoCrossRef(it) }
+            backupData.subscriptionGroups?.let { groups ->
+                if (groups.isNotEmpty()) {
+                    database.subscriptionGroupDao().insertAll(groups)
+                }
+            }
         }
         backupData.settings?.let { settings ->
             playerPreferences.restoreData(settings)
@@ -886,6 +941,19 @@ class BackupRepository(private val context: Context) {
                     }
                 }
             }
+        }
+    }
+
+    private fun toNewPipeChannelUrl(channelId: String): String {
+        val value = channelId.trim()
+        return when {
+            value.startsWith("http://", ignoreCase = true) || value.startsWith("https://", ignoreCase = true) -> value
+            value.startsWith("@") -> "https://www.youtube.com/$value"
+            value.startsWith("channel/") -> "https://www.youtube.com/$value"
+            value.startsWith("user/") -> "https://www.youtube.com/$value"
+            value.startsWith("c/") -> "https://www.youtube.com/$value"
+            value.startsWith("UC") -> "https://www.youtube.com/channel/$value"
+            else -> "https://www.youtube.com/channel/$value"
         }
     }
 
@@ -957,6 +1025,7 @@ class BackupRepository(private val context: Context) {
                 playlists = database.playlistDao().getAllPlaylists().first(),
                 playlistVideos = database.playlistDao().getAllPlaylistVideoCrossRefs(),
                 videos = database.videoDao().getAllVideos(),
+                subscriptionGroups = database.subscriptionGroupDao().getAllGroupsOnce(),
                 likedVideos = likedVideosRepo.getAllLikedVideos().first(),
                 settings = mergedSettings
             )
