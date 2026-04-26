@@ -19,6 +19,7 @@ import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorFilter
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
@@ -50,6 +51,15 @@ fun FlowSplashScreen(
     onAnimationFinished: () -> Unit
 ) {
     val context = LocalContext.current
+    val colorScheme = MaterialTheme.colorScheme
+    val textColor = colorScheme.onBackground
+    val loadingTrackColor = colorScheme.onBackground.copy(
+        alpha = if (colorScheme.background.luminance() < 0.5f) 0.22f else 0.12f
+    )
+    val loadingGradient = listOf(
+        colorScheme.primary,
+        colorScheme.tertiary
+    )
 
     // Detect the currently active app icon
     val activeIcon = remember {
@@ -102,7 +112,7 @@ fun FlowSplashScreen(
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .background(Color(0xFF0F0F0F)) // Deep Dark Background
+                .background(colorScheme.background)
                 .alpha(alpha.value), // Controls the fade out
             contentAlignment = Alignment.Center
         ) {
@@ -118,13 +128,13 @@ fun FlowSplashScreen(
                             .scale(scale.value)
                             .size(90.dp)
                             .clip(RoundedCornerShape(24.dp))
-                            .background(MaterialTheme.colorScheme.secondaryContainer),
+                            .background(colorScheme.secondaryContainer),
                         contentAlignment = Alignment.Center
                     ) {
                         Image(
                             painter = painterResource(id = activeIcon.drawableRes),
                             contentDescription = "Flow Logo",
-                            colorFilter = ColorFilter.tint(MaterialTheme.colorScheme.onSecondaryContainer),
+                            colorFilter = ColorFilter.tint(colorScheme.onSecondaryContainer),
                             modifier = Modifier.fillMaxSize(0.72f)
                         )
                     }
@@ -143,7 +153,7 @@ fun FlowSplashScreen(
                 // 2. The Text (Optional)
                 Text(
                     text = "Flow",
-                    color = Color.White,
+                    color = textColor,
                     fontSize = 26.sp,
                     fontWeight = FontWeight.Bold,
                     letterSpacing = 1.sp,
@@ -162,7 +172,7 @@ fun FlowSplashScreen(
                     .width(180.dp)
                     .height(4.dp)
                     .clip(CircleShape)
-                    .background(Color(0xFF333333)) // Dark Track
+                    .background(loadingTrackColor)
             ) {
                 Box(
                     modifier = Modifier
@@ -170,12 +180,8 @@ fun FlowSplashScreen(
                         .fillMaxWidth(lineProgress.value) // The growing animation
                         .clip(CircleShape)
                         .background(
-                            // UNIQUE TOUCH: A gradient line instead of flat red
                             brush = Brush.horizontalGradient(
-                                colors = listOf(
-                                    Color(0xFFFF0000), // Red
-                                    Color(0xFFFF8A80)  // Lighter Red/Pink tip
-                                )
+                                colors = loadingGradient
                             )
                         )
                 )

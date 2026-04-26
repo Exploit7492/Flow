@@ -45,6 +45,7 @@ import androidx.activity.SystemBarStyle
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.runBlocking
 
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
@@ -107,6 +108,8 @@ class MainActivity : ComponentActivity() {
         }
 
         val dataManager = LocalDataManager(applicationContext)
+        val initialThemeMode = runBlocking { dataManager.themeMode.first() }
+        val initialCustomThemeColors = runBlocking { dataManager.customThemeColors.first() }
 
         handleIntent(intent)
 
@@ -118,8 +121,8 @@ class MainActivity : ComponentActivity() {
 
         setContent {
             val scope = rememberCoroutineScope()
-            var themeMode by remember { mutableStateOf(ThemeMode.LIGHT) }
-            var customThemeColors by remember { mutableStateOf(CustomThemeColors.default()) }
+            var themeMode by remember { mutableStateOf(initialThemeMode) }
+            var customThemeColors by remember { mutableStateOf(initialCustomThemeColors) }
             // State to control splash visibility
             var showSplash by remember { mutableStateOf(true) }
 

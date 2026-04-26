@@ -175,6 +175,9 @@ class PlayerPreferences(private val context: Context) {
         // Video card inline like/dislike action buttons
         val VIDEO_CARD_ACTIONS_ENABLED = booleanPreferencesKey("video_card_actions_enabled")
 
+        // Video card mark-as-watched quick actions
+        val VIDEO_CARD_MARK_WATCHED_ENABLED = booleanPreferencesKey("video_card_mark_watched_enabled")
+
         // Show app logo icon in home screen top bar
         val SHOW_APP_LOGO_ICON = booleanPreferencesKey("show_app_logo_icon")
 
@@ -1024,6 +1027,16 @@ class PlayerPreferences(private val context: Context) {
     suspend fun setVideoCardActionsEnabled(enabled: Boolean) {
         context.playerPreferencesDataStore.edit { preferences ->
             preferences[Keys.VIDEO_CARD_ACTIONS_ENABLED] = enabled
+        }
+    }
+
+    // Video card inline mark-as-watched action controls (default off)
+    val videoCardMarkWatchedEnabled: Flow<Boolean> = context.playerPreferencesDataStore.data
+        .map { preferences -> preferences[Keys.VIDEO_CARD_MARK_WATCHED_ENABLED] ?: false }
+
+    suspend fun setVideoCardMarkWatchedEnabled(enabled: Boolean) {
+        context.playerPreferencesDataStore.edit { preferences ->
+            preferences[Keys.VIDEO_CARD_MARK_WATCHED_ENABLED] = enabled
         }
     }
 

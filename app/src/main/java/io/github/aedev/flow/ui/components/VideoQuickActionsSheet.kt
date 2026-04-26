@@ -23,6 +23,7 @@ import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.NotificationsActive
 import androidx.compose.material.icons.filled.WatchLater
 import androidx.compose.material.icons.outlined.CheckCircle
+import androidx.compose.material.icons.outlined.Visibility
 import androidx.compose.material.icons.outlined.Download
 import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.outlined.NotificationsNone
@@ -345,7 +346,7 @@ fun VideoQuickActionsBottomSheet(
                         FlowMenuItemData(
                             icon = {
                                 Icon(
-                                    if (isWatched) Icons.Filled.CheckCircle else Icons.Outlined.CheckCircle,
+                                    if (isWatched) Icons.Filled.CheckCircle else Icons.Outlined.Visibility,
                                     null,
                                     tint = if (isWatched) MaterialTheme.colorScheme.primary
                                     else MaterialTheme.colorScheme.onSurfaceVariant

@@ -20,6 +20,7 @@ import androidx.compose.material.icons.filled.PlayCircle
 import androidx.compose.material.icons.outlined.ThumbDown
 import androidx.compose.material.icons.outlined.ThumbUp
 import androidx.compose.material.icons.outlined.AutoFixHigh
+import androidx.compose.material.icons.outlined.Visibility
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
@@ -506,7 +507,12 @@ fun VideoCardFullWidth(
     val displayTitle = deArrowResultFullWidth?.title ?: video.title
     val displayThumbnailUrl = deArrowResultFullWidth?.thumbnailUrl ?: video.thumbnailUrl
     val videoCardActionsEnabledFW by playerPrefsFullWidth.videoCardActionsEnabled.collectAsState(initial = false)
+    val videoCardMarkWatchedEnabledFW by playerPrefsFullWidth.videoCardMarkWatchedEnabled.collectAsState(initial = false)
     val quickActionsVmFW: QuickActionsViewModel = hiltViewModel()
+    val watchedVideoIdsFW by quickActionsVmFW.watchedVideoIds.collectAsState()
+    val isWatchedFW = remember(watchedVideoIdsFW, watchProgress, video.id) {
+        watchedVideoIdsFW.contains(video.id) || (watchProgress ?: 0f) >= 0.99f
+    }
 
     val interactionSource = remember { MutableInteractionSource() }
     Column(
@@ -673,58 +679,98 @@ fun VideoCardFullWidth(
             }
         }
 
-        // Like / Dislike action buttons
-        if (videoCardActionsEnabledFW) {
-            Row(
+        // Video card quick actions (like/dislike/mark watched)
+        if (videoCardActionsEnabledFW || videoCardMarkWatchedEnabledFW) {
+            Column(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = 12.dp)
                     .padding(bottom = 10.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                verticalArrangement = Arrangement.spacedBy(6.dp)
             ) {
-                Row(
-                    modifier = Modifier
-                        .weight(1f)
-                        .clip(RoundedCornerShape(8.dp))
-                        .clickable { quickActionsVmFW.markAsInteresting(video) }
-                        .padding(horizontal = 8.dp, vertical = 8.dp),
-                    horizontalArrangement = Arrangement.Center,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Icon(
-                        Icons.Outlined.ThumbUp,
-                        contentDescription = stringResource(R.string.i_like_this),
-                        modifier = Modifier.size(16.dp),
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    Spacer(modifier = Modifier.width(6.dp))
-                    Text(
-                        text = stringResource(R.string.i_like_this),
-                        style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
+                if (videoCardActionsEnabledFW) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .weight(1f)
+                                .clip(RoundedCornerShape(8.dp))
+                                .clickable { quickActionsVmFW.markAsInteresting(video) }
+                                .padding(horizontal = 8.dp, vertical = 8.dp),
+                            horizontalArrangement = Arrangement.Center,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(
+                                Icons.Outlined.ThumbUp,
+                                contentDescription = stringResource(R.string.i_like_this),
+                                modifier = Modifier.size(16.dp),
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(
+                                text = stringResource(R.string.i_like_this),
+                                style = MaterialTheme.typography.labelMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                        Row(
+                            modifier = Modifier
+                                .weight(1f)
+                                .clip(RoundedCornerShape(8.dp))
+                                .clickable { quickActionsVmFW.markNotInterested(video) }
+                                .padding(horizontal = 8.dp, vertical = 8.dp),
+                            horizontalArrangement = Arrangement.Center,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(
+                                Icons.Outlined.ThumbDown,
+                                contentDescription = stringResource(R.string.not_interested),
+                                modifier = Modifier.size(16.dp),
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(
+                                text = stringResource(R.string.not_interested),
+                                style = MaterialTheme.typography.labelMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
                 }
-                Row(
-                    modifier = Modifier
-                        .weight(1f)
-                        .clip(RoundedCornerShape(8.dp))
-                        .clickable { quickActionsVmFW.markNotInterested(video) }
-                        .padding(horizontal = 8.dp, vertical = 8.dp),
-                    horizontalArrangement = Arrangement.Center,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Icon(
-                        Icons.Outlined.ThumbDown,
-                        contentDescription = stringResource(R.string.not_interested),
-                        modifier = Modifier.size(16.dp),
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    Spacer(modifier = Modifier.width(6.dp))
-                    Text(
-                        text = stringResource(R.string.not_interested),
-                        style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
+
+                if (videoCardMarkWatchedEnabledFW) {
+                    val watchedTint = if (isWatchedFW) {
+                        MaterialTheme.colorScheme.primary
+                    } else {
+                        MaterialTheme.colorScheme.onSurfaceVariant
+                    }
+
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(8.dp))
+                            .clickable {
+                                if (!isWatchedFW) quickActionsVmFW.markAsWatched(video)
+                            }
+                            .padding(horizontal = 8.dp, vertical = 8.dp),
+                        horizontalArrangement = Arrangement.Center,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            Icons.Outlined.Visibility,
+                            contentDescription = stringResource(R.string.mark_as_watched),
+                            modifier = Modifier.size(16.dp),
+                            tint = watchedTint
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(
+                            text = stringResource(R.string.mark_as_watched),
+                            style = MaterialTheme.typography.labelMedium,
+                            color = watchedTint
+                        )
+                    }
                 }
             }
         }
@@ -770,6 +816,12 @@ fun CompactVideoCard(
         initialValue = null, key1 = video.id, key2 = deArrowEnabledCompact
     ) {
         value = if (deArrowEnabledCompact) DeArrowRepository.getDeArrowResult(video.id) else null
+    }
+    val videoCardMarkWatchedEnabledCompact by playerPrefsCompact.videoCardMarkWatchedEnabled.collectAsState(initial = false)
+    val quickActionsVmCompact: QuickActionsViewModel = hiltViewModel()
+    val watchedVideoIdsCompact by quickActionsVmCompact.watchedVideoIds.collectAsState()
+    val isWatchedCompact = remember(watchedVideoIdsCompact, watchProgress, video.id) {
+        watchedVideoIdsCompact.contains(video.id) || (watchProgress ?: 0f) >= 0.99f
     }
     val displayTitle = deArrowResultCompact?.title ?: video.title
     val displayThumbnailUrl = deArrowResultCompact?.thumbnailUrl ?: video.thumbnailUrl
@@ -910,19 +962,38 @@ fun CompactVideoCard(
             )
         }
 
-        // More options button
-        IconButton(
-            onClick = { showQuickActions = true },
-            modifier = Modifier
-                .size(24.dp)
-                .align(Alignment.Top)
+        Column(
+            modifier = Modifier.align(Alignment.Top),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(4.dp)
         ) {
-            Icon(
-                imageVector = Icons.Default.MoreVert,
-                contentDescription = "More options",
-                tint = MaterialTheme.colorScheme.onBackground,
-                modifier = Modifier.size(16.dp)
-            )
+            IconButton(
+                onClick = { showQuickActions = true },
+                modifier = Modifier.size(24.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Default.MoreVert,
+                    contentDescription = "More options",
+                    tint = MaterialTheme.colorScheme.onBackground,
+                    modifier = Modifier.size(16.dp)
+                )
+            }
+
+            if (videoCardMarkWatchedEnabledCompact) {
+                IconButton(
+                    onClick = {
+                        if (!isWatchedCompact) quickActionsVmCompact.markAsWatched(video)
+                    },
+                    modifier = Modifier.size(24.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Outlined.Visibility,
+                        contentDescription = stringResource(R.string.mark_as_watched),
+                        tint = if (isWatchedCompact) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onBackground,
+                        modifier = Modifier.size(16.dp)
+                    )
+                }
+            }
         }
     }
     

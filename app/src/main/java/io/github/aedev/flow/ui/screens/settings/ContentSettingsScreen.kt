@@ -22,6 +22,7 @@ import androidx.compose.material.icons.outlined.ViewAgenda
 import androidx.compose.material.icons.outlined.Explore
 import androidx.compose.material.icons.outlined.ViewQuilt
 import androidx.compose.material.icons.outlined.VisibilityOff
+import androidx.compose.material.icons.outlined.Visibility
 import androidx.compose.material.icons.outlined.ThumbUp
 import androidx.compose.material.icons.outlined.Title
 import androidx.compose.material3.*
@@ -80,6 +81,7 @@ fun ContentSettingsScreen(
     val showRegionPickerInExplore by preferences.showRegionPickerInExplore.collectAsState(initial = true)
     val videoTitleMaxLines by preferences.videoTitleMaxLines.collectAsState(initial = 1)
     val videoCardActionsEnabled by preferences.videoCardActionsEnabled.collectAsState(initial = false)
+    val videoCardMarkWatchedEnabled by preferences.videoCardMarkWatchedEnabled.collectAsState(initial = false)
     
     Scaffold(
         topBar = {
@@ -266,7 +268,7 @@ fun ContentSettingsScreen(
                 SectionHeader(text = stringResource(R.string.content_settings_header_content_components))
                 SettingsGroup {
                     SettingsSwitchItem(
-                        icon = Icons.Outlined.ViewQuilt,
+                        icon = androidx.compose.ui.graphics.vector.ImageVector.vectorResource(id = R.drawable.ic_shorts),
                         title = stringResource(R.string.settings_subs_shorts_shelf_title),
                         subtitle = stringResource(R.string.settings_subs_shorts_shelf_subtitle),
                         checked = isShortsShelfEnabled,
@@ -278,7 +280,7 @@ fun ContentSettingsScreen(
                     )
                     HorizontalDivider(Modifier.padding(start = 56.dp), color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
                     SettingsSwitchItem(
-                        icon = Icons.Outlined.DesktopWindows,
+                        icon = androidx.compose.ui.graphics.vector.ImageVector.vectorResource(id = R.drawable.ic_shorts),
                         title = stringResource(R.string.settings_home_shorts_shelf_title),
                         subtitle = stringResource(R.string.settings_home_shorts_shelf_subtitle),
                         checked = isHomeShortsShelfEnabled,
@@ -357,6 +359,18 @@ fun ContentSettingsScreen(
                         onCheckedChange = { enabled ->
                             coroutineScope.launch {
                                 preferences.setVideoCardActionsEnabled(enabled)
+                            }
+                        }
+                    )
+                    HorizontalDivider(Modifier.padding(start = 56.dp), color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
+                    SettingsSwitchItem(
+                        icon = Icons.Outlined.Visibility,
+                        title = stringResource(R.string.content_settings_video_card_mark_watched_title),
+                        subtitle = stringResource(R.string.content_settings_video_card_mark_watched_subtitle),
+                        checked = videoCardMarkWatchedEnabled,
+                        onCheckedChange = { enabled ->
+                            coroutineScope.launch {
+                                preferences.setVideoCardMarkWatchedEnabled(enabled)
                             }
                         }
                     )

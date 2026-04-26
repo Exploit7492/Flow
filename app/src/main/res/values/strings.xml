@@ -600,6 +600,8 @@
     <string name="content_settings_title_lines_unlimited">No limit</string>
     <string name="content_settings_video_card_actions_title">Video card like &amp; dislike buttons</string>
     <string name="content_settings_video_card_actions_subtitle">Show thumbs up / thumbs down buttons on video cards to quickly tune your recommendations</string>
+    <string name="content_settings_video_card_mark_watched_title">Video card mark as watched button</string>
+    <string name="content_settings_video_card_mark_watched_subtitle">Show an eye button on full and compact video cards to quickly mark videos as watched</string>
     <string name="content_settings_show_app_logo_title">Show app logo icon</string>
     <string name="content_settings_show_app_logo_subtitle">Display the Flow logo icon next to the app name in the home screen top bar</string>
     <string name="content_settings_header_content_components">Content Components</string>

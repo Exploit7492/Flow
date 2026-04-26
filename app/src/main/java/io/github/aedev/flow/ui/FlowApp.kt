@@ -1,5 +1,6 @@
 package io.github.aedev.flow.ui
 
+import android.app.Activity
 import androidx.compose.animation.*
 import androidx.compose.animation.core.FastOutLinearInEasing
 import androidx.compose.animation.core.FastOutSlowInEasing
@@ -8,17 +9,22 @@ import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
 import androidx.compose.ui.input.nestedscroll.NestedScrollSource
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.graphics.toArgb
+import androidx.core.view.WindowCompat
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.compose.NavHost
@@ -63,6 +69,11 @@ fun FlowApp(
     val playerUiStateResult = playerViewModel.uiState.collectAsStateWithLifecycle()
     val playerUiState by playerUiStateResult
     val playerState by EnhancedPlayerManager.getInstance().playerState.collectAsStateWithLifecycle()
+
+    ApplyStatusBarStyle(
+        themeMode = currentTheme,
+        isFullscreen = playerUiState.isFullscreen
+    )
     
     val preferences = remember { io.github.aedev.flow.data.local.PlayerPreferences(context) }
     val isShortsNavigationEnabled by preferences.shortsNavigationEnabled.collectAsState(initial = true)
@@ -476,4 +487,38 @@ fun FlowApp(
             )
     )
   } 
+}
+
+@Composable
+private fun ApplyStatusBarStyle(
+    themeMode: ThemeMode,
+    isFullscreen: Boolean
+) {
+    val activity = LocalContext.current as? Activity ?: return
+    val view = LocalView.current
+    val colorScheme = MaterialTheme.colorScheme
+    val isDarkTheme = when (themeMode) {
+        ThemeMode.LIGHT,
+        ThemeMode.MINT_LIGHT,
+        ThemeMode.ROSE_LIGHT,
+        ThemeMode.SKY_LIGHT,
+        ThemeMode.CREAM_LIGHT -> false
+
+        ThemeMode.SYSTEM -> isSystemInDarkTheme()
+
+        else -> true
+    }
+
+    SideEffect {
+        val window = activity.window
+        val insetsController = WindowCompat.getInsetsController(window, view)
+
+        window.statusBarColor = if (isFullscreen) {
+            android.graphics.Color.TRANSPARENT
+        } else {
+            colorScheme.background.toArgb()
+        }
+
+        insetsController.isAppearanceLightStatusBars = !isDarkTheme && !isFullscreen
+    }
 }
