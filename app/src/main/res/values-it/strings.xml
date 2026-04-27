@@ -319,7 +319,7 @@
     <string name="settings_item_theme">Tema</string>
     <string name="settings_item_app_icon">Icona app</string>
     <string name="settings_item_app_icon_subtitle">Personalizza l\'icona del launcher</string>
-    <string name="settings_item_content_prefs">Preferenze dei contenuti</string>
+    <string name="settings_item_content_prefs">Preferenze contenuti</string>
     <string name="settings_item_content_prefs_subtitle">Blocca gli argomenti che non vuoi vedere</string>
     <string name="settings_item_player">Impostazioni player</string>
     <string name="settings_item_player_subtitle">Riproduzione automatica, riproduzione in background, SponsorBlock</string>
@@ -738,7 +738,7 @@
     <string name="deep_flow_mode_title">Modalità Deep Flow</string>
     <string name="deep_flow_learning_paused">APPRENDIMENTO SOSPESO</string>
     <string name="deep_flow_expires_in">Scade tra %s</string>
-    <string name="deep_flow_expire_duration_title">Disabilita automaticamente dopo</string>
+    <string name="deep_flow_expire_duration_title">Sospensione automatica</string>
     <string name="deep_flow_expire_duration_subtitle">L\'apprendimento riprenderà automaticamente dopo %s</string>
     <string name="deep_flow_dialog_title">Durata sospensione</string>
     <string name="deep_flow_dialog_body">Per quanto tempo deve stare sospeso l\'apprendimento?</string>
