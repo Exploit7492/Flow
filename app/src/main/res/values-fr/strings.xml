@@ -899,7 +899,7 @@
     <string name="deep_flow_expire_duration_title">Désactivation automatique après</string>
     <string name="deep_flow_expire_duration_subtitle">L\'apprentissage reprend automatiquement après %s</string>
     <string name="deep_flow_dialog_title">Durée de la pause</string>
-    <string name="deep_flow_dialog_body">Combien de temps l\'apprentissage devrait-il rester en pause ?</string>
+    <string name="deep_flow_dialog_body">Combien de temps l\'apprentissage devrait-il rester en pause ?</string>
     <string name="deep_flow_duration_1h">1 heure</string>
     <string name="deep_flow_duration_2h">2 heures</string>
     <string name="deep_flow_duration_4h">4 heures</string>
@@ -933,7 +933,7 @@
     <string name="appearance_customize_theme">Personnalisation du Thème</string>
     <string name="appearance_customizer_title">Éditeur de Thèmes Personnalisés</string>
     <string name="appearance_customizer_subtitle">Définissez chaque rôle à l\'aide de valeurs hexadécimales et prévisualisez instantanément</string>
-    <string name="appearance_customizer_format_hint">Format hexadécimal : #RRGGBB ou #AARRGGBB</string>
+    <string name="appearance_customizer_format_hint">Format hexadécimal : #RRGGBB ou #AARRGGBB</string>
     <string name="appearance_customizer_reset">Réinitialiser</string>
     <string name="appearance_customizer_save">Sauvegarder le Thème</string>
     <string name="appearance_role_primary">Primaire</string>
