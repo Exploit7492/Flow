@@ -471,8 +471,6 @@
     <plurals name="subscriptions_last_refreshed_template">
         <item quantity="other">上次重新整理：%1$s－已檢查 %2$d 部影片</item>
     </plurals>
-    <plurals name="download_all_confirmation">
-    </plurals>
     <string name="subscriptions_failed_channels_more">%1$s 及另外 %2$d 個頻道</string>
     <string name="streamed_date_template">於 %1$s 串流播放</string>
     <string name="channel_and_more_template">%1$s 及另外 %2$d 個頻道</string>
