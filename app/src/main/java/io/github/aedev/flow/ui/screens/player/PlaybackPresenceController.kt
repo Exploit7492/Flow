@@ -55,7 +55,7 @@ internal class PlaybackPresenceController(
     fun armNotificationFor(video: Video) =
         playerManager.startBackgroundService(
             videoId = video.id,
-            title = video.title.ifEmpty { "Flow Player" },
+            title = video.title.ifEmpty { "YouTube-X Player" },
             channel = video.channelName,
             thumbnail = video.thumbnailUrl,
         )

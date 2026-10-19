@@ -8,8 +8,8 @@ private const val NEW_ISSUE_URL = "https://github.com/Flow-Tube/Flow/issues/new"
 private const val APP_PACKAGE = "io.github.aedev.flow"
 private const val MAX_URL_LOG_CHARS = 1_500
 private const val MAX_URL_ACTUAL_CHARS = 300
-private const val UNKNOWN_STEPS = "Not known. Flow crashed during normal use; the stack trace is under Logs."
-private const val EXPECTED = "Flow keeps running."
+private const val UNKNOWN_STEPS = "Not known. YouTube-X crashed during normal use; the stack trace is under Logs."
+private const val EXPECTED = "YouTube-X keeps running."
 private const val TOP_FRAMES = 6
 private val ReportTime: DateTimeFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss.SSS")
 
@@ -77,7 +77,7 @@ fun CrashSummary.issueUrl(): String {
             device?.let { "device" to it },
             "steps" to UNKNOWN_STEPS,
             "expected" to EXPECTED,
-            "actual" to "Flow crashed with $error".take(MAX_URL_ACTUAL_CHARS),
+            "actual" to "YouTube-X crashed with $error".take(MAX_URL_ACTUAL_CHARS),
             "logs" to log,
         )
     return NEW_ISSUE_URL + "?" +

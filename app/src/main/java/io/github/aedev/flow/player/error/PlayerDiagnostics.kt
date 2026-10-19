@@ -215,7 +215,7 @@ object PlayerDiagnostics {
         return try {
             val report = buildReport(context)
             val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-            val clip = ClipData.newPlainText("Flow Player Diagnostics", report)
+            val clip = ClipData.newPlainText("YouTube-X Player Diagnostics", report)
             clipboard.setPrimaryClip(clip)
             Log.i(TAG, "Diagnostics copied to clipboard (${report.length} chars)")
             true

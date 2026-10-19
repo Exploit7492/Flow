@@ -167,7 +167,7 @@ object EnhancedMusicPlayerManager {
     private val _repeatMode = MutableStateFlow(RepeatMode.OFF)
     val repeatMode: StateFlow<RepeatMode> = _repeatMode.asStateFlow()
 
-    private val _playingFrom = MutableStateFlow("Flow Music")
+    private val _playingFrom = MutableStateFlow("YouTube-X Music")
     val playingFrom: StateFlow<String> = _playingFrom.asStateFlow()
 
     private val _isLiked = MutableStateFlow(false)
@@ -1110,7 +1110,7 @@ object EnhancedMusicPlayerManager {
         _currentQueueIndex.value = 0
         clearPendingPlayNext()
         _currentPosition.value = 0L
-        _playingFrom.value = "Flow Music"
+        _playingFrom.value = "YouTube-X Music"
         _playerState.value = MusicPlayerState()
     }
 

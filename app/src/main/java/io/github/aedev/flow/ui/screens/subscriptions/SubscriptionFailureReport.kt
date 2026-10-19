@@ -17,7 +17,7 @@ internal fun buildSubscriptionFailureReport(
     sessionLogs: String,
 ): String =
     buildString {
-        appendLine("Flow — subscription refresh failure")
+        appendLine("YouTube-X — subscription refresh failure")
         appendLine("=".repeat(60))
         appendLine()
         append(deviceInfo)

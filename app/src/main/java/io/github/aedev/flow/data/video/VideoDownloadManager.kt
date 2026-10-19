@@ -86,8 +86,11 @@ class VideoDownloadManager
     ) {
         companion object {
             private const val TAG = "VideoDownloadManager"
-            const val VIDEO_DIR = "Flow"
-            const val AUDIO_DIR = "Flow"
+            const val VIDEO_DIR = "YouTube-X"
+            const val AUDIO_DIR = "YouTube-X"
+
+            /** Folders earlier builds wrote to; still read so their downloads are not orphaned. */
+            const val LEGACY_DIR = "Flow"
             private const val STAGING_DIR = "staging"
             private const val INTERNAL_DIR = "downloads"
 

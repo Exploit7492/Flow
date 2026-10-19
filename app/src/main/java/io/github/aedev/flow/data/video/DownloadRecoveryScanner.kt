@@ -13,6 +13,7 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import io.github.aedev.flow.data.local.PlayerPreferences
 import io.github.aedev.flow.data.local.dao.DownloadDao
 import io.github.aedev.flow.data.local.entity.DownloadItemStatus
+import io.github.aedev.flow.data.video.VideoDownloadManager.Companion.LEGACY_DIR
 import io.github.aedev.flow.data.video.VideoDownloadManager.Companion.VIDEO_DIR
 import io.github.aedev.flow.data.video.downloader.tags.DownloadTagReader
 import io.github.aedev.flow.data.video.storage.DownloadCovers
@@ -96,8 +97,10 @@ class DownloadRecoveryScanner
         private fun defaultFolders(): List<File> =
             buildList {
                 listOf(Environment.DIRECTORY_DOWNLOADS, Environment.DIRECTORY_MOVIES, Environment.DIRECTORY_MUSIC).forEach { type ->
-                    runCatching { add(File(Environment.getExternalStoragePublicDirectory(type), VIDEO_DIR)) }
-                    context.getExternalFilesDir(type)?.let { add(File(it, VIDEO_DIR)) }
+                    listOf(VIDEO_DIR, LEGACY_DIR).forEach { dir ->
+                        runCatching { add(File(Environment.getExternalStoragePublicDirectory(type), dir)) }
+                        context.getExternalFilesDir(type)?.let { add(File(it, dir)) }
+                    }
                 }
             }
 
