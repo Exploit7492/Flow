@@ -18,6 +18,7 @@ import io.github.aedev.flow.data.model.ShortLinkedVideo
 import io.github.aedev.flow.data.model.ShortVideo
 import io.github.aedev.flow.data.model.Video
 import io.github.aedev.flow.data.model.toVideo
+import io.github.aedev.flow.data.recommendation.BlockedChannelNames
 import io.github.aedev.flow.data.recommendation.FlowNeuroEngine
 import io.github.aedev.flow.data.recommendation.InteractionType
 import io.github.aedev.flow.data.repository.YouTubeRepository
@@ -43,6 +44,7 @@ import io.github.aedev.flow.innertube.models.response.PlayerResponse
 import io.github.aedev.flow.innertube.pages.VideoCommentSort
 import io.github.aedev.flow.innertube.pages.reel.ReelOverlay
 import io.github.aedev.flow.player.stream.StreamSizeEstimator
+import io.github.aedev.flow.utils.OriginalTextPolicy
 import io.github.aedev.flow.utils.PerformanceDispatcher
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
@@ -71,6 +73,7 @@ class ShortsViewModel
         private val queueFactory: ShortsQueueLoaderFactory,
         private val playerPreferences: PlayerPreferences,
         private val videoStats: VideoStatsRecorder,
+        private val blockedNames: BlockedChannelNames,
     ) : ViewModel() {
         private val _uiState = MutableStateFlow(ShortsUiState())
         val uiState: StateFlow<ShortsUiState> = _uiState.asStateFlow()
@@ -305,7 +308,8 @@ class ShortsViewModel
         fun loadShortDetails(videoId: String) {
             viewModelScope.launch(PerformanceDispatcher.networkIO) {
                 val overlay = runCatching { metadata.overlayFor(videoId) }.getOrNull() ?: return@launch
-                enrich(videoId) { it.withOverlay(overlay) }
+                val preferOriginal = playerPreferences.originalTitles.first()
+                enrich(videoId) { it.withOverlay(overlay, preferOriginal) }
             }
         }
 
@@ -342,9 +346,10 @@ class ShortsViewModel
                 publishQueue()
                 return
             }
+            val preferOriginal = playerPreferences.originalTitles.first()
             enrich(videoId) { short ->
                 short.copy(
-                    title = details.title.ifBlank { short.title },
+                    title = OriginalTextPolicy.streamTitle(details.title, short.title, preferOriginal).orEmpty(),
                     channelName = details.channelName.ifBlank { short.channelName },
                     channelId = details.channelId.ifBlank { short.channelId },
                     viewCount = details.viewCount ?: short.viewCount,
@@ -353,9 +358,13 @@ class ShortsViewModel
             }
         }
 
-        private fun ShortVideo.withOverlay(overlay: ReelOverlay): ShortVideo =
+        /** The overlay is translated like any list, `/player` is not, and the switch picks one (#1230). */
+        private fun ShortVideo.withOverlay(
+            overlay: ReelOverlay,
+            preferOriginal: Boolean,
+        ): ShortVideo =
             copy(
-                title = title.ifBlank { overlay.title.orEmpty() },
+                title = OriginalTextPolicy.streamTitle(title, overlay.title, preferOriginal).orEmpty(),
                 channelName = channelName.ifBlank { overlay.channelName.orEmpty() },
                 channelId = channelId.ifBlank { overlay.channelId.orEmpty() },
                 channelThumbnailUrl = overlay.channelAvatarUrl ?: channelThumbnailUrl,
@@ -531,13 +540,17 @@ class ShortsViewModel
         fun blockChannel(short: ShortVideo) {
             viewModelScope.launch(PerformanceDispatcher.networkIO) {
                 try {
-                    val channelId = short.channelId
+                    // A handle in place of the channel id would block a key no feed matches.
+                    val metadata = if (short.channelId.startsWith("UC")) null else repository.getLiveWatchMetadata(short.id)
+                    val channelId = metadata?.channelId.orEmpty().ifBlank { short.channelId }
                     check(channelId.isNotBlank()) { context.getString(R.string.channel_metadata_unavailable) }
+                    val channelName = metadata?.channelName.orEmpty().ifBlank { short.channelName }
                     FlowNeuroEngine.blockChannel(context, channelId)
+                    blockedNames.remember(channelId, channelName)
                     videoStats.onAction(LedgerAction.BLOCK_CHANNEL)
                     dropChannel(channelId)
                     FeedInvalidationBus.emit(FeedInvalidationBus.Event.ChannelBlocked(channelId, short.id))
-                    _snackbarMessage.value = context.getString(R.string.channel_blocked_toast, short.channelName)
+                    _snackbarMessage.value = context.getString(R.string.channel_blocked_toast, channelName)
                 } catch (e: Exception) {
                     Log.e(TAG, "Error blocking channel", e)
                     _snackbarMessage.value = context.getString(R.string.quick_actions_error_template, e.message)

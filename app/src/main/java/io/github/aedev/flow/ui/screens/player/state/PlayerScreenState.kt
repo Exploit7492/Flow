@@ -31,7 +31,8 @@ class PlayerScreenState {
     internal var activeSheet by mutableStateOf<PlayerSheet>(PlayerSheet.None)
 
     // The tablet side column's own show/hide toggle, not a sheet: it survives a sheet dismissal.
-    var showLiveChatPanel by mutableStateOf(true)
+    // Closed until tapped, because an open column is a running poll (#1042).
+    var showLiveChatPanel by mutableStateOf(false)
 
     // Comment Sorting
     var commentSortFilter by mutableStateOf(CommentSortFilter.TOP)
@@ -42,11 +43,16 @@ class PlayerScreenState {
     var volumeLevel by mutableFloatStateOf(0.5f)
     var showBrightnessOverlay by mutableStateOf(false)
     var showVolumeOverlay by mutableStateOf(false)
+    var showSpeedSwipeOverlay by mutableStateOf(false)
+    var speedSwipeLevel by mutableFloatStateOf(1.0f)
 
     // Seek Animation States
     var showSeekForwardAnimation by mutableStateOf(false)
     var seekAccumulation by mutableIntStateOf(10)
     var showSeekBackAnimation by mutableStateOf(false)
+
+    /** A tap just lifted and the double-tap timeout is still running. */
+    var isTapWindowOpen by mutableStateOf(false)
 
     // Subtitle States
     var subtitleStyle by mutableStateOf(SubtitleStyle())
@@ -89,12 +95,13 @@ class PlayerScreenState {
         selectedTranscriptUrl = null
         showBrightnessOverlay = false
         showVolumeOverlay = false
+        showSpeedSwipeOverlay = false
         showSeekBackAnimation = false
         showSeekForwardAnimation = false
         hasShownShortsPrompt = false
         showShortsPrompt = false
         activeSheet = PlayerSheet.None
-        showLiveChatPanel = true
+        showLiveChatPanel = false
         zoomScale = 1f
         zoomOffsetX = 0f
         zoomOffsetY = 0f
@@ -143,6 +150,8 @@ class PlayerScreenState {
     fun revealLockOverlay() {
         lockOverlayRevealSignal++
     }
+
+    fun playbackFraction(): Float = if (duration > 0) (currentPosition.toFloat() / duration.toFloat()).coerceIn(0f, 1f) else 0f
 }
 
 @Composable

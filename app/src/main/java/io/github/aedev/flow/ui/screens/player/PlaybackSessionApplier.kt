@@ -129,29 +129,9 @@ internal class PlaybackSessionApplier(
         }
     }
 
-    /**
-     * The same request answers both counts.
-     *
-     * Its like count is only adopted when the watch page withheld one, which is what a creator who
-     * hides likes leaves behind: the response carries an `unset_like_count_entity_key` and nothing
-     * else, and the screen was showing that as a flat zero.
-     */
-    fun startDislikeLoad(load: LoadContext) {
-        scope.launch(networkDispatcher) {
-            if (playerPreferences.rytdEnabled.first()) {
-                val counts = withTimeoutOrNull(5000L) { repository.returnYouTubeDislikeCounts(load.videoId) }
-                if (counts == null || !isLoadCurrent(load.token)) return@launch
-                uiState.update { state ->
-                    val cached = state.cachedVideo?.takeIf { it.id == load.videoId } ?: return@update state
-                    val likes = counts.likes?.takeIf { it > 0L && cached.likeCount <= 0L }
-                    state.copy(
-                        dislikeCount = counts.dislikes ?: state.dislikeCount,
-                        cachedVideo = likes?.let { cached.copy(likeCount = it) } ?: cached,
-                    )
-                }
-            }
-        }
-    }
+    private val dislikeCounts = DislikeCountLoader(uiState, isLoadCurrent, repository, playerPreferences, scope, networkDispatcher)
+
+    fun startDislikeLoad(load: LoadContext) = dislikeCounts.start(load)
 
     suspend fun prepareLocalMedia(
         load: LoadContext,
@@ -495,7 +475,7 @@ internal class PlaybackSessionApplier(
         }
     }
 
-    /** Folded into the tags the engine ingests, so the watch signal carries it. */
+    /** Kept on the video, so the watch signal carries it. */
     private fun applyCategory(result: SecondaryMetadata.Category) {
         if (!isLoadCurrent(result.loadToken)) return
         if (PlaybackSpeedPolicy.isMusic(musicVideoType = null, category = result.category, openedAsMusic = false)) {
@@ -504,8 +484,8 @@ internal class PlaybackSessionApplier(
 
         uiState.update { state ->
             val cached = state.cachedVideo?.takeIf { it.id == result.videoId } ?: return@update state
-            if (result.category in cached.tags) return@update state
-            state.copy(cachedVideo = cached.copy(tags = cached.tags + result.category))
+            if (cached.category == result.category) return@update state
+            state.copy(cachedVideo = cached.copy(category = result.category))
         }
 
         uiState.value.cachedVideo
@@ -543,6 +523,21 @@ internal class PlaybackSessionApplier(
                 enabled = autoplay,
             )
             uiState.update { it.applyRelatedVideos(videoId, videos) }
+        }
+        noteRelatedForLearning(videoId, videos)
+    }
+
+    /** Hands the related list to the engine, which keeps it only if this video is then watched or liked. */
+    private fun noteRelatedForLearning(
+        videoId: String,
+        videos: List<Video>,
+    ) {
+        scope.launch(ioDispatcher) {
+            try {
+                FlowNeuroEngine.noteRelated(context, videoId, videos)
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to note related videos", e)
+            }
         }
     }
 

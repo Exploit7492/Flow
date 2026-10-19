@@ -130,6 +130,18 @@ internal object NeuroScoring {
     const val RELEVANCE_FLOOR_SEVERE_PENALTY = 0.15
     const val RELEVANCE_FLOOR_MODERATE_PENALTY = 0.40
 
+    /** Long-form videos skipped in a row before the feed gets an extra exploration slot. */
+    const val BOREDOM_SKIPS = 5
+
+    /** Topic overlap a Home lane needs from a candidate: below it the video shares nothing with your taste. */
+    const val LANE_RELEVANCE_FLOOR = 0.02
+
+    // Below this specificity-weighted overlap a video shares nothing but common words with the viewer (#907).
+    const val UNRELATED_SIMILARITY = 0.002
+
+    // A channel the viewer has taken to more than once; one click on a padded card moves it to only 0.525 (#907).
+    const val KNOWN_CHANNEL_SCORE = 0.6
+
     const val EXPLORATION_MIN_SCORE_RATIO = 0.30
 
     // ── Feed History Constants ──
@@ -199,6 +211,9 @@ internal object NeuroScoring {
 
     /** A "~" pattern counts once a second rejection repeats it. */
     private const val REJECTION_REPEATED = 1.5
+
+    /** Words these lists compare keys with; key spec 2 never stems them ([NeuroStemmer]). */
+    internal val CURATED_WORDS: Set<String> get() = REJECTION_BROAD_TOPICS + MUSIC_KEYWORDS
 
     private val REJECTION_BROAD_TOPICS =
         hashSetOf(
@@ -385,7 +400,8 @@ internal object NeuroScoring {
         val views = video.viewCount
         val likes = video.likeCount
 
-        if (views < ENGAGEMENT_MIN_VIEWS || likes < 0) return 1.0
+        // Search, related and feed lists carry no like count, so 0 means unknown, not a clickbait ratio (#907).
+        if (views < ENGAGEMENT_MIN_VIEWS || likes <= 0) return 1.0
 
         val rate = likes.toDouble() / views.toDouble()
 
@@ -1070,6 +1086,25 @@ internal object NeuroScoring {
     }
 
     /**
+     * Candidates that share a topic with [user] or come from a channel the viewer subscribes to or
+     * has taken to, so a lane cannot fill its slots with videos that have nothing to do with the
+     * viewer (#907). A thin lane stays thin: Home looks for more on the viewer's subjects instead.
+     */
+    fun keepRelevant(
+        candidates: List<Pair<Video, ContentVector>>,
+        user: NeuroVectorMath.PreparedVector,
+        minRelevance: Double,
+        userSubs: Set<String>,
+        channelScores: Map<String, Double>,
+        specificity: ((String) -> Double)? = null,
+    ): List<Pair<Video, ContentVector>> {
+        fun knownChannel(channelId: String) = channelId in userSubs || (channelScores[channelId] ?: 0.0) >= KNOWN_CHANNEL_SCORE
+        return candidates.filter { (video, vector) ->
+            knownChannel(video.channelId) || NeuroVectorMath.topicSimilarity(user, vector, specificity) >= minRelevance
+        }
+    }
+
+    /**
      * Cluster-diversified seed pick with PROGRESSIVE fill: pass 1 takes at most
      * one seed per cluster (spread-first, so with community-mapped keys each
      * major interest gets a related seed before any interest gets two); later
@@ -1079,6 +1114,7 @@ internal object NeuroScoring {
         seeds: List<SeedRank>,
         maxSeeds: Int,
         maxPerCluster: Int,
+        capOf: (String) -> Int = { maxPerCluster },
     ): List<String> {
         val sortedSeeds = seeds.sortedByDescending { it.weight }
         val out = LinkedHashSet<String>()
@@ -1088,7 +1124,7 @@ internal object NeuroScoring {
                 if (out.size >= maxSeeds) return out.toList()
                 if (s.id in out) continue
                 val count = perCluster[s.clusterKey] ?: 0
-                if (count >= allowed) continue
+                if (count >= minOf(allowed, capOf(s.clusterKey))) continue
                 out.add(s.id)
                 perCluster[s.clusterKey] = count + 1
             }
@@ -1217,11 +1253,11 @@ internal object NeuroScoring {
 
         val personalityScore =
             if (video.isShort && brain.shortsVector.topics.isNotEmpty()) {
-                val globalSim = NeuroVectorMath.calculateCosineSimilarity(p.preparedGlobal, videoVector)
+                val globalSim = NeuroVectorMath.calculateCosineSimilarity(p.preparedTaste, videoVector)
                 val shortsSim = NeuroVectorMath.calculateCosineSimilarity(p.preparedShorts, videoVector)
                 globalSim * 0.4 + shortsSim * 0.6
             } else {
-                NeuroVectorMath.calculateCosineSimilarity(p.preparedGlobal, videoVector)
+                NeuroVectorMath.calculateCosineSimilarity(p.preparedTaste, videoVector)
             }
         val contextScore = NeuroVectorMath.calculateCosineSimilarity(p.preparedContext, videoVector)
         // Smooth ramp instead of a cliff at the gate: two near-identical candidates
@@ -1243,7 +1279,11 @@ internal object NeuroScoring {
 
         if (brain.topicAffinities.isNotEmpty()) totalScore += affinityBoost(videoVector, p)
 
+        totalScore += NeuroFormats.scoreTerm(brain.formatAffinity, videoVector.formats)
+
         totalScore += calculateChannelSignal(video, brain, p.userSubs)
+
+        totalScore += (p.coWatchPrior[video.channelId] ?: 0.0) * FlowNeuroEngine.COWATCH_MAX_PRIOR
 
         totalScore += calculateSerendipity(noveltyScore, contextScore)
 
@@ -1263,6 +1303,8 @@ internal object NeuroScoring {
                 else -> ageMultiplier
             }
         totalScore *= finalAgeFactor
+
+        totalScore *= categoryFactor(video, videoVector, p, isSub)
 
         totalScore +=
             calculateCuriosityBonus(
@@ -1332,13 +1374,41 @@ internal object NeuroScoring {
         return totalScore
     }
 
+    /** A soft category mismatch ([NeuroCategories]); subscriptions and picked topics are exempt. */
+    private fun categoryFactor(
+        video: Video,
+        videoVector: ContentVector,
+        p: ScoringParams,
+        isSub: Boolean,
+    ): Double {
+        if (isSub || p.lemmatizedPreferred.any { it in videoVector.topics }) return 1.0
+        val category =
+            NeuroCategories.idOf(video.category)?.let { ChannelCategory(it, 1.0) }
+                ?: p.categoryOf(video.channelId)
+                ?: return 1.0
+        return NeuroCategories.factor(p.brain.categoryAffinity, category)
+    }
+
     /**
-     * Smart diversity re-ranking across channels and topics.
+     * Smart diversity re-ranking across channels and topics. With [dropUnrelated] a video [isUnrelated]
+     * calls unrelated is left out; otherwise it waits for the relaxed fill.
      */
     fun applySmartDiversity(
         candidates: MutableList<ScoredVideo>,
         tokenizer: NeuroTokenizer,
+        extraExplorationSlots: Int = 0,
+        isUnrelated: (ScoredVideo) -> Boolean = { false },
+        trace: RankTrace? = null,
+        dropUnrelated: Boolean = false,
     ): List<Video> {
+        fun placed(
+            scored: ScoredVideo,
+            phase: DiversityPhase,
+        ) {
+            if (trace == null) return
+            trace.phases[scored.video.id] = phase
+            if (isUnrelated(scored)) trace.unrelated += scored.video.id
+        }
         val finalPlaylist = mutableListOf<Video>()
         val channelWindow = mutableListOf<String>()
         val topicWindow = mutableListOf<String>()
@@ -1369,7 +1439,7 @@ internal object NeuroScoring {
                 topicDiversity <= 2 -> 2
                 topicDiversity <= 4 -> 2
                 else -> 1
-            }
+            } + extraExplorationSlots
 
         val userTopTopics =
             candidates
@@ -1432,7 +1502,10 @@ internal object NeuroScoring {
                     maxPerTopic
                 }
 
+            // A slot among the first is never a prize for being from a new channel alone: a video that
+            // shares nothing with the viewer waits for the relaxed fill, after the ones that do (#907).
             if (channelCount == 0 &&
+                !isUnrelated(current) &&
                 topicCount < effectiveTopicCap &&
                 !isTitleSimilar
             ) {
@@ -1442,6 +1515,7 @@ internal object NeuroScoring {
                     topicWindow.add(primaryTopic)
                 }
                 if (qualifiesForExploration) explorationCount++
+                placed(current, if (qualifiesForExploration) DiversityPhase.EXPLORATION else DiversityPhase.STRICT)
                 phase1Iterator.remove()
             } else if (topScore > 0 &&
                 current.score > (topScore * 0.8)
@@ -1470,8 +1544,9 @@ internal object NeuroScoring {
                         NeuroVectorMath.calculateTitleSimilarity(tokens1, tokens2) >
                             TITLE_SIMILARITY_RELAXED
                     }
-            if (channelOk && titleOk) {
+            if (channelOk && titleOk && !(dropUnrelated && isUnrelated(scored))) {
                 finalPlaylist.add(scored.video)
+                placed(scored, DiversityPhase.DEFERRED)
             }
         }
 
@@ -1494,8 +1569,9 @@ internal object NeuroScoring {
                         NeuroVectorMath.calculateTitleSimilarity(tokens1, tokens2) >
                             TITLE_SIMILARITY_RELAXED
                     }
-            if (!channelSpam && !titleSimilar) {
+            if (!channelSpam && !titleSimilar && !(dropUnrelated && isUnrelated(scored))) {
                 finalPlaylist.add(scored.video)
+                placed(scored, DiversityPhase.RELAXED)
             }
         }
 

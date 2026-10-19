@@ -35,6 +35,7 @@ enum class SettingsDestination(
     QUALITY("quality", R.string.quality),
     CONTENT("content", R.string.settings_content_title),
     MUSIC_HOME("music_home", R.string.settings_music_home_title, CONTENT),
+    LIBRARY("library", R.string.library, CONTENT),
     TOPICS("topics", R.string.settings_topics_title),
     INTEGRATIONS("integrations", R.string.settings_integrations_title),
     SCROBBLING("scrobbling", R.string.scrobbling_title, INTEGRATIONS),
@@ -47,6 +48,7 @@ enum class SettingsDestination(
     NETWORK("network", R.string.settings_network_title),
     WELLBEING("wellbeing", R.string.settings_wellbeing_title),
     ABOUT("about", R.string.settings_item_about_flow),
+    REMOTE_GUIDE("remote_guide", R.string.tv_remote_guide_title, ABOUT),
     DIAGNOSTICS("diagnostics", R.string.settings_item_diagnostics),
     ;
 

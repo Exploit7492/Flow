@@ -1,6 +1,9 @@
 package io.github.aedev.flow.ui.screens.settings.home
 
 import androidx.compose.runtime.Immutable
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.res.stringResource
 import io.github.aedev.flow.BuildConfig
 import io.github.aedev.flow.R
@@ -11,8 +14,10 @@ import io.github.aedev.flow.ui.components.settings.SettingsListScope
 import io.github.aedev.flow.ui.components.settings.SettingsTarget
 import io.github.aedev.flow.ui.components.settings.nav
 import io.github.aedev.flow.ui.components.settings.switch
+import io.github.aedev.flow.ui.components.shared.DeepFlowState
 import io.github.aedev.flow.ui.components.shared.FlowNavRow
 import io.github.aedev.flow.ui.components.shared.FlowSwitchRow
+import io.github.aedev.flow.ui.components.shared.deepFlowStatus
 import io.github.aedev.flow.ui.screens.settings.index.DestinationIndex
 import io.github.aedev.flow.ui.screens.settings.index.HomeIndex
 
@@ -23,6 +28,8 @@ internal data class SettingsHomeState(
     val deepFlow: DeepFlowState,
     /** Shown on the update row while a check the user started is running; null when idle. */
     val updateCheckingLabel: String?,
+    /** Attached to the [selected] page's row, so a host can return focus to it. */
+    val selectedRowFocus: FocusRequester? = null,
 )
 
 internal class SettingsHomeActions(
@@ -32,6 +39,7 @@ internal class SettingsHomeActions(
     val onDurationClick: () -> Unit,
     val onSaveHistoryChange: (Boolean) -> Unit,
     val onScrobbleChange: (Boolean) -> Unit,
+    val onShowOnSearchChange: (Boolean) -> Unit,
     val onCheckForUpdates: () -> Unit,
 )
 
@@ -45,6 +53,7 @@ internal fun SettingsListScope.homeContent(
             persona = state.persona,
             selected = state.selected == SettingsDestination.TASTE,
             onOpen = { actions.onOpen(SettingsTarget(SettingsDestination.TASTE)) },
+            modifier = state.selectedFocusModifier(SettingsDestination.TASTE),
         )
     }
 
@@ -55,6 +64,7 @@ internal fun SettingsListScope.homeContent(
             icon = destinationIcon(destination),
             selected = state.selected == destination,
             showChevron = state.selected == null,
+            modifier = state.selectedFocusModifier(destination),
         )
 
     group(key = "home.engine", header = R.string.settings_flow_engine_header) {
@@ -88,6 +98,12 @@ internal fun SettingsListScope.homeContent(
             checked = state.deepFlow.scrobble,
             onCheckedChange = actions.onScrobbleChange,
             icon = HomeRowIcons.DeepFlowScrobble,
+        )
+        switch(
+            HomeIndex.deepFlowOnSearch,
+            checked = state.deepFlow.showOnSearch,
+            onCheckedChange = actions.onShowOnSearchChange,
+            icon = HomeRowIcons.DeepFlowOnSearch,
         )
         page(SettingsDestination.TOPICS)
     }
@@ -129,3 +145,6 @@ internal fun SettingsListScope.homeContent(
         nav(HomeIndex.support, onClick = actions.onOpenDonations, icon = HomeRowIcons.Support)
     }
 }
+
+private fun SettingsHomeState.selectedFocusModifier(destination: SettingsDestination): Modifier =
+    selectedRowFocus?.takeIf { selected == destination }?.let { Modifier.focusRequester(it) } ?: Modifier

@@ -28,7 +28,7 @@ import io.github.aedev.flow.ui.components.settings.SettingsPage
 import io.github.aedev.flow.ui.components.settings.SettingsTarget
 import io.github.aedev.flow.ui.components.shared.FlowAlertDialog
 import io.github.aedev.flow.ui.components.shared.FlowLoadingIndicator
-import io.github.aedev.flow.ui.screens.settings.home.deepFlowStatus
+import io.github.aedev.flow.ui.components.shared.deepFlowStatus
 import kotlinx.coroutines.launch
 import java.time.LocalDate
 
@@ -85,6 +85,11 @@ internal fun TasteScreen(
         rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri -> start(uri, viewModel::importMusicProfile) }
     val hiddenLabel = hiddenCountLabel(state.hidden.count)
     val noQueriesLabel = stringResource(R.string.diagnostics_engine_queries_none)
+    val startersLabel =
+        state.engine
+            ?.starters
+            ?.takeIf { it.isNotEmpty() }
+            ?.let { stringResource(R.string.taste_starter_searches_detail, it.joinToString(", ")) }
     val pausedLabel = stringResource(R.string.taste_learning_paused)
     val pausedStatus = deepFlowStatus(deepFlow)
 
@@ -119,7 +124,7 @@ internal fun TasteScreen(
             item("taste.loading") { FlowLoadingIndicator(Modifier.fillMaxWidth().height(LoadingHeight)) }
         } else {
             pausedStatus?.let { learningPaused(pausedLabel, it) }
-            tasteContent(state, hiddenLabel, noQueriesLabel, actions)
+            tasteContent(state, hiddenLabel, noQueriesLabel, startersLabel, actions)
         }
     }
 

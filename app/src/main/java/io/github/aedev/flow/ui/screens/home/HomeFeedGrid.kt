@@ -24,6 +24,7 @@ import io.github.aedev.flow.ui.components.shared.FlowFeedProgress
 import io.github.aedev.flow.ui.components.shared.MediaShortsShelf
 import io.github.aedev.flow.ui.components.shared.card.MediaVideoCard
 import io.github.aedev.flow.ui.components.shared.card.VideoCardLayout
+import io.github.aedev.flow.ui.components.shared.dpadFocusGroup
 import io.github.aedev.flow.ui.components.shared.feedStripCardWidth
 import io.github.aedev.flow.ui.components.shared.rememberFeedGridPlan
 
@@ -46,16 +47,19 @@ internal fun HomeFeedGrid(
     onShortsShown: (ids: List<String>) -> Unit,
     onRefresh: () -> Unit,
     modifier: Modifier = Modifier,
+    onRetryLoadMore: () -> Unit = {},
+    footerMinVideos: Int = FEED_FOOTER_MIN_VIDEOS,
+    showShorts: Boolean = true,
 ) {
     val videos = uiState.videos
     val channelMemoryReason = stringResource(R.string.home_reason_channel_memory)
     val rows =
-        remember(videos, feedLayout.columns, uiState.continueWatchingVideos.isNotEmpty(), uiState.shorts.isNotEmpty()) {
+        remember(videos, feedLayout.columns, uiState.continueWatchingVideos.isNotEmpty(), showShorts && uiState.shorts.isNotEmpty()) {
             homeFeedRows(
                 videos = videos,
                 columns = feedLayout.columns,
                 showContinueWatching = uiState.continueWatchingVideos.isNotEmpty(),
-                showShorts = uiState.shorts.isNotEmpty(),
+                showShorts = showShorts && uiState.shorts.isNotEmpty(),
             )
         }
     val plan =
@@ -75,6 +79,7 @@ internal fun HomeFeedGrid(
         modifier =
             modifier
                 .fillMaxSize()
+                .dpadFocusGroup()
                 .testTag("home_feed"),
         state = gridState,
         contentPadding = plan.contentPadding(top = FeedTopPadding, bottom = flowBottomContentPadding()),
@@ -95,9 +100,10 @@ internal fun HomeFeedGrid(
                         video = row.video,
                         layout = if (plan.isListCard(index)) VideoCardLayout.Row else VideoCardLayout.Stacked,
                         onClick = { onVideoClick(row.video) },
-                        useInternalPadding = !feedLayout.isCompact,
+                        useInternalPadding = !feedLayout.cardsBleed,
                         thumbnailWidth = plan.listThumbnailWidth,
-                        reason = if (row.video.id in uiState.channelMemoryVideoIds) channelMemoryReason else null,
+                        reason = channelMemoryReason.takeIf { uiState.origins[row.video.id]?.kind == HomeCardOrigin.Kind.CHANNEL_MEMORY },
+                        whyShown = uiState.origins[row.video.id]?.label(),
                         modifier = Modifier.testTag("home_video_card"),
                     )
                 }
@@ -138,7 +144,16 @@ internal fun HomeFeedGrid(
             }
         }
 
-        if (!uiState.hasMorePages && videos.size > FEED_FOOTER_MIN_VIDEOS && !uiState.isLoadingMore) {
+        if (uiState.loadMoreFailed && !uiState.isLoadingMore) {
+            item(
+                key = "load_more_failed",
+                span = { GridItemSpan(maxLineSpan) },
+            ) {
+                HomeLoadMoreFailed(onRetry = onRetryLoadMore)
+            }
+        }
+
+        if (!uiState.hasMorePages && videos.size > footerMinVideos && !uiState.isLoadingMore) {
             item(
                 key = "feed_footer",
                 span = { GridItemSpan(maxLineSpan) },

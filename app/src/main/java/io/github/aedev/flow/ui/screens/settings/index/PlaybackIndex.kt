@@ -180,6 +180,21 @@ internal object PlaybackIndex {
             section = R.string.player_appearance_gestures_header,
             destination = page,
         )
+    val speedSwipe =
+        SettingEntry(
+            key = "playback.speed_swipe",
+            title = R.string.player_settings_speed_swipe,
+            keywords = R.string.settings_keywords_gestures,
+            section = R.string.player_appearance_gestures_header,
+            destination = page,
+        )
+    val speedSwipeStep =
+        SettingEntry(
+            key = "playback.speed_swipe_step",
+            title = R.string.player_settings_speed_swipe_step,
+            section = R.string.player_appearance_gestures_header,
+            destination = page,
+        )
     val seekGesture =
         SettingEntry(
             key = "playback.seek_gesture",
@@ -278,6 +293,15 @@ internal object PlaybackIndex {
             section = R.string.settings_section_player_buttons,
             destination = page,
         )
+    val nextPrevButtons =
+        SettingEntry(
+            key = "playback.next_prev_buttons",
+            title = R.string.player_settings_overlay_next_prev,
+            summary = R.string.player_settings_overlay_next_prev_subtitle,
+            keywords = R.string.settings_keywords_next_prev,
+            section = R.string.settings_section_player_buttons,
+            destination = page,
+        )
     val autoPip =
         SettingEntry(
             key = "playback.auto_pip",
@@ -371,6 +395,14 @@ internal object PlaybackIndex {
             key = "playback.comments_preview",
             title = R.string.content_settings_comments_preview_title,
             summary = R.string.content_settings_comments_preview_subtitle,
+            section = R.string.settings_section_watch_page,
+            destination = page,
+        )
+    val liveChat =
+        SettingEntry(
+            key = "playback.live_chat",
+            title = R.string.content_settings_live_chat_enabled_title,
+            summary = R.string.content_settings_live_chat_enabled_subtitle,
             section = R.string.settings_section_watch_page,
             destination = page,
         )
@@ -477,6 +509,8 @@ internal object PlaybackIndex {
             rememberBrightness,
             volumeGesture,
             volumeBoost,
+            speedSwipe,
+            speedSwipeStep,
             seekGesture,
             haptics,
             controlsWhileLoading,
@@ -489,6 +523,7 @@ internal object PlaybackIndex {
             speedIndicator,
             commentsButton,
             sponsorBlockButton,
+            nextPrevButtons,
             autoPip,
             continueWatchingMiniPlayer,
             restoreMusicMiniPlayer,
@@ -501,6 +536,7 @@ internal object PlaybackIndex {
             titleLines,
             comments,
             commentsPreview,
+            liveChat,
             disableShortsPlayer,
             shortsPlayerPrompt,
             shortsPlaybackMode,

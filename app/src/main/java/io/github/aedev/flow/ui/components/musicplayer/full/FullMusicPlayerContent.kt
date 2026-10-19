@@ -23,7 +23,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.min
@@ -36,8 +35,7 @@ import io.github.aedev.flow.player.SleepTimerManager
 import io.github.aedev.flow.ui.components.layout.navigation.LocalMediaNavigator
 import io.github.aedev.flow.ui.components.music.sheet.MusicQuickActionsSheet
 import io.github.aedev.flow.ui.components.music.sheet.SaveSongSheet
-import io.github.aedev.flow.ui.components.musicplayer.common.SkipDirection
-import io.github.aedev.flow.ui.components.musicplayer.controls.PlayerPlaybackControls
+import io.github.aedev.flow.ui.components.musicplayer.common.PlayerBackdropColors
 import io.github.aedev.flow.ui.components.musicplayer.controls.PlayerProgressSlider
 import io.github.aedev.flow.ui.components.musicplayer.lyrics.DEFAULT_LYRICS_TEXT_SIZE
 import io.github.aedev.flow.ui.components.musicplayer.lyrics.LARGE_LYRICS_TEXT_SIZE
@@ -50,7 +48,9 @@ import io.github.aedev.flow.ui.components.musicplayer.queue.queuePullUpGesture
 import io.github.aedev.flow.ui.components.musicplayer.queue.rememberQueuePullUpState
 import io.github.aedev.flow.ui.components.musicplayer.sheet.AudioSettingsSheet
 import io.github.aedev.flow.ui.components.shared.MediaPalette
+import io.github.aedev.flow.ui.components.shared.MediaPlaybackControls
 import io.github.aedev.flow.ui.components.shared.MediaSleepTimerSheet
+import io.github.aedev.flow.ui.components.shared.SkipDirection
 import io.github.aedev.flow.ui.screens.music.MusicPlayerViewModel
 import io.github.aedev.flow.ui.screens.music.MusicVideoSwitchViewModel
 import io.github.aedev.flow.ui.screens.music.sharedMusicPlayerViewModel
@@ -63,8 +63,10 @@ internal fun FullMusicPlayerContent(
     track: MusicTrack,
     isPlayerSheetExpanded: Boolean,
     palette: MediaPalette,
+    backdrop: PlayerBackdropColors,
     backgroundStyle: MusicPlayerBackgroundStyle,
     hideArtwork: Boolean,
+    sleepTimerButton: Boolean,
     // The transport, seek bar, like and download and the action row draw with this scheme.
     controlScheme: ColorScheme = MaterialTheme.colorScheme,
     viewModel: MusicPlayerViewModel = sharedMusicPlayerViewModel(),
@@ -72,7 +74,6 @@ internal fun FullMusicPlayerContent(
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val positionState = viewModel.currentPositionMs.collectAsState()
-    val context = LocalContext.current
     val density = LocalDensity.current
     val colorScheme = MaterialTheme.colorScheme
     val navigator = LocalMediaNavigator.current
@@ -117,13 +118,6 @@ internal fun FullMusicPlayerContent(
             player = musicPlayer,
         ) {
             EnhancedMusicPlayerManager.player?.pause()
-        }
-    }
-
-    LaunchedEffect(Unit) {
-        SleepTimerManager.attachExitCallback {
-            EnhancedMusicPlayerManager.stop()
-            (context as? android.app.Activity)?.finishAndRemoveTask()
         }
     }
 
@@ -330,7 +324,7 @@ internal fun FullMusicPlayerContent(
                 },
                 controls = { modifier ->
                     MaterialTheme(colorScheme = controlScheme) {
-                        PlayerPlaybackControls(
+                        MediaPlaybackControls(
                             isPlaying = uiState.isPlaying,
                             isBuffering = uiState.isBuffering && isPlayerSheetExpanded,
                             onPreviousClick = { viewModel.skipToPrevious() },
@@ -355,6 +349,8 @@ internal fun FullMusicPlayerContent(
                             onMoreClick = { showMoreOptions = true },
                             modifier = modifier,
                             queueActive = isWide && sidePaneTab == PlayerSidePaneTab.UP_NEXT,
+                            sleepTimerActive = SleepTimerManager.isActive,
+                            onSleepTimerClick = if (sleepTimerButton) ({ showSleepTimer = true }) else null,
                         )
                     }
                 },
@@ -363,8 +359,7 @@ internal fun FullMusicPlayerContent(
         PlayerBackground(
             thumbnailUrl = backgroundThumbnailUrl,
             style = backgroundStyle,
-            paletteBaseColor = palette.base,
-            paletteAccentColor = palette.accent,
+            backdrop = backdrop,
             artworkAtStart = layout == MusicPlayerLayout.WIDE || layout == MusicPlayerLayout.SPLIT,
             animatedArtwork = animatedArtwork.takeIf { immersiveBackground },
         )

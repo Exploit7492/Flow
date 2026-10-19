@@ -22,6 +22,7 @@ import io.github.aedev.flow.ui.components.layout.flowBottomContentPadding
 import io.github.aedev.flow.ui.components.shared.FeedGridSkeleton
 import io.github.aedev.flow.ui.components.shared.FlowEmptyState
 import io.github.aedev.flow.ui.components.shared.FlowErrorState
+import io.github.aedev.flow.ui.components.shared.dpadFocusGroup
 import io.github.aedev.flow.ui.screens.home.HomeFeedGrid
 import io.github.aedev.flow.ui.screens.home.HomeUiState
 
@@ -46,7 +47,7 @@ internal fun HomeChipContent(
             FeedGridSkeleton(
                 layout = feedLayout,
                 listMode = isListView,
-                stackedInset = !feedLayout.isCompact,
+                stackedInset = !feedLayout.cardsBleed,
                 placeholderCount = SKELETON_CARDS,
                 compactRowSpacing = if (isListView) 0.dp else feedLayout.cardSpacing,
                 modifier = modifier,
@@ -107,7 +108,7 @@ private fun HomeMixGrid(
     LazyVerticalGrid(
         columns = feedLayout.cells,
         state = gridState,
-        modifier = modifier.fillMaxSize(),
+        modifier = modifier.fillMaxSize().dpadFocusGroup(),
         contentPadding =
             PaddingValues(
                 start = feedLayout.contentPadding,

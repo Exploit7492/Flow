@@ -3,6 +3,7 @@ package io.github.aedev.flow.ui.screens.settings.region
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Language
 import androidx.compose.material.icons.outlined.Public
+import androidx.compose.material.icons.outlined.Title
 import androidx.compose.material.icons.outlined.Translate
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -18,6 +19,7 @@ import io.github.aedev.flow.R
 import io.github.aedev.flow.data.local.CONTENT_LANGUAGE_FOLLOW_APP
 import io.github.aedev.flow.ui.components.settings.SettingsPage
 import io.github.aedev.flow.ui.components.settings.nav
+import io.github.aedev.flow.ui.components.settings.switch
 import io.github.aedev.flow.ui.components.shared.FlowChoice
 import io.github.aedev.flow.ui.components.shared.FlowChoiceDialog
 import io.github.aedev.flow.ui.screens.settings.index.LanguageRegionIndex
@@ -81,6 +83,12 @@ internal fun LanguageRegionScreen(
                 showChevron = false,
                 onClick = { dialog = LanguageRegionDialog.CONTENT_COUNTRY },
             )
+            switch(
+                LanguageRegionIndex.originalTitles,
+                state = viewModel.originalTitles,
+                onCheckedChange = viewModel::setOriginalTitles,
+                icon = Icons.Outlined.Title,
+            )
         }
     }
 
@@ -102,7 +110,7 @@ internal fun LanguageRegionScreen(
                 selected = normalizedAppLanguage,
                 onSelect = { tag ->
                     viewModel.setAppLanguage(tag).invokeOnCompletion {
-                        AppLanguageManager.activityContext(context)?.recreate()
+                        if (!AppLanguageManager.systemStoresLanguage) AppLanguageManager.activityContext(context)?.recreate()
                     }
                 },
                 onDismiss = { dialog = null },

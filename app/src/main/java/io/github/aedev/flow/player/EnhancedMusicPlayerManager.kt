@@ -6,7 +6,6 @@ import android.net.Uri
 import android.util.Log
 import androidx.annotation.OptIn
 import androidx.media3.common.MediaItem
-import androidx.media3.common.MediaMetadata
 import androidx.media3.common.PlaybackParameters
 import androidx.media3.common.Player
 import androidx.media3.common.util.UnstableApi
@@ -69,6 +68,15 @@ object EnhancedMusicPlayerManager {
         _radioLoading.value = loading
     }
 
+    private val _radioStationActive = MutableStateFlow(false)
+
+    /** A radio the user started by name: it outruns the endless-radio setting, for this session only. */
+    val radioStationActive: StateFlow<Boolean> = _radioStationActive.asStateFlow()
+
+    fun setRadioStationActive(active: Boolean) {
+        _radioStationActive.value = active
+    }
+
     private var appContext: Context? = null
 
     private val _playerInstance = MutableStateFlow<Player?>(null)
@@ -88,6 +96,9 @@ object EnhancedMusicPlayerManager {
 
     // Persistence
     private var queuePersistence: QueuePersistence? = null
+
+    /** The restored track and where it stopped, used once by the next play of that same track. */
+    private var resumePosition: Pair<String, Long>? = null
     private var audioSettingsPersistence: AudioSettingsPersistence? = null
 
     // Audio Settings State
@@ -361,6 +372,8 @@ object EnhancedMusicPlayerManager {
                 }
             _currentTrack.value = track
             _currentQueueIndex.value = resolvedIndex.coerceAtLeast(0)
+        } else {
+            adoptPlayerQueue(controller)
         }
         if (
             pendingPlayNextMediaId == trackId &&
@@ -371,6 +384,22 @@ object EnhancedMusicPlayerManager {
         ) {
             clearPendingPlayNext()
         }
+    }
+
+    /**
+     * The app sets its queue before it hands the player any item, so an item it does not know was
+     * loaded by someone else, such as the car (#1221). The player's items become the queue, so the
+     * app shows, saves and extends what is actually playing.
+     */
+    private fun adoptPlayerQueue(controller: Player) {
+        val adopted = adoptedQueue((0 until controller.mediaItemCount).map(controller::getMediaItemAt))
+        if (adopted.isEmpty()) return
+        val index = controller.currentMediaItemIndex.coerceIn(0, adopted.lastIndex)
+        Log.d("EnhancedMusicPlayer", "Adopting a queue of ${adopted.size} the app did not set")
+        _queue.value = adopted
+        _currentQueueIndex.value = index
+        _currentTrack.value = adopted[index]
+        triggerQueueSave()
     }
 
     private fun enforcePendingPlayNext(
@@ -479,28 +508,7 @@ object EnhancedMusicPlayerManager {
         track: MusicTrack,
         uri: Uri = streamUri(track.videoId),
         useCacheKey: Boolean = !LocalMediaIds.isLocal(track.videoId),
-    ): MediaItem {
-        val builder =
-            MediaItem
-                .Builder()
-                .setUri(uri)
-                .setMediaId(track.videoId)
-                .setMediaMetadata(
-                    MediaMetadata
-                        .Builder()
-                        .setTitle(track.title)
-                        .setArtist(track.artist)
-                        .setArtworkUri(Uri.parse(track.highResThumbnailUrl))
-                        .build(),
-                )
-
-        if (useCacheKey) {
-            builder.setCustomCacheKey(track.videoId)
-        }
-
-        return builder
-            .build()
-    }
+    ): MediaItem = musicMediaItem(track, uri, useCacheKey)
 
     private fun clearPendingPlayNext() {
         pendingPlayNextMediaId = null
@@ -610,9 +618,14 @@ object EnhancedMusicPlayerManager {
         sourceName: String? = null,
         localUriOverrides: Map<String, Uri> = emptyMap(),
     ) {
+        val restoredStart = resumePosition?.takeIf { (id, _) -> id == track.videoId && startPositionMs == 0L }?.second
+        resumePosition = null
         player?.stop()
         player?.clearMediaItems()
         clearPendingPlayNext()
+        // A new queue ends a named station even when it shares tracks with it, which the service
+        // would read as the same session. Start radio re-marks it from its pending seed.
+        _radioStationActive.value = false
 
         _playerState.value = _playerState.value.copy(isPreparing = false)
 
@@ -636,7 +649,7 @@ object EnhancedMusicPlayerManager {
 
         val startIdx = if (startIndex >= 0) startIndex else activeQueue.indexOfFirst { it.videoId == track.videoId }.coerceAtLeast(0)
 
-        player?.setMediaItems(mediaItems, startIdx, startPositionMs)
+        player?.setMediaItems(mediaItems, startIdx, restoredStart ?: startPositionMs)
         player?.prepare()
         player?.play()
 
@@ -766,29 +779,37 @@ object EnhancedMusicPlayerManager {
      */
     private suspend fun restoreSavedQueue() {
         try {
-            val savedState = queuePersistence?.restoreQueue() ?: return
+            val restored = queuePersistence?.restoreQueue()?.let(::restoredMusicQueue) ?: return
+            val controller = player
+            val loadedItem = controller?.currentMediaItem
+            // The system media controls may already have resumed this queue in the service.
+            val resumedBySystem = loadedItem != null && restored.queue.any { it.videoId == loadedItem.mediaId }
+            if (loadedItem != null && !resumedBySystem) return
 
-            if (savedState.queue.isEmpty()) return
+            Log.d("EnhancedMusicPlayer", "Restoring saved queue: ${restored.queue.size} tracks")
 
-            if ((player?.mediaItemCount ?: 0) > 0) return
+            _queue.value = restored.queue
+            _currentQueueIndex.value = restored.index
+            _shuffleEnabled.value = restored.shuffleEnabled
+            _automixItems.value = restored.automix
 
-            Log.d("EnhancedMusicPlayer", "Restoring saved queue: ${savedState.queue.size} tracks")
-
-            _queue.value = savedState.queue
-            _currentQueueIndex.value = savedState.currentIndex.coerceIn(0, savedState.queue.size - 1)
-            _shuffleEnabled.value = savedState.shuffleEnabled
-            _automixItems.value = savedState.automix
-
-            val currentTrack =
-                savedState.currentTrackId?.let { id ->
-                    savedState.queue.find { it.videoId == id }
-                } ?: savedState.queue.getOrNull(savedState.currentIndex)
-
-            currentTrack?.let {
+            if (controller != null && loadedItem != null) {
+                syncCurrentTrackFromMediaItem(controller, loadedItem)
+                // Already playing when this controller connected, so no change callback reports it.
+                updatePlayerState()
+                if (controller.isPlaying) startPositionUpdates()
+                return
+            }
+            restored.track?.let {
                 _currentTrack.value = it
-                if (it.duration > 0) {
-                    _playerState.value = _playerState.value.copy(duration = it.duration * 1000L)
-                }
+                _currentPosition.value = restored.resumePositionMs
+                resumePosition = it.videoId to restored.resumePositionMs
+                val state = _playerState.value
+                _playerState.value =
+                    state.copy(
+                        position = restored.resumePositionMs,
+                        duration = if (it.duration > 0) it.duration * 1000L else state.duration,
+                    )
             }
         } catch (e: Exception) {
             Log.e("EnhancedMusicPlayer", "Failed to restore queue", e)
@@ -1085,6 +1106,7 @@ object EnhancedMusicPlayerManager {
         playContextGenre = null
         pendingRadioSeedId = null
         _radioLoading.value = false
+        _radioStationActive.value = false
         _currentQueueIndex.value = 0
         clearPendingPlayNext()
         _currentPosition.value = 0L

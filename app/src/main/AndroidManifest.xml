@@ -65,8 +65,10 @@
     <application
         android:name=".FlowApplication"
         android:allowBackup="true"
+        android:backupAgent=".data.backup.FlowBackupAgent"
         android:dataExtractionRules="@xml/data_extraction_rules"
         android:fullBackupContent="@xml/backup_rules"
+        android:fullBackupOnly="true"
         android:banner="@drawable/tv_banner"
         android:icon="@mipmap/ic_launcher"
         android:label="@string/app_launcher_name"
@@ -225,9 +227,18 @@
             android:foregroundServiceType="mediaPlayback">
             <intent-filter>
                 <action android:name="androidx.media3.session.MediaSessionService"/>
-                <action android:name="android.intent.action.MEDIA_BUTTON" />
             </intent-filter>
         </service>
+
+        <!-- Media3 playback resumption: a headset's Play after Flow was killed reaches the music
+             service (the only MediaLibraryService), which resumes the saved queue. -->
+        <receiver
+            android:name="androidx.media3.session.MediaButtonReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.MEDIA_BUTTON" />
+            </intent-filter>
+        </receiver>
 
         <!-- The download queue runs as WorkManager work; its foreground service carries dataSync. -->
         <service
@@ -627,6 +638,13 @@
                 android:name="android.support.FILE_PROVIDER_PATHS"
                 android:resource="@xml/shared_file_paths" />
         </provider>
+
+        <!-- Song artwork for Android Auto, which only loads browse images from content URIs. Read access is granted to the browsing car app. -->
+        <provider
+            android:name=".service.auto.AutoArtworkProvider"
+            android:authorities="${applicationId}.auto.artwork"
+            android:exported="false"
+            android:grantUriPermissions="true" />
     </application>
 
 </manifest>

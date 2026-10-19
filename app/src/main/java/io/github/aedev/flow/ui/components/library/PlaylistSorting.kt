@@ -18,6 +18,8 @@ enum class PlaylistSortOrder(
     MOST_POPULAR("most_popular", R.string.playlist_sort_most_popular),
     DATE_PUBLISHED_NEWEST("date_published_newest", R.string.playlist_sort_date_published_newest),
     DATE_PUBLISHED_OLDEST("date_published_oldest", R.string.playlist_sort_date_published_oldest),
+    LONGEST("longest", R.string.music_sort_longest),
+    SHORTEST("shortest", R.string.music_sort_shortest),
     ;
 
     /** Rows show when each video was added only while the list is ordered by it. */
@@ -45,20 +47,21 @@ enum class PlaylistSortOrder(
     }
 }
 
+// A live stream or a row saved without its length has no duration; it sorts last by length either way.
 internal fun List<Video>.sortedForPlaylist(sortOrder: PlaylistSortOrder): List<Video> =
     when (sortOrder) {
-        PlaylistSortOrder.MANUAL,
-        PlaylistSortOrder.DATE_ADDED_NEWEST,
-        -> this
-
-        PlaylistSortOrder.DATE_ADDED_OLDEST -> asReversed()
-
+        PlaylistSortOrder.MANUAL -> this
+        PlaylistSortOrder.DATE_ADDED_NEWEST -> sortedByDateAdded()
+        PlaylistSortOrder.DATE_ADDED_OLDEST -> sortedByDateAdded().asReversed()
         PlaylistSortOrder.MOST_POPULAR -> sortedByDescending { it.viewCount }
-
         PlaylistSortOrder.DATE_PUBLISHED_NEWEST -> sortedByPublishDate(descending = true)
-
         PlaylistSortOrder.DATE_PUBLISHED_OLDEST -> sortedByPublishDate(descending = false)
+        PlaylistSortOrder.LONGEST -> sortedByDescending { it.duration }
+        PlaylistSortOrder.SHORTEST -> sortedBy { if (it.duration > 0) it.duration else Int.MAX_VALUE }
     }
+
+// Rows without an add time predate every timed one; those and any ties go by position, latest first.
+private fun List<Video>.sortedByDateAdded(): List<Video> = asReversed().sortedByDescending { it.addedAtInPlaylist ?: 0L }
 
 private fun List<Video>.sortedByPublishDate(descending: Boolean): List<Video> {
     val now = System.currentTimeMillis()

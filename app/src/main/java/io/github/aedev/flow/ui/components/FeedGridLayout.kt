@@ -14,7 +14,7 @@ import io.github.aedev.flow.ui.theme.Dimensions
  * Narrowest a grid cell may be before the grid drops a column: a 260 dp card plus the 12 dp gutter
  * the grid used to add between cells, so the counts the per-screen width tables produced survive.
  */
-private val FeedCardMinWidth = 272.dp
+val FeedCardMinWidth = 272.dp
 
 /** Widest a capped cell may grow before a very wide window adds a column anyway. */
 private val FeedCardMaxWidth = 460.dp
@@ -58,16 +58,24 @@ data class FeedGridLayout(
 ) {
     /** The width between the grid's own padding, for strips that span a whole row. */
     val rowWidth: Dp get() = cardWidth * columns
+
+    /**
+     * Whether stacked cards run edge to edge. Only a single compact column does: a compact grid has no
+     * margin, so two or three pinned columns keep each card's inset to leave a gap between them.
+     */
+    val cardsBleed: Boolean get() = isCompact && columns == 1
 }
 
 /**
  * [columnPreference] pins the count the user chose in settings; [maxAutoColumns] caps only the
- * automatic derivation.
+ * automatic derivation. [minCellWidth] is the narrowest cell before a column drops; a TV canvas,
+ * seen from across the room at 960 dp wide, fits a fourth column by passing a smaller one.
  */
 fun feedGridLayoutFor(
     maxWidth: Dp,
     columnPreference: HomeFeedColumns = HomeFeedColumns.AUTO,
     maxAutoColumns: Int = FEED_MAX_AUTO_COLUMNS,
+    minCellWidth: Dp = FeedCardMinWidth,
 ): FeedGridLayout {
     val isCompact = maxWidth < WindowSizeClass.WIDTH_DP_MEDIUM_LOWER_BOUND.dp
     val spacing =
@@ -78,7 +86,7 @@ fun feedGridLayoutFor(
         }
     val contentPadding = (spacing.margin - VideoCardDefaults.Inset).coerceAtLeast(0.dp)
     val availableWidth = (maxWidth - contentPadding * 2).coerceAtLeast(0.dp)
-    val autoColumns = if (isCompact) 1 else adaptiveColumnsFor(availableWidth)
+    val autoColumns = if (isCompact) 1 else adaptiveColumnsFor(availableWidth, minCellWidth)
     val automaticColumns = cappedColumns(availableWidth, autoColumns, maxAutoColumns)
     val columns = columnPreference.fixedCount ?: automaticColumns
     val alignedColumns = if (columns == 1 && !isCompact) automaticColumns else columns
@@ -86,7 +94,7 @@ fun feedGridLayoutFor(
         if (columnPreference.fixedCount != null || isCompact || columns < autoColumns) {
             GridCells.Fixed(columns)
         } else {
-            GridCells.Adaptive(FeedCardMinWidth)
+            GridCells.Adaptive(minCellWidth)
         }
     return FeedGridLayout(
         cells = cells,
@@ -99,8 +107,11 @@ fun feedGridLayoutFor(
     )
 }
 
-/** The count [GridCells.Adaptive] derives for [FeedCardMinWidth]: as many whole cells as fit. */
-private fun adaptiveColumnsFor(availableWidth: Dp): Int = (availableWidth / FeedCardMinWidth).toInt().coerceAtLeast(1)
+/** The count [GridCells.Adaptive] derives for [minCellWidth]: as many whole cells as fit. */
+private fun adaptiveColumnsFor(
+    availableWidth: Dp,
+    minCellWidth: Dp,
+): Int = (availableWidth / minCellWidth).toInt().coerceAtLeast(1)
 
 private fun cappedColumns(
     availableWidth: Dp,
@@ -117,7 +128,8 @@ fun rememberFeedGridLayout(
     maxWidth: Dp,
     columnPreference: HomeFeedColumns = HomeFeedColumns.AUTO,
     maxAutoColumns: Int = FEED_MAX_AUTO_COLUMNS,
+    minCellWidth: Dp = FeedCardMinWidth,
 ): FeedGridLayout =
-    remember(maxWidth, columnPreference, maxAutoColumns) {
-        feedGridLayoutFor(maxWidth, columnPreference, maxAutoColumns)
+    remember(maxWidth, columnPreference, maxAutoColumns, minCellWidth) {
+        feedGridLayoutFor(maxWidth, columnPreference, maxAutoColumns, minCellWidth)
     }

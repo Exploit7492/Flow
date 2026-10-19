@@ -122,6 +122,7 @@ class VideoPlayerViewModel
                 isLoadCurrent = { loads.isCurrent(it) },
                 currentLoadToken = { loads.token },
                 shortsEnabled = { loads.shortsEnabled },
+                originalTitles = { loads.originalTitles },
                 exclusions = { loads.exclusions },
             )
 
@@ -239,6 +240,8 @@ class VideoPlayerViewModel
                 .debounce(QUEUE_SAVE_DEBOUNCE_MS)
                 .onEach { (videos, index) -> videoQueueStore.save(videos, index, playerManager.playerState.value.queueTitle) }
                 .launchIn(viewModelScope)
+
+            playerPreferences.liveChatEnabled.onEach(liveChat::setEnabled).launchIn(viewModelScope)
 
             combine(liveChat.messages, liveChat.isLoading, liveChat.isAvailable, ::Triple)
                 .onEach { (messages, isLoading, isAvailable) ->

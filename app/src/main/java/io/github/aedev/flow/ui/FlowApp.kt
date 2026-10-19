@@ -48,6 +48,7 @@ import io.github.aedev.flow.ui.components.layout.topbar.ProvideFlowGlobalActions
 import io.github.aedev.flow.ui.components.music.common.ProvideMusicPlaybackState
 import io.github.aedev.flow.ui.components.music.sheet.LocalMusicMenus
 import io.github.aedev.flow.ui.components.music.sheet.rememberMusicMenus
+import io.github.aedev.flow.ui.components.musicplayer.common.canTurnLight
 import io.github.aedev.flow.ui.components.musicplayer.sheet.rememberMusicPlayerSheetState
 import io.github.aedev.flow.ui.components.shared.LocalMediaOpenOrigins
 import io.github.aedev.flow.ui.components.shared.MediaMiniBarDefaults
@@ -65,6 +66,7 @@ import io.github.aedev.flow.ui.theme.ThemeMode
 import io.github.aedev.flow.ui.theme.ThemeVariant
 import io.github.aedev.flow.ui.utils.LocalWindowSizeClass
 import io.github.aedev.flow.ui.utils.isMediumWidth
+import kotlinx.coroutines.flow.first
 import kotlin.math.roundToInt
 
 @UnstableApi
@@ -76,6 +78,7 @@ fun FlowApp(
     systemDarkThemeMode: ThemeMode,
     deeplinkVideoId: String? = null,
     isShort: Boolean = false,
+    isSharedLink: Boolean = false,
     openMusicPlayerRequest: Int = 0,
     onDeeplinkConsumed: () -> Unit = {},
     pendingRoute: String? = null,
@@ -104,6 +107,7 @@ fun FlowApp(
     val musicPlayerBackgroundStyle by preferences.musicPlayerBackgroundStyle.collectAsState(
         initial = io.github.aedev.flow.data.local.MusicPlayerBackgroundStyle.BLUR_GRADIENT,
     )
+    val musicPlayerFollowLightTheme by preferences.musicPlayerFollowLightTheme.collectAsState(initial = false)
     val navTabOrder by preferences.navTabOrder.collectAsState(initial = io.github.aedev.flow.data.local.DEFAULT_NAV_TAB_ORDER)
     val defaultNavTabIndex by preferences.defaultNavTabIndex.collectAsState(initial = 0)
     val subscriptionRefreshOnStartup by preferences.subscriptionRefreshOnStartup.collectAsState(initial = false)
@@ -138,10 +142,20 @@ fun FlowApp(
     var needsOnboarding by remember { mutableStateOf<Boolean?>(null) }
 
     LaunchedEffect(Unit) {
-        FlowNeuroEngine.initialize(context)
         DeepFlowManager.initialize(context)
         val bypass = activity?.intent?.getBooleanExtra(MainActivity.EXTRA_BENCHMARK_BYPASS_ONBOARDING, false) == true
-        needsOnboarding = if (bypass) false else FlowNeuroEngine.needsOnboarding()
+        // A viewer who is past onboarding never waits for the engine here; everyone else asks it (#1301).
+        needsOnboarding =
+            when {
+                bypass || preferences.onboardingDone.first() -> {
+                    false
+                }
+
+                else -> {
+                    FlowNeuroEngine.initialize(context)
+                    FlowNeuroEngine.needsOnboarding().also { preferences.setOnboardingDone(!it) }
+                }
+            }
         onStartDestinationKnown()
     }
 
@@ -151,10 +165,11 @@ fun FlowApp(
         subscriptionRefreshOnStartup = subscriptionRefreshOnStartup,
     )
 
-    HandleDeepLinks(deeplinkVideoId, isShort, navController, onDeeplinkConsumed)
+    HandleIncomingVideo(deeplinkVideoId, isShort, isSharedLink, navController, preferences, onDeeplinkConsumed)
     OfflineMonitor(context, navController, snackbarHostState, currentRoute)
 
     val currentEntry by navController.currentBackStackEntryAsState()
+    val statusBarHero = remember { StatusBarHeroState() }
     val currentTab = currentEntry?.flowTab()
     val selectedTab by rememberSelectedFlowTab(navController, defaultTab)
     val usesNavigationRail = flowUsesNavigationRail()
@@ -310,8 +325,13 @@ fun FlowApp(
             isFullscreen = false,
             isMusicPlayerImmersive = currentMusicTrack != null && musicPlayerSheetState.isImmersive,
             musicPlayerFollowsTheme =
-                musicPlayerBackgroundStyle == io.github.aedev.flow.data.local.MusicPlayerBackgroundStyle.DEFAULT,
+                musicPlayerBackgroundStyle == io.github.aedev.flow.data.local.MusicPlayerBackgroundStyle.DEFAULT ||
+                    (musicPlayerFollowLightTheme && musicPlayerBackgroundStyle.canTurnLight),
             isShortsPlayer = isShortsPlayerRoute,
+            heroUnderStatusBar =
+                statusBarHero.heroUnderStatusBar &&
+                    !musicPlayerSheetState.isExpanded &&
+                    playerSheetState.currentValue != PlayerSheetValue.Expanded,
         )
 
         LaunchedEffect(isInPipMode) {
@@ -470,6 +490,7 @@ fun FlowApp(
                                     LocalMusicMenus provides musicMenus,
                                     LocalEqualizerState provides equalizerViewModel.state,
                                     LocalFlowBottomInsets provides bottomInsets,
+                                    LocalStatusBarHero provides statusBarHero,
                                 ) {
                                     NavHost(
                                         navController = navController,

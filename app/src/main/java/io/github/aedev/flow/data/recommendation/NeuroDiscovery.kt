@@ -36,8 +36,17 @@ internal class NeuroDiscovery(
     private val topicCategories: List<TopicCategory>,
     private val tokenizer: NeuroTokenizer,
 ) {
-    private companion object {
-        const val SPECIFIC_QUERY_MAX_WORDS = 4
+    companion object {
+        /** What Home searches before anything is learned or picked; never recorded as learned (#907). */
+        val STARTER_QUERIES = listOf("Music", "Science", "Technology", "Education", "Nature")
+        private const val SPECIFIC_QUERY_MAX_WORDS = 4
+        private const val QUERY_MIN_SPECIFICITY = 0.65
+
+        // A phrase this strong against its word alone takes the word's place in searches.
+        private const val PHRASE_SHARE = 0.5
+
+        /** How much a viewer must take to a format before searches ask for it. */
+        private const val FORMAT_QUERY_MIN_AFFINITY = 0.2
     }
 
     // ═══════════════════════════════════════════════
@@ -68,7 +77,7 @@ internal class NeuroDiscovery(
         brain: UserBrain,
         timeTopics: Set<String>,
     ): List<MatureTopic> {
-        val allTopics = brain.globalVector.topics
+        val allTopics = brain.interests.topics
         if (allTopics.isEmpty()) return emptyList()
 
         return allTopics.entries
@@ -84,7 +93,7 @@ internal class NeuroDiscovery(
 
                 val categorySupport =
                     topicCategories.count { cat ->
-                        val catTopics = cat.topics.map { tokenizer.normalizeLemma(it) }
+                        val catTopics = cat.topics.map { tokenizer.keyOf(it) }
                         catTopics.contains(name) &&
                             catTopics.count { it in allTopics } >= 2
                     }
@@ -173,6 +182,7 @@ internal class NeuroDiscovery(
         now: Long,
         depth: Int,
         maxClusters: Int,
+        channelEdges: Map<String, Double>,
     ): TopicSelection {
         if (matureTopics.isEmpty()) return emptySelection()
 
@@ -182,12 +192,13 @@ internal class NeuroDiscovery(
                 affinities = brain.topicAffinities,
                 channelTopicProfiles = brain.channelTopicProfiles,
                 categories = topicCategories,
-                normalizeLemma = tokenizer::normalizeLemma,
+                normalizeLemma = tokenizer::keyOf,
                 tagAffinities = brain.tagAffinities,
+                channelEdges = channelEdges,
             )
         if (clusters.isEmpty()) return emptySelection()
 
-        val scheduled = NeuroClusters.schedule(clusters, brain.clusterRotation, now)
+        val scheduled = NeuroClusters.schedule(clusters, brain.clusterRotation, now) { brain.topicEvidence[it]?.firstSeenAt }
 
         val byBase = HashMap<String, MatureTopic>()
         matureTopics.forEach { topic ->
@@ -263,7 +274,7 @@ internal class NeuroDiscovery(
         val base = NeuroScoring.stripDomainTag(topicName)
         return topicCategories
             .find { cat ->
-                cat.topics.any { tokenizer.normalizeLemma(it) == base }
+                cat.topics.any { tokenizer.keyOf(it) == base }
             }?.name
     }
 
@@ -284,7 +295,7 @@ internal class NeuroDiscovery(
         val base = NeuroScoring.stripDomainTag(topic)
         val preferred =
             brain.preferredTopics.any {
-                tokenizer.normalizeLemma(it).equals(base, ignoreCase = true)
+                tokenizer.keyOf(it).equals(base, ignoreCase = true)
             }
         if (preferred) return true
 
@@ -328,6 +339,12 @@ internal class NeuroDiscovery(
     // ═══════════════════════════════════════════════
     // QUERY ENRICHMENT FOR AMBIGUOUS TOPICS
     // ═══════════════════════════════════════════════
+
+    /** Words these lists compare keys with; key spec 2 never stems them ([NeuroStemmer]). */
+    internal val curatedWords: Set<String> get() = ambiguousQueryWords + queryNoiseWords + fillerWords
+
+    /** Verbs titles use for anything ("I tested", "we built"), as keys titles give them. */
+    private val genericTitleVerbs = hashSetOf("test", "built", "make", "made", "tri", "use", "get", "got", "show", "watch")
 
     private val ambiguousQueryWords =
         hashSetOf(
@@ -387,6 +404,20 @@ internal class NeuroDiscovery(
             "match",
         )
 
+    internal fun enclosingPhrase(
+        word: String,
+        brain: UserBrain,
+    ): String? {
+        val alone =
+            brain.globalVector.topics.entries
+                .sumOf { (key, value) -> if (NeuroScoring.stripDomainTag(key) == word) value else 0.0 }
+        return brain.globalVector.topics.entries
+            .map { (key, value) -> NeuroScoring.stripDomainTag(key) to value }
+            .filter { (key, value) -> ' ' in key && word in key.split(' ') && value >= alone * PHRASE_SHARE }
+            .maxByOrNull { it.second }
+            ?.first
+    }
+
     private fun needsQueryEnrichment(topic: String): Boolean {
         val base = NeuroScoring.stripDomainTag(topic)
         // Only genuinely AMBIGUOUS words need a qualifier. The old length<6 rule
@@ -409,6 +440,10 @@ internal class NeuroDiscovery(
         brain: UserBrain,
     ): String {
         val base = NeuroScoring.stripDomainTag(topic)
+
+        // A word the viewer mostly meets inside a phrase names something else alone: "elite" of
+        // "elite gen" searches up a TV series and a space game (#907).
+        if (' ' !in base) enclosingPhrase(base, brain)?.let { return it }
 
         if (!needsQueryEnrichment(base)) return base
 
@@ -449,11 +484,11 @@ internal class NeuroDiscovery(
         // 4. Category keyword
         topicCategories
             .find { cat ->
-                cat.topics.any { tokenizer.normalizeLemma(it) == base }
+                cat.topics.any { tokenizer.keyOf(it) == base }
             }?.let { cat ->
                 val catWord =
                     cat.topics
-                        .firstOrNull { tokenizer.normalizeLemma(it) != base && it.length > 3 }
+                        .firstOrNull { tokenizer.keyOf(it) != base && it.length > 3 }
                 if (catWord != null) return "$base $catWord"
             }
 
@@ -502,6 +537,7 @@ internal class NeuroDiscovery(
         brain: UserBrain,
         now: Long = System.currentTimeMillis(),
         depth: Int = 0,
+        channelEdges: Map<String, Double> = emptyMap(),
         personaProvider: (UserBrain) -> FlowPersona,
     ): List<DiscoveryQuery> {
         val persona = personaProvider(brain)
@@ -529,7 +565,7 @@ internal class NeuroDiscovery(
                 FlowPersona.SPECIALIST -> 3
                 else -> NeuroScoring.MAX_CLUSTERS_PER_REFRESH
             }
-        val selection = selectDiverseTopics(matureTopics, brain, now, depth, maxClusters)
+        val selection = selectDiverseTopics(matureTopics, brain, now, depth, maxClusters, channelEdges)
 
         // Step 3: Generate queries — every strategy is interest-rooted
         val queries = mutableListOf<DiscoveryQuery>()
@@ -550,7 +586,7 @@ internal class NeuroDiscovery(
                 .filter { q ->
                     !blocked.any { b -> q.query.lowercase().contains(b) }
                 }.mapNotNull { q ->
-                    sanitizeQuery(q.query)?.let { q.copy(query = it) }
+                    sanitizeQuery(NeuroDisplayForms.searchText(brain.displayForms, q.query))?.let { q.copy(query = it) }
                 }
 
         return balanceQueryStrategies(filtered, selection.uniqueTopicCount())
@@ -904,8 +940,18 @@ internal class NeuroDiscovery(
         val primary = selection.primary.firstOrNull { isDiscoveryEligible(it, isMatureBrain) } ?: return
         val v = brain.globalVector
 
+        // The format the viewer actually watches, once there is one; until then a guess from length.
+        val favourite =
+            brain.formatAffinity
+                .filterValues { it >= FORMAT_QUERY_MIN_AFFINITY }
+                .maxByOrNull { it.value }
+                ?.key
         val formatWord =
             when {
+                favourite != null -> {
+                    NeuroFormats.searchWord(favourite)
+                }
+
                 v.duration > 0.75 ||
                     persona == FlowPersona.DEEP_DIVER ||
                     persona == FlowPersona.SCHOLAR -> {
@@ -1013,11 +1059,17 @@ internal class NeuroDiscovery(
         // Exploration is a guess, so it also steers clear of the single words of a blocked phrase:
         // channels that taught "resident evil" go on teaching "evil".
         val blockedPhraseWords = blocked.filter { ' ' in it }.flatMapTo(HashSet()) { tokenizer.tokenize(it) }
+
+        // Exploration searches the topic itself, so a word that needs a qualifier or is only a title's
+        // verb names nothing: "build" went out as "build knife", "test" brought cricket Test matches (#907).
+        fun namesSubject(topic: String) =
+            ' ' in topic || (topic !in ambiguousQueryWords && topic !in tokenizer.polysemousWords && topic !in genericTitleVerbs)
         val picks =
             adjacentWeights.entries
                 .filter { (topic, _) ->
-                    !blocked.any { b -> topic.contains(b) || tokenizer.normalizeLemma(topic).contains(b) } &&
-                        tokenizer.normalizeLemma(topic) !in blockedPhraseWords &&
+                    namesSubject(topic) &&
+                        !blocked.any { b -> topic.contains(b) || tokenizer.keyOf(topic).contains(b) } &&
+                        tokenizer.keyOf(topic) !in blockedPhraseWords &&
                         !tokenizer.isNoiseTopic(topic)
                 }.sortedByDescending { it.value }
                 .take(6)
@@ -1041,7 +1093,7 @@ internal class NeuroDiscovery(
                         .lowercase()
                         .split(NeuroTokenizer.WHITESPACE_REGEX)
                         .filter(NeuroText::isTopicSized)
-                        .map { tokenizer.normalizeLemma(it) }
+                        .map { tokenizer.keyOf(it) }
                 }.toSet()
 
         val blocked = brain.blockedTopics
@@ -1049,7 +1101,7 @@ internal class NeuroDiscovery(
             brain.preferredTopics
                 .map { it.trim() }
                 .filter { pref ->
-                    val lemma = tokenizer.normalizeLemma(pref)
+                    val lemma = tokenizer.keyOf(pref)
                     NeuroText.isTopicSized(lemma) &&
                         lemma !in existingTokens &&
                         !blocked.any { b -> lemma.contains(b) }
@@ -1128,8 +1180,17 @@ internal class NeuroDiscovery(
             "network",
         )
 
-    private fun sanitizeQuery(raw: String): String? {
-        val words = raw.trim().split(NeuroTokenizer.WHITESPACE_REGEX)
+    /** 0 for confident searches, 1 for middling, 2 for the rest, with no gap between them (0.69 was in none). */
+    internal fun confidenceTier(confidence: Double): Int =
+        when {
+            confidence >= 0.7 -> 0
+            confidence >= 0.4 -> 1
+            else -> 2
+        }
+
+    internal fun sanitizeQuery(raw: String): String? {
+        // A domain tag ("metal:music") tells the engine which metal; YouTube would read it as text (#907).
+        val words = raw.trim().split(NeuroTokenizer.WHITESPACE_REGEX).map { it.substringBefore(':') }
         val deduped = LinkedHashSet(words)
         val cleaned =
             deduped.filter { word ->
@@ -1158,7 +1219,8 @@ internal class NeuroDiscovery(
         // Strip domain tags for checking: "metal:music" → "metal"
         val base = if (lower.contains(":")) lower.substringBefore(":") else lower
         if (!NeuroText.isTopicSized(base)) return false
-        return true
+        // A word every subject uses ("normal", "better", "buy") searches up any subject (#907).
+        return tokenizer.specificity(lower) >= QUERY_MIN_SPECIFICITY
     }
 
     // ═══════════════════════════════════════════════
@@ -1223,7 +1285,7 @@ internal class NeuroDiscovery(
                     .lowercase()
                     .split(NeuroTokenizer.WHITESPACE_REGEX)
                     .filter(NeuroText::isTopicSized)
-                    .map { tokenizer.normalizeLemma(it) }
+                    .map { tokenizer.keyOf(it) }
                     .toSet()
 
             val isDuplicate =
@@ -1351,20 +1413,11 @@ internal class NeuroDiscovery(
         }
 
         // Phase 4: Shuffle within confidence tiers for variety
-        val highConf =
-            balanced
-                .filter { it.confidence >= 0.7 }
-                .shuffled()
-        val medConf =
-            balanced
-                .filter { it.confidence in 0.4..0.69 }
-                .shuffled()
-        val lowConf =
-            balanced
-                .filter { it.confidence < 0.4 }
-                .shuffled()
-
-        return highConf + medConf + lowConf
+        return balanced
+            .groupBy { confidenceTier(it.confidence) }
+            .toSortedMap()
+            .values
+            .flatMap { it.shuffled() }
     }
 
     private fun extractTopicRoot(query: String): String? {
@@ -1373,7 +1426,7 @@ internal class NeuroDiscovery(
                 .lowercase()
                 .split(NeuroTokenizer.WHITESPACE_REGEX)
                 .filter(NeuroText::isTopicSized)
-                .map { tokenizer.normalizeLemma(it) }
+                .map { tokenizer.keyOf(it) }
                 .filter { it !in fillerWords }
 
         if (words.isEmpty()) return null

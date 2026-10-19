@@ -28,6 +28,7 @@ class LanguageRegionViewModel
         val appLanguage = preferences.appLanguage.asState(AppLanguageManager.SYSTEM_DEFAULT)
         val contentLanguage = preferences.contentLanguage.asState(CONTENT_LANGUAGE_FOLLOW_APP)
         val contentCountry = preferences.trendingRegion.asState(DEFAULT_COUNTRY)
+        val originalTitles = preferences.originalTitles.asState(false)
 
         /** The languages YouTube localizes content into, i.e. every value its `hl` accepts. */
         val contentLanguages: List<LanguageOption> by lazy {
@@ -45,18 +46,20 @@ class LanguageRegionViewModel
         }
 
         /**
-         * Saves the app language and returns whether the activity must be recreated to apply it.
-         * The recreate itself belongs to the screen, which owns the activity.
+         * Saves the app language. Below Android 13 the screen recreates the activity to apply it;
+         * from 13 the system does that itself.
          */
         fun setAppLanguage(tag: String) =
             write {
                 preferences.setAppLanguage(tag)
-                AppLanguageManager.saveLanguageTag(context, tag)
+                AppLanguageManager.applyLanguageTag(context, tag)
             }
 
         fun setContentLanguage(tag: String) = write { preferences.setContentLanguage(tag) }
 
         fun setContentCountry(code: String) = write { preferences.setTrendingRegion(code) }
+
+        fun setOriginalTitles(enabled: Boolean) = write { preferences.setOriginalTitles(enabled) }
 
         private companion object {
             const val DEFAULT_COUNTRY = "US"

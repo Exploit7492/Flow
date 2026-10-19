@@ -12,6 +12,7 @@ import io.github.aedev.flow.player.stream.StreamProcessor
 import io.github.aedev.flow.player.stream.StreamSizeEstimator
 import io.github.aedev.flow.player.stream.VideoQualityOptions
 import io.github.aedev.flow.ui.screens.player.state.blankVideo
+import io.github.aedev.flow.utils.OriginalTextPolicy
 import io.github.aedev.flow.utils.ThumbnailUrlResolver
 import org.schabi.newpipe.extractor.stream.AudioStream
 import org.schabi.newpipe.extractor.stream.VideoStream
@@ -21,11 +22,13 @@ import org.schabi.newpipe.extractor.stream.VideoStream
  * session and the media notification are armed with, the Media3-shaped streams and captions, and the
  * quality and audio track the load's preferences select.
  *
- * Pure — no network, no player, no preferences and no screen state. The ViewModel owns what happens
- * around the result: it applies the state reducers, reads the resume position, and hands the streams
- * to [PlaybackPreparer] in the order playback needs them.
+ * Pure — no network, no player and no screen state, and its one preference, [originalText], is handed
+ * in. The ViewModel owns what happens around the result: it applies the state reducers, reads the
+ * resume position, and hands the streams to [PlaybackPreparer] in the order playback needs them.
  */
-internal class PlaybackStreamPreparer {
+internal class PlaybackStreamPreparer(
+    private val originalText: () -> Boolean = { false },
+) {
     /** The identity every InnerTube result carries, merged over what the screen already knew. */
     data class StreamIdentity(
         val enrichedVideo: Video,
@@ -116,7 +119,8 @@ internal class PlaybackStreamPreparer {
         durationSeconds: Long,
     ): StreamIdentity {
         val details = result.playerResponse.videoDetails
-        val title = details?.title?.takeIf { it.isNotBlank() } ?: cached?.title ?: fallbackTitle
+        val preferOriginal = originalText()
+        val title = OriginalTextPolicy.streamTitle(details?.title, cached?.title, preferOriginal) ?: fallbackTitle
         val channel = details?.author?.takeIf { it.isNotBlank() } ?: cached?.channelName ?: ""
         val channelId = details?.channelId?.takeIf { it.isNotBlank() } ?: cached?.channelId ?: ""
         val thumbnail =
@@ -126,18 +130,19 @@ internal class PlaybackStreamPreparer {
                 ?.maxByOrNull { it.height ?: 0 }
                 ?.url
                 ?: cached?.thumbnailUrl ?: ThumbnailUrlResolver.normalizeVideoThumbnail(videoId, null)
+        val known = blankVideo(videoId, cached)
         return StreamIdentity(
             enrichedVideo =
-                blankVideo(videoId, cached).copy(
+                known.copy(
                     title = title,
+                    description = OriginalTextPolicy.streamDescription(details?.shortDescription, known.description, preferOriginal),
                     channelName = channel,
                     channelId = channelId,
                     thumbnailUrl = thumbnail,
                     duration = durationSeconds.toInt(),
-                    // The category when the winning client happened to return a microformat
-                    // (WEB/MWEB do, VISIONOS does not), then the creator-declared keywords. The
-                    // category leads because the engine reads only the first tags.
-                    tags = topicTags(result, cached),
+                    tags = keywordTags(result, cached),
+                    // Only when the winning client returned a microformat: WEB/MWEB do, VISIONOS does not.
+                    category = microformatCategory(result) ?: cached?.category,
                 ),
             title = title,
             channel = channel,
@@ -147,22 +152,21 @@ internal class PlaybackStreamPreparer {
         )
     }
 
-    private fun topicTags(
+    private fun keywordTags(
         result: InnerTubeVideoStreamExtractor.VideoExtractionResult,
         cached: Video?,
-    ): List<String> {
-        val keywords =
-            result.playerResponse.videoDetails
-                ?.keywords
-                .orEmpty()
-        val category =
-            result.playerResponse.microformat
-                ?.playerMicroformatRenderer
-                ?.category
-                ?.takeIf { it.isNotBlank() }
-        val tags = (listOfNotNull(category) + keywords).distinct()
-        return tags.ifEmpty { cached?.tags.orEmpty() }
-    }
+    ): List<String> =
+        result.playerResponse.videoDetails
+            ?.keywords
+            .orEmpty()
+            .distinct()
+            .ifEmpty { cached?.tags.orEmpty() }
+
+    private fun microformatCategory(result: InnerTubeVideoStreamExtractor.VideoExtractionResult): String? =
+        result.playerResponse.microformat
+            ?.playerMicroformatRenderer
+            ?.category
+            ?.takeIf { it.isNotBlank() }
 
     private fun captionStreams(
         result: InnerTubeVideoStreamExtractor.VideoExtractionResult,

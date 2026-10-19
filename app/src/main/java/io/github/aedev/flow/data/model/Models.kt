@@ -27,6 +27,8 @@ data class Video(
     val description: String = "",
     val channelThumbnailUrl: String = "",
     val tags: List<String> = emptyList(),
+    // YouTube's category, such as "Music"; kept out of [tags] so it never reads as a creator keyword.
+    val category: String? = null,
     val isMusic: Boolean = false,
     val isLive: Boolean = false,
     val isShort: Boolean = false,
@@ -72,6 +74,7 @@ data class Playlist(
     val description: String = "",
     val videos: List<Video> = emptyList(),
     val isLocal: Boolean = true,
+    val isCourse: Boolean = false,
 )
 
 data class Comment(

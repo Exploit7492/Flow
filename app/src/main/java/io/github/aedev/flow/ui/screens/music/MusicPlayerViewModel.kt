@@ -70,6 +70,7 @@ class MusicPlayerViewModel
         private var loadTrackJob: kotlinx.coroutines.Job? = null
         private var pendingSeekPosition: Long? = null
         private var pendingSeekStartedAtMs: Long = 0L
+        private val radioSwitch = MusicRadioSwitch(viewModelScope, _uiState, playerPreferences)
         private val lyrics =
             MusicPlayerLyrics(
                 context,
@@ -101,11 +102,7 @@ class MusicPlayerViewModel
                     _uiState.update { it.copy(lyricsTextAlign = align) }
                 }
             }
-            viewModelScope.launch {
-                playerPreferences.musicEndlessRadioEnabled.collect { enabled ->
-                    _uiState.update { it.copy(endlessRadioEnabled = enabled) }
-                }
-            }
+            radioSwitch.observe()
         }
 
         private fun initializeObservers() {
@@ -404,6 +401,16 @@ class MusicPlayerViewModel
             loadAndPlayTrack(track)
         }
 
+        /** Plays a watch playlist such as an artist's shuffle or mix; false when YouTube returned no songs. */
+        suspend fun playWatchPlaylist(
+            playlistId: String,
+            params: String?,
+        ): Boolean {
+            val tracks = withTimeoutOrNull(10_000L) { InnertubeMusicService.fetchWatchPlaylist(playlistId, params) }.orEmpty()
+            loadAndPlayTrack(tracks.firstOrNull() ?: return false, tracks)
+            return true
+        }
+
         /** Plays the On Repeat shelf in a shuffled order, as the widget's Shuffle asks. */
         suspend fun shuffleOnRepeat(sourceName: String) {
             val tracks = musicBrain.onRepeatShelf().shuffled()
@@ -474,9 +481,7 @@ class MusicPlayerViewModel
             if (index >= 0) EnhancedMusicPlayerManager.playFromQueue(index) else loadAndPlayTrack(track)
         }
 
-        fun setEndlessRadioEnabled(enabled: Boolean) {
-            viewModelScope.launch { playerPreferences.setMusicEndlessRadioEnabled(enabled) }
-        }
+        fun setEndlessRadioEnabled(enabled: Boolean) = radioSwitch.set(enabled)
 
         fun seekTo(position: Long) {
             val duration =
@@ -608,6 +613,8 @@ class MusicPlayerViewModel
         fun setLyricsShowRomanization(show: Boolean) = lyrics.setShowRomanization(show)
 
         fun setLyricsAutoRomanize(enabled: Boolean) = lyrics.setAutoRomanize(enabled)
+
+        fun setLyricsKeepScreenOn(enabled: Boolean) = lyrics.setKeepScreenOn(enabled)
 
         override fun onCleared() {
             super.onCleared()

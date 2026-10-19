@@ -6,9 +6,11 @@ import io.github.aedev.flow.data.local.LikedVideosRepository
 import io.github.aedev.flow.data.local.PlaylistRepository
 import io.github.aedev.flow.data.local.ViewHistory
 import io.github.aedev.flow.data.model.Video
+import io.github.aedev.flow.data.recommendation.FlowNeuroEngine
 import io.github.aedev.flow.data.recommendation.GraphSeedInput
 import io.github.aedev.flow.data.recommendation.GraphSeedSelector
 import io.github.aedev.flow.data.recommendation.GraphSeedSource
+import io.github.aedev.flow.data.recommendation.NeighbourChannels
 import io.github.aedev.flow.data.repository.YouTubeRepository
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
@@ -23,6 +25,9 @@ import javax.inject.Inject
 private const val RELATED_TTL_MS = 45L * 60L * 1000L
 private const val RELATED_FETCH_CONCURRENCY = 3
 private const val RELATED_FETCH_TIMEOUT_MS = 4_000L
+
+// Related lists of followed uploads fetched per Home load to teach co-watch; each upload is used once.
+private const val FOLLOWED_SOURCES_PER_LOAD = 2
 private const val SAVED_SEED_COOLDOWN_MS = 3L * 60L * 60L * 1000L
 private const val LONG_TERM_HISTORY_MAX = 200
 
@@ -47,6 +52,7 @@ class HomeFeedSources
         private val viewHistory: ViewHistory,
         private val likedVideosRepository: LikedVideosRepository,
         private val playlistRepository: PlaylistRepository,
+        private val neuroEngine: FlowNeuroEngine,
     ) {
         private data class CachedRelated(
             val videos: List<Video>,
@@ -94,7 +100,7 @@ class HomeFeedSources
                     GraphSeedInput(
                         id = it.videoId,
                         title = it.title,
-                        channelId = "",
+                        channelId = it.channelId.orEmpty(),
                         source = GraphSeedSource.LIKED,
                         engagementWeight = 1.0,
                         timestamp = it.likedAt,
@@ -137,6 +143,32 @@ class HomeFeedSources
             seedId: String,
             filters: suspend () -> HomeFeedCacheFilters,
         ): List<Video> = fetchRelatedVideos(seedId, filters)
+
+        /**
+         * Lets the related lists of up to two recent uploads of followed channels, each used once, teach
+         * co-watch which channels sit beside the viewer's own ([NeighbourChannels]). Two requests at most.
+         */
+        suspend fun learnFromFollowed(
+            subscriptionFeed: List<Video>,
+            followed: Set<String>,
+            filters: suspend () -> HomeFeedCacheFilters,
+            now: Long = System.currentTimeMillis(),
+        ) {
+            if (followed.isEmpty()) return
+            val known = neuroEngine.coWatchSourceIds()
+            subscriptionFeed
+                .asSequence()
+                .filter { it.channelId in followed && it.id !in known && !it.isShort && !it.isLive && !it.isUpcoming }
+                .filter { now - it.timestamp in 0..NeighbourChannels.UPLOAD_WINDOW_MS }
+                .sortedByDescending { it.timestamp }
+                .distinctBy { it.channelId }
+                .take(FOLLOWED_SOURCES_PER_LOAD)
+                .toList()
+                .forEach { upload ->
+                    val related = fetchRelatedVideos(upload.id, filters)
+                    if (related.isNotEmpty()) neuroEngine.noteRelatedOfFollowed(upload, related)
+                }
+        }
 
         private suspend fun fetchRelatedVideos(
             seedId: String,
@@ -192,6 +224,7 @@ class HomeFeedSources
                             async {
                                 val seed = seedMetadata[seedId]
                                 val videos = fetchRelatedVideos(seedId, filters)
+                                if (seed != null && videos.isNotEmpty()) neuroEngine.noteRelatedOfWatched(seed, videos)
                                 val seedScore = seed?.let { GraphSeedSelector.scoreSeed(it, now) } ?: 0.0
                                 val seedCluster = seed?.let { GraphSeedSelector.clusterKey(it) } ?: "misc"
                                 val candidates =

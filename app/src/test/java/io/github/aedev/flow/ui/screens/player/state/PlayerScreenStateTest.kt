@@ -28,12 +28,14 @@ class PlayerScreenStateTest {
             "bufferedPosition" to 0L,
             "duration" to 0L,
             "activeSheet" to PlayerSheet.None,
-            "showLiveChatPanel" to true,
+            "showLiveChatPanel" to false,
             "commentSortFilter" to CommentSortFilter.TOP,
             "brightnessLevel" to 0.5f,
             "volumeLevel" to 0.5f,
             "showBrightnessOverlay" to false,
             "showVolumeOverlay" to false,
+            "showSpeedSwipeOverlay" to false,
+            "speedSwipeLevel" to 1.0f,
             "showSeekForwardAnimation" to false,
             "seekAccumulation" to 10,
             "showSeekBackAnimation" to false,
@@ -65,6 +67,7 @@ class PlayerScreenStateTest {
             "duration",
             "showBrightnessOverlay",
             "showVolumeOverlay",
+            "showSpeedSwipeOverlay",
             "showSeekBackAnimation",
             "showSeekForwardAnimation",
             "hasShownShortsPrompt",
@@ -88,6 +91,7 @@ class PlayerScreenStateTest {
             "commentSortFilter",
             "brightnessLevel",
             "volumeLevel",
+            "speedSwipeLevel",
             "seekAccumulation",
             "subtitleStyle",
             "resizeMode",
@@ -131,6 +135,8 @@ class PlayerScreenStateTest {
             "volumeLevel" to volumeLevel,
             "showBrightnessOverlay" to showBrightnessOverlay,
             "showVolumeOverlay" to showVolumeOverlay,
+            "showSpeedSwipeOverlay" to showSpeedSwipeOverlay,
+            "speedSwipeLevel" to speedSwipeLevel,
             "showSeekForwardAnimation" to showSeekForwardAnimation,
             "seekAccumulation" to seekAccumulation,
             "showSeekBackAnimation" to showSeekBackAnimation,
@@ -164,12 +170,14 @@ class PlayerScreenStateTest {
         bufferedPosition = 120_000L
         duration = 600_000L
         activeSheet = PlayerSheet.Settings(PlayerSettingsPage.Quality)
-        showLiveChatPanel = false
+        showLiveChatPanel = true
         commentSortFilter = CommentSortFilter.NEWEST
         brightnessLevel = 0.9f
         volumeLevel = 0.1f
         showBrightnessOverlay = true
         showVolumeOverlay = true
+        showSpeedSwipeOverlay = true
+        speedSwipeLevel = 2.5f
         showSeekForwardAnimation = true
         seekAccumulation = 30
         showSeekBackAnimation = true
@@ -237,7 +245,7 @@ class PlayerScreenStateTest {
 
         val expected = dirty + dismissMediaSheetsClears.associateWith { PlayerSheet.None }
         assertThat(state.snapshot()).containsExactlyEntriesIn(expected)
-        assertThat(state.showLiveChatPanel).isFalse()
+        assertThat(state.showLiveChatPanel).isTrue()
         assertThat(state.lastInteractionTimestamp).isEqualTo(1L)
     }
 

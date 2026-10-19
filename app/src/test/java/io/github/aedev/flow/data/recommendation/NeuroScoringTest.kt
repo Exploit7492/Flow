@@ -188,4 +188,63 @@ class NeuroScoringTest {
         NeuroScoring.capIdfVocabulary(freq)
         assertThat(freq).hasSize(2)
     }
+
+    @Test
+    fun `lanes keep what shares a topic or a known channel and drop the rest`() {
+        val user = NeuroVectorMath.PreparedVector(vec("comedy" to 0.8, "guitar" to 0.2))
+        val onTopic = (0 until 6).map { video("comedy$it") to vec("comedy" to 1.0) }
+        val subscribed = video("sub", channelId = "subscribed") to vec("prank" to 1.0)
+        val watched = video("watched", channelId = "watched") to vec("prank" to 1.0)
+        val disliked = video("disliked", channelId = "disliked") to vec("prank" to 1.0)
+        val drift = video("drift") to vec("lottery" to 1.0)
+
+        val kept =
+            NeuroScoring
+                .keepRelevant(
+                    onTopic + listOf(subscribed, watched, disliked, drift),
+                    user,
+                    NeuroScoring.LANE_RELEVANCE_FLOOR,
+                    userSubs = setOf("subscribed"),
+                    channelScores = mapOf("watched" to 0.6, "disliked" to 0.3),
+                ).map { it.first.id }
+
+        assertThat(kept).containsExactlyElementsIn(onTopic.map { it.first.id } + listOf("sub", "watched"))
+    }
+
+    @Test
+    fun `a thin lane keeps only the videos on the viewer's subjects`() {
+        val user = NeuroVectorMath.PreparedVector(vec("comedy" to 0.8, "guitar" to 0.2))
+        val onTopic = (0 until 2).map { video("comedy$it") to vec("comedy" to 1.0) }
+        val drift = (0 until 6).map { video("drift$it") to vec("lottery" to 1.0) }
+        val faint = video("faint") to vec("lottery" to 1.0, "comedy" to 0.01)
+
+        val kept =
+            NeuroScoring
+                .keepRelevant(onTopic + drift + faint, user, NeuroScoring.LANE_RELEVANCE_FLOOR, emptySet(), emptyMap())
+                .map { it.first.id }
+
+        assertThat(kept).containsExactly("comedy0", "comedy1")
+    }
+
+    @Test
+    fun `one click does not make a channel known`() {
+        val user = NeuroVectorMath.PreparedVector(vec("comedy" to 1.0))
+        val clickedOnce = video("drift", channelId = "clicked") to vec("lottery" to 1.0)
+        val onTopic = (0 until 6).map { video("comedy$it") to vec("comedy" to 1.0) }
+
+        val kept =
+            NeuroScoring
+                .keepRelevant(onTopic + clickedOnce, user, NeuroScoring.LANE_RELEVANCE_FLOOR, emptySet(), mapOf("clicked" to 0.525))
+                .map { it.first.id }
+
+        assertThat(kept).doesNotContain("drift")
+    }
+
+    @Test
+    fun `a like count the list never carried is no sign of clickbait`() {
+        val popular = video("p", viewCount = 400_000L, uploadDate = "3 days ago")
+
+        assertThat(NeuroScoring.calculateEngagementQuality(popular, isColdStart = false)).isEqualTo(1.0)
+        assertThat(NeuroScoring.calculateEngagementQuality(popular.copy(likeCount = 100L), isColdStart = false)).isLessThan(0.5)
+    }
 }

@@ -14,9 +14,16 @@
     <string name="no_subscriptions_yet">No Subscriptions Yet</string>
     <string name="empty_subscriptions_body">Subscribe to channels to see their latest videos here</string>
     <string name="home_refresh_feed">Refresh Feed</string>
+    <string name="home_load_more_failed">Couldn\'t load more videos</string>
+    <string name="home_load_more_failed_body">Check your connection</string>
+    <string name="home_refresh_failed">Couldn\'t refresh your feed</string>
     <plurals name="subscriptions_refresh_progress_template">
         <item quantity="one">Refreshing %1$d of %2$d channel</item>
         <item quantity="other">Refreshing %1$d of %2$d channels</item>
+    </plurals>
+    <plurals name="subscriptions_refresh_checks_template">
+        <item quantity="one">Checking %1$d of %2$d channel for Shorts and live</item>
+        <item quantity="other">Checking %1$d of %2$d channels for Shorts and live</item>
     </plurals>
     <plurals name="subscriptions_last_refreshed_template">
         <item quantity="one">Last refreshed %1$s - %2$d video checked</item>
@@ -131,8 +138,14 @@
     <string name="lyrics_show_romanization_summary">Show lyrics in other scripts in Latin letters too</string>
     <string name="lyrics_auto_romanize">Romanize on this device</string>
     <string name="lyrics_auto_romanize_summary">When the lyrics source has no romanization</string>
+    <string name="lyrics_keep_screen_on">Keep screen on</string>
+    <string name="lyrics_keep_screen_on_summary">While lyrics are showing and music plays</string>
     <string name="player_appearance_artwork_control_colors_title">Artwork colors on controls</string>
     <string name="player_appearance_artwork_control_colors_subtitle">Tint the buttons and seek bar from the cover</string>
+    <string name="player_appearance_follow_light_theme_title">Light in light theme</string>
+    <string name="player_appearance_follow_light_theme_subtitle">Artwork backgrounds turn light</string>
+    <string name="player_appearance_sleep_timer_button_title">Sleep timer button</string>
+    <string name="player_appearance_sleep_timer_button_subtitle">Show it next to the queue button</string>
     <string name="player_appearance_plain_control_colors_title">Control colors</string>
     <string name="player_appearance_plain_control_colors_monochrome">Black and white</string>
     <string name="player_appearance_plain_control_colors_app">App theme</string>
@@ -426,6 +439,10 @@
     <string name="unsubscribed_from_template">Unsubscribed from %1$s</string>
     <string name="hide_channel_shorts">Hide Shorts from this channel</string>
     <string name="show_channel_shorts">Show Shorts from this channel</string>
+    <plurals name="course_lessons_count">
+        <item quantity="one">Course · %d lesson</item>
+        <item quantity="other">Course · %d lessons</item>
+    </plurals>
     <plurals name="videos_count_template">
         <item quantity="one">%1$d video</item>
         <item quantity="other">%1$d videos</item>
@@ -496,6 +513,17 @@
     <string name="search_filter_group_upload_date">Upload date</string>
     <string name="search_filter_group_features">Features</string>
     <string name="search_filter_group_sort">Sort by</string>
+    <string name="search_filter_group_watched">Watched</string>
+    <string name="search_filter_recently_uploaded">Recently uploaded</string>
+    <string name="search_filter_watch_any">Watched or not</string>
+    <string name="search_filter_unwatched">Unwatched</string>
+    <string name="search_filter_watched">Watched</string>
+    <plurals name="search_watch_empty_watched">
+        <item quantity="one">No watched videos</item>
+    </plurals>
+    <plurals name="search_watch_empty_unwatched">
+        <item quantity="one">No unwatched videos</item>
+    </plurals>
     <string name="search_feature_hd">HD</string>
     <string name="search_feature_4k">4K</string>
     <string name="search_feature_hdr">HDR</string>
@@ -668,6 +696,8 @@
     <string name="deep_flow_scrobble_title">Scrobble during Deep Flow</string>
     <string name="taste_learning_paused">Deep Flow is on, learning is paused</string>
     <string name="deep_flow_scrobble_subtitle">Keep sending listens to Last.fm, Libre.fm and ListenBrainz</string>
+    <string name="deep_flow_on_search_title">Show on search</string>
+    <string name="deep_flow_on_search_subtitle">A Deep Flow switch above recent searches</string>
     <string name="deep_flow_dialog_title">Pause Duration</string>
     <string name="deep_flow_dialog_body">How long should learning stay paused?</string>
     <string name="deep_flow_enabled_message">Deep Flow enabled</string>
@@ -716,6 +746,7 @@
     <string name="notif_check_interval">New Video Check Interval</string>
     <string name="notif_check_interval_subtitle_template">Check every %s</string>
     <string name="notif_check_interval_disabled">Background notification checks are disabled</string>
+    <string name="notif_check_interval_off_new_videos">Off while New Videos is off</string>
     <string name="notif_check_interval_dialog_title">Check Interval</string>
     <string name="notif_check_interval_dialog_body">How often Flow checks your subscriptions for new videos.</string>
     <string name="notif_interval_15m">15 minutes</string>
@@ -907,7 +938,7 @@
     <string name="player_appearance_volume_gesture_title">Volume Gesture</string>
     <string name="player_appearance_volume_gesture_subtitle">Swipe the right edge in fullscreen to adjust volume</string>
     <string name="player_appearance_seek_gesture_title">Seek Gesture</string>
-    <string name="player_appearance_seek_gesture_subtitle">Swipe sideways in fullscreen to seek</string>
+    <string name="player_appearance_seek_gesture_subtitle">Swipe sideways on the video to seek</string>
     <string name="player_appearance_controls_while_loading_title">Controls While Loading</string>
     <string name="player_appearance_controls_while_loading_subtitle">Show controls before the video finishes loading</string>
     <string name="player_appearance_long_press_speed_title">Long-press Playback Speed</string>
@@ -1142,6 +1173,8 @@
     <string name="content_settings_comments_enabled_subtitle">Show comments under videos</string>
     <string name="content_settings_comments_preview_title">Comments preview</string>
     <string name="content_settings_comments_preview_subtitle">Show the latest comment inside the comments card</string>
+    <string name="content_settings_live_chat_enabled_title">Live chat</string>
+    <string name="content_settings_live_chat_enabled_subtitle">Show chat on live streams</string>
     <string name="content_settings_subs_startup_refresh_title">Refresh subscriptions at startup</string>
     <string name="content_settings_subs_startup_refresh_subtitle">Check your subscription feed when the app opens</string>
     <string name="content_settings_subs_show_checked_count_title">Checked video count</string>
@@ -1184,7 +1217,9 @@
     <string name="category_learning">Learning</string>
     <string name="category_fashion">Fashion</string>
     <string name="categories_chart_source">YouTube Music charts</string>
-    <string name="categories_rate_limited">YouTube is limiting requests right now. Try again in a few minutes.</string>
+    <plurals name="categories_rate_limited">
+        <item quantity="one">YouTube is limiting requests right now. Try again later.</item>
+    </plurals>
     <string name="categories_shelf_see_all">See all</string>
     <string name="categories_shelf_back">Back to all shelves</string>
     <string name="settings_continue_watching_title">Continue Watching shelf</string>
@@ -1384,6 +1419,16 @@
     <string name="player_settings_seek_zone_normal_desc">Thirds on every width.</string>
     <string name="player_settings_seek_zone_narrow">Narrow</string>
     <string name="player_settings_seek_zone_narrow_desc">A quarter each side, so the center is half.</string>
+    <string name="player_settings_seek_zone_edge_to_edge">Edge to edge</string>
+    <string name="player_settings_speed_swipe">Speed swipe</string>
+    <string name="player_settings_speed_swipe_dialog_body">Swipe up or down on this side in fullscreen to change the speed, in place of brightness or volume.</string>
+    <string name="player_settings_speed_swipe_off">Off</string>
+    <string name="player_settings_speed_swipe_left">Left side</string>
+    <string name="player_settings_speed_swipe_right">Right side</string>
+    <string name="player_settings_speed_swipe_step">Speed step</string>
+    <string name="player_settings_speed_swipe_step_dialog_body">How much each step of a speed swipe changes the speed.</string>
+    <string name="player_settings_speed_swipe_step_value">%1$s per step</string>
+    <string name="player_settings_seek_zone_edge_to_edge_desc">Thirds that reach the screen edges, so taps there count too.</string>
     <string name="player_settings_seek_zone_back">−%1$d s</string>
     <string name="player_settings_seek_zone_forward">+%1$d s</string>
     <string name="player_settings_seek_zone_play_pause">Play / pause</string>
@@ -1766,7 +1811,8 @@
     <!-- Donations Screen -->
     <string name="support_donations_title">Support &amp; Donations</string>
     <string name="support_flow_dev_title">Support Flow Development</string>
-    <string name="support_flow_dev_desc">If Flow is useful to you, you can support it on Patreon or with crypto below. Thank you!</string>
+    <string name="support_flow_dev_desc">If Flow is useful to you, you can support it on Open Collective, Patreon or with crypto below. Thank you!</string>
+    <string name="support_flow_open_collective">Support Flow on Open Collective</string>
     <string name="support_flow_patreon">Support Flow on Patreon</string>
     <string name="thank_you_support_message">Thank you for your support! ❤️</string>
     <string name="address_copied_toast">Address copied to clipboard</string>
@@ -1774,8 +1820,9 @@
     <!-- One-time support prompt -->
     <string name="donation_prompt_title">Enjoying Flow?</string>
     <string name="donation_prompt_message">Flow is free, open source and ad-free. If it earned a spot on your phone, a little support keeps it going.</string>
+    <string name="donation_method_open_collective" translatable="false">Open Collective</string>
     <string name="donation_method_patreon" translatable="false">Patreon</string>
-    <string name="donation_prompt_methods">Patreon · Bitcoin · Ethereum · Solana · USDT · Monero</string>
+    <string name="donation_prompt_methods">Open Collective · Patreon · Bitcoin · Ethereum · Solana · USDT · Monero</string>
     <string name="donation_prompt_support">Support development</string>
     <string name="donation_prompt_later">Maybe later</string>
     <string name="donation_prompt_never">Don\'t show again</string>
@@ -1790,6 +1837,8 @@
     <string name="newpipe_extractor_title">NewPipe Extractor</string>
     <string name="newpipe_extractor_subtitle">Core extraction library</string>
     <string name="about_license">License</string>
+    <string name="about_notices">Open source notices</string>
+    <string name="about_notices_summary">Word lists and code from other projects</string>
     <string name="about_license_name">GNU GPL v3</string>
     <string name="about_changelog">Changelog</string>
     <string name="whats_new_in_flow">What\'s new in Flow</string>
@@ -2143,6 +2192,8 @@
     <string name="daily_discover_for_fans_of">For fans of %1$s</string>
     <string name="section_recommended">Recommended</string>
     <string name="section_recently_played">Recently played</string>
+    <string name="auto_tab_for_you">For you</string>
+    <string name="auto_tab_queue">Queue</string>
     <string name="section_music_videos">Music videos</string>
     <string name="section_music_videos_for_you">Music videos for you</string>
     <string name="section_live_performances">Live performances</string>
@@ -2726,6 +2777,8 @@
     <string name="player_settings_overlay_comments_subtitle">Open comments in a side panel in fullscreen</string>
     <string name="player_settings_overlay_sponsorblock">SponsorBlock Button</string>
     <string name="player_settings_overlay_sponsorblock_subtitle">Shown when SponsorBlock is on and the video has segments</string>
+    <string name="player_settings_overlay_next_prev">Previous and Next Buttons</string>
+    <string name="player_settings_overlay_next_prev_subtitle">Show previous and next video buttons on the video player overlay</string>
     <string name="player_action_background">Background</string>
     <string name="player_action_copy_link">Copy link</string>
     <string name="player_action_copy_link_at_time">Copy at time</string>
@@ -2984,63 +3037,9 @@
     <string name="interface_mode_mobile_summary">Always use the phone and tablet interface</string>
     <string name="interface_mode_tv">TV</string>
     <string name="interface_mode_tv_summary">Always use the remote-friendly television interface</string>
-    <string name="tv_home_title">Home</string>
-    <string name="tv_continue_watching">Continue watching</string>
-    <string name="tv_home_recommended">Recommended</string>
-    <string name="tv_error_loading">Couldn\'t load content</string>
-    <string name="tv_no_recommendations">No recommendations yet</string>
-    <string name="tv_subscriptions_title">Subscriptions</string>
-    <string name="tv_no_subscriptions">No subscription videos yet</string>
-    <string name="tv_search_hint">Search videos</string>
-    <string name="tv_search_empty">Search for videos to watch</string>
-    <string name="tv_search_no_results">No videos found</string>
-    <string name="tv_library_history">History</string>
-    <string name="tv_library_liked">Liked videos</string>
-    <string name="tv_library_playlists">Playlists</string>
-    <string name="tv_library_empty">Your library is empty</string>
-    <string name="tv_player_rewind">Rewind 10 seconds</string>
-    <string name="tv_player_fast_forward">Forward 10 seconds</string>
-    <string name="tv_player_close">Close player</string>
-    <string name="tv_subscriptions_empty">No subscription videos yet</string>
-    <string name="tv_search_prompt">Search for videos</string>
-    <string name="tv_search_action">Search</string>
-    <string name="tv_library_likes">Liked videos</string>
-    <string name="tv_library_watch_later">Watch later</string>
-    <string name="tv_music_empty">No music recommendations yet</string>
-    <string name="tv_music_charts">Charts</string>
-    <string name="tv_player_settings">Player settings</string>
     <string name="tv_player_queue">Queue</string>
-    <string name="tv_player_play_now">Play now</string>
-    <string name="tv_player_skip_segment">Skip %1$s</string>
-    <string name="tv_player_chapters">Chapters</string>
-    <string name="tv_more_replies">More replies</string>
-    <string name="tv_keyboard_space">Space</string>
-    <string name="tv_keyboard_delete">Delete</string>
-    <string name="tv_keyboard_clear">Clear</string>
-    <string name="tv_keyboard_voice">Voice search</string>
-    <string name="tv_filter_all">All</string>
-    <string name="tv_filter_videos">Videos</string>
-    <string name="tv_filter_channels">Channels</string>
-    <string name="tv_filter_playlists">Playlists</string>
-    <string name="tv_filter_artists">Artists</string>
-    <string name="tv_filter_live">Live</string>
-    <string name="tv_channel_videos">Videos</string>
-    <string name="tv_subscriptions_all">All channels</string>
-    <plurals name="tv_playlist_video_count">
-        <item quantity="one">%1$d video</item>
-        <item quantity="other">%1$d videos</item>
-    </plurals>
-    <string name="tv_music_lyrics">Lyrics</string>
-    <string name="tv_music_expand">Open full player</string>
-    <string name="tv_music_no_lyrics">No lyrics found</string>
-    <string name="tv_music_radio">Radio</string>
-    <string name="tv_settings_appearance">Appearance</string>
-    <string name="tv_settings_flow_engine">Flow Engine</string>
-    <string name="tv_settings_sync">Sync devices</string>
-    <string name="tv_sync_qr_session_active">This code stays active while this screen is open.</string>
     <string name="tv_remote_guide_title">Remote &amp; keypad guide</string>
     <string name="tv_remote_guide_subtitle">A quick reference for navigating Flow from the couch</string>
-    <string name="tv_remote_guide_back">Back to settings</string>
     <string name="tv_guide_navigation_title">Navigation</string>
     <string name="tv_guide_search_title">Search &amp; browse</string>
     <string name="tv_guide_playback_title">Playback</string>
@@ -3049,9 +3048,7 @@
     <string name="tv_guide_key_back">Back</string>
     <string name="tv_guide_key_left_edge">Left edge</string>
     <string name="tv_guide_key_rail">Rail</string>
-    <string name="tv_guide_key_edit">Edit keys</string>
     <string name="tv_guide_key_voice">Mic</string>
-    <string name="tv_guide_key_right">Right</string>
     <string name="tv_guide_key_left_right">Left / Right</string>
     <string name="tv_guide_key_hold">Hold</string>
     <string name="tv_guide_key_up">Up</string>
@@ -3062,11 +3059,10 @@
     <string name="tv_guide_back">Close the active panel, return to the previous screen, or move toward Home before exiting.</string>
     <string name="tv_guide_left_edge">Move left from the content boundary to open the navigation rail.</string>
     <string name="tv_guide_rail">Use Up and Down to choose a destination, OK to open it, and Right to return to content.</string>
-    <string name="tv_guide_search_keyboard">Move across the on-screen keyboard and filter rows.</string>
-    <string name="tv_guide_search_type">Enter the focused letter or activate a filter, suggestion, or result.</string>
-    <string name="tv_guide_search_edit">Use Space, Delete, and Clear on the bottom keyboard row to edit the query.</string>
+    <string name="tv_guide_search_field">On the search field, open the TV keyboard to type in any language.</string>
+    <string name="tv_guide_search_down">Move from the search bar into suggestions and results.</string>
+    <string name="tv_guide_search_open">Open the focused suggestion or result.</string>
     <string name="tv_guide_search_voice">Start voice search when the TV has a supported microphone service.</string>
-    <string name="tv_guide_search_results">Move from the keyboard into filters and results; use Up and Down between sections.</string>
     <string name="tv_guide_player_toggle">Play or pause and reveal the transport controls.</string>
     <string name="tv_guide_player_seek">Seek backward or forward; the seek bar shows the pending position.</string>
     <string name="tv_guide_player_hold">Hold Left or Right to accelerate scrubbing, then release to commit.</string>
@@ -3074,15 +3070,6 @@
     <string name="tv_guide_player_down">Reveal the transport controls and focus Play/Pause.</string>
     <string name="tv_guide_player_media">Play, Pause, Previous, Next, Rewind, Fast-forward, and Captions keys work directly.</string>
     <string name="tv_guide_player_back">Close a panel or the controls first; press again to leave the player.</string>
-    <string name="tv_settings_wifi_quality">Default quality (Wi‑Fi)</string>
-    <string name="tv_settings_cellular_quality">Default quality (cellular)</string>
-    <string name="tv_settings_codec">Preferred codec</string>
-    <string name="tv_theme_mode_title">Theme</string>
-    <string name="tv_theme_variant_title">Variant</string>
-    <string name="tv_theme_variant_light">Light</string>
-    <string name="tv_theme_variant_dark">Dark</string>
-    <string name="tv_theme_variant_amoled">AMOLED</string>
-    <string name="tv_about_version">Version %1$s</string>
     <!-- Home-screen widgets -->
     <string name="widget_now_playing_label">Now Playing</string>
     <string name="widget_now_playing_description">Control the music that\'s playing in Flow</string>
@@ -3639,6 +3626,9 @@
     <string name="settings_content_country_summary">Country used for trending, charts and recommendations</string>
     <string name="settings_keywords_region">trending region, country, location, charts</string>
     <string name="settings_keywords_language">locale, translation, titles</string>
+    <string name="settings_original_titles">Original titles</string>
+    <string name="settings_original_titles_summary">Show titles and descriptions in the video\'s own language</string>
+    <string name="settings_keywords_original_titles">untranslated, auto-translated, translation, original language, titles, descriptions</string>
     <string name="settings_section_speed">Speed</string>
     <string name="settings_section_player_buttons">Player buttons</string>
     <string name="settings_section_pip">Picture-in-picture and mini player</string>
@@ -3649,6 +3639,7 @@
     <string name="settings_section_advanced">Advanced</string>
     <string name="settings_keywords_autoplay">next video, up next, continuous play</string>
     <string name="settings_keywords_captions">subtitles, cc, closed captions</string>
+    <string name="settings_keywords_next_prev">skip, previous video, next video, double tap</string>
     <string name="settings_keywords_gestures">swipe, double tap, touch</string>
     <string name="settings_speed_preset_hint">e.g. 1.35</string>
     <string name="settings_speed_preset_add">Add preset</string>
@@ -3692,6 +3683,14 @@
     <string name="content_settings_open_links_some">On for %1$d of %2$d addresses</string>
     <string name="content_settings_open_links_off">Off. Links open in another app</string>
     <string name="content_settings_open_links_system_asks">Android asks which app to use</string>
+    <string name="content_settings_shared_links_title">Shared links</string>
+    <string name="content_settings_shared_links_subtitle">What a video shared to Flow does</string>
+    <string name="content_settings_shared_links_dialog_body">Links you tap in other apps always play.</string>
+    <string name="content_settings_shared_links_play">Play right away</string>
+    <string name="content_settings_shared_links_ask_while_playing">Ask while something plays</string>
+    <string name="content_settings_shared_links_always_ask">Always ask</string>
+    <string name="shared_link_play_now">Play now</string>
+    <string name="shared_link_play_now_desc">Replaces what is playing</string>
     <string name="settings_keywords_hide_watched">seen, already watched, filter</string>
     <string-array name="settings_block_suggestions">
         <item>ASMR</item>
@@ -3768,6 +3767,14 @@
     <string name="settings_diagnostics_copy_summary">Device details, warnings and crash reports</string>
     <string name="settings_diagnostics_share_summary">Send the report to another app</string>
     <string name="settings_diagnostics_reset_summary">Try this if videos stop or won\'t play</string>
+    <string name="settings_section_home_snapshots">Home snapshots</string>
+    <string name="diagnostics_record_home_snapshots">Record Home snapshots</string>
+    <string name="settings_diagnostics_record_snapshots_summary">Keeps your last 3 Home loads on this device for a recommendation report</string>
+    <string name="diagnostics_export_home_snapshot">Export latest snapshot</string>
+    <string name="settings_diagnostics_export_snapshot_summary">Contains titles from your watch history</string>
+    <string name="diagnostics_no_home_snapshot">Open Home with recording on first</string>
+    <string name="diagnostics_snapshot_exported">Snapshot exported</string>
+    <string name="diagnostics_snapshot_export_failed">Couldn\'t export the snapshot</string>
     <string name="settings_keywords_diagnostics">logs, crash, bug report, debug, support, logcat</string>
     <string name="donation_currency_bitcoin" translatable="false">Bitcoin</string>
     <string name="donation_currency_ethereum" translatable="false">Ethereum</string>
@@ -3864,7 +3871,6 @@
     </plurals>
     <string name="settings_custom_theme_in_use">In use</string>
     <string name="settings_custom_theme_export_failed">The theme could not be saved</string>
-
     <!-- Your taste -->
     <string name="taste_title">Your taste</string>
     <string name="taste_summary">How Flow sees you, and what shapes your feed</string>
@@ -3877,9 +3883,15 @@
     <string name="taste_interests_footer">Boost a topic to see more of it, or block it to see none of it.</string>
     <string name="taste_interests_empty">Watch a few videos and your interests show up here</string>
     <string name="taste_topic_boosted">Boosted</string>
+    <string name="taste_picks_header">Your picks</string>
+    <string name="taste_evidence_often">Watched often</string>
+    <string name="taste_evidence_some">Watched a few times</string>
+    <string name="taste_evidence_once">Watched once or twice</string>
+    <string name="taste_evidence_none">Not watched yet</string>
     <string name="taste_topic_boost">Show more like this</string>
     <string name="taste_topic_unboost">Stop boosting</string>
     <string name="taste_topic_block">Block topic</string>
+    <string name="taste_topic_block_named">Block %1$s</string>
     <string name="taste_channels_header">Channels it favours</string>
     <string name="taste_channel_block">Block channel</string>
     <string name="taste_item_actions">More options for %1$s</string>
@@ -3899,6 +3911,7 @@
     <string name="taste_hidden_artists">Artists</string>
     <string name="taste_unblock">Unblock</string>
     <string name="taste_unblock_item">Unblock %1$s</string>
+    <string name="taste_unknown_channel">Unknown channel</string>
     <string name="taste_data_header">Your data</string>
     <string name="taste_export_video">Export video profile</string>
     <string name="taste_import_video">Import video profile</string>
@@ -3906,14 +3919,15 @@
     <string name="taste_export_music">Export music profile</string>
     <string name="taste_import_music">Import music profile</string>
     <string name="taste_reset_music">Reset music profile</string>
-    <string name="taste_reset_video_body">This clears what Flow learned from your videos and starts again from zero. Your recap and hidden channels, topics and videos stay.</string>
+    <string name="taste_reset_video_body">Flow forgets what it learned from your videos and searches. History, likes, playlists and hidden items stay, and Home still uses them.</string>
     <string name="taste_reset_music_title">Reset music profile?</string>
     <string name="taste_reset_music_body">This clears what Flow learned from your music and starts again from zero. Your recap stays.</string>
     <string name="taste_trait_now">Now %1$s</string>
     <string name="taste_reset_done">Profile reset</string>
     <string name="diagnostics_engine_header">Engine details</string>
     <string name="diagnostics_engine_queries_none">None yet</string>
-
+    <string name="taste_starter_searches">Starter searches</string>
+    <string name="taste_starter_searches_detail">%1$s. Used until Flow learns what you watch.</string>
     <!-- Flow Recap -->
     <string name="recap_title">Flow Recap</string>
     <string name="recap_summary">What you watched and listened to, month by month</string>
@@ -4075,7 +4089,6 @@
         <item quantity="one">Imported %1$s, %2$d video</item>
         <item quantity="other">Imported %1$s, %2$d videos</item>
     </plurals>
-
     <!-- Watch later: remove watched videos (#1060) -->
     <string name="content_settings_remove_watched_watch_later_title">Remove watched videos</string>
     <string name="content_settings_remove_watched_watch_later_subtitle">Take videos out of Watch later once you finish them</string>
@@ -4136,6 +4149,16 @@
     <string name="save_as_playlist">Save as playlist</string>
     <string name="daily_mix_saved_as_playlist">Saved %1$s to your playlists</string>
     <string name="home_reason_channel_memory">From a channel you watch</string>
+    <string name="details_why_shown">Why you see this</string>
+    <string name="home_origin_subscription">From a channel you follow</string>
+    <string name="home_origin_related">Related to %1$s</string>
+    <string name="home_origin_related_watched">Related to a video you watched</string>
+    <string name="home_origin_search">From a search for %1$s</string>
+    <string name="home_origin_search_unnamed">From a search for your interests</string>
+    <string name="home_origin_channel_memory">From a channel you often watch</string>
+    <string name="home_origin_neighbour">A channel like %1$s</string>
+    <string name="home_origin_neighbour_unnamed">A channel like the ones you follow</string>
+    <string name="home_origin_neighbour_pair">%1$s and %2$s</string>
     <string name="taste_remembered_header">Channels you keep watching</string>
     <string name="taste_remembered_footer">New uploads from these channels show up on Home now and then. Subscribing to a channel or removing it takes it off this list.</string>
     <string name="taste_remembered_empty">Watch a channel a few times without subscribing and it shows up here.</string>
@@ -4148,6 +4171,14 @@
     <string name="home_chip_mixes">Mixes</string>
     <string name="home_chip_live">Live</string>
     <string name="home_chip_watched">Watched</string>
+    <string name="home_theme_science">Science &amp; tech</string>
+    <string name="home_theme_comedy">Comedy</string>
+    <string name="home_theme_film">Film &amp; animation</string>
+    <string name="home_theme_autos">Cars &amp; vehicles</string>
+    <string name="home_theme_pets">Pets &amp; animals</string>
+    <string name="home_theme_travel">Travel</string>
+    <string name="home_theme_howto">How-to &amp; style</string>
+    <string name="home_theme_nonprofits">Nonprofits</string>
     <string name="home_chip_description">Show %1$s on Home</string>
     <string name="home_chip_empty_title">Nothing here right now</string>
     <string name="home_chip_empty_body">Pull down to look again later.</string>
@@ -4175,6 +4206,8 @@
     <string name="discover_channels_title">Discover channels</string>
     <string name="discover_channels_summary">Search channels and subscribe, as at setup</string>
     <string name="discover_channels_suggested_footer">Channels you have watched a few times without subscribing.</string>
+    <string name="discover_channels_like_yours">Channels like yours</string>
+    <string name="discover_channels_like_yours_footer">Channels YouTube lists next to several of the ones you follow or watch.</string>
     <string name="favourite_artists_search">Search artists</string>
     <string name="favourite_artists_picked">Your picks</string>
     <string name="favourite_artists_popular">Popular now</string>
@@ -4199,6 +4232,7 @@
     <string name="settings_music_home_title">Music home</string>
     <string name="settings_music_home_summary">Choose the sections the music home shows</string>
     <string name="settings_music_home_sections">Sections</string>
+    <string name="settings_library_summary">Choose the sections Library shows</string>
     <string name="onboarding_step_artists">Artists</string>
     <string name="onboarding_artists_title">Pick some artists</string>
     <string name="onboarding_artists_subtitle">Your music picks start from them. Skip it if you like.</string>

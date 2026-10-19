@@ -22,7 +22,10 @@ import io.github.aedev.flow.data.recommendation.ChannelMemoryRepository
 import io.github.aedev.flow.data.recommendation.FeedExclusions
 import io.github.aedev.flow.data.recommendation.FlowNeuroEngine
 import io.github.aedev.flow.data.recommendation.GraphSeedInput
+import io.github.aedev.flow.data.recommendation.NeighbourChannel
+import io.github.aedev.flow.data.recommendation.NeighbourChannelsRepository
 import io.github.aedev.flow.data.recommendation.NeuroScoring
+import io.github.aedev.flow.data.recommendation.RankTrace
 import io.github.aedev.flow.data.recommendation.UserBrain
 import io.github.aedev.flow.data.repository.YouTubeRepository
 import io.github.aedev.flow.data.repository.needsChannelMetadata
@@ -34,33 +37,51 @@ import io.github.aedev.flow.ui.screens.home.chips.HomeChipFeeds
 import io.github.aedev.flow.ui.screens.home.chips.HomeChipsState
 import io.github.aedev.flow.utils.PerformanceDispatcher
 import io.github.aedev.flow.utils.ThumbnailUrlResolver
+import io.github.aedev.flow.utils.traced
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.supervisorScope
 import kotlinx.coroutines.withTimeoutOrNull
 import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.atomic.AtomicBoolean
 import javax.inject.Inject
 
 private data class Wave1FeedResults(
     val discovery: List<Pair<String, List<Video>>>,
     val related: RelatedGraphFetchResult,
+)
+
+/** Cards a load-more attempt found but did not show yet, with why each is there. */
+private class HeldPage(
+    val videos: List<Video>,
+    val origins: Map<String, HomeCardOrigin>,
+)
+
+private class PrefetchAttempt(
+    val outcome: LoadMoreOutcome,
+    val held: HeldPage? = null,
 )
 
 @HiltViewModel
@@ -79,6 +100,8 @@ class HomeViewModel
         private val viewHistory: ViewHistory,
         private val channelMemory: ChannelMemoryRepository,
         private val chipFeeds: HomeChipFeeds,
+        private val snapshotRecorder: HomeSnapshotRecorder,
+        private val neighbourChannels: NeighbourChannelsRepository,
         savedStateHandle: SavedStateHandle,
         @ApplicationContext private val appContext: Context,
     ) : ViewModel() {
@@ -93,6 +116,9 @@ class HomeViewModel
             private const val MAX_RELATED_SEEDS = 4
             private const val MIN_PAGE_SIZE = 8
             private const val LOAD_MORE_GRAPH_SEEDS = 3
+
+            // Saved rows of each source ranked again on load-more; the best of them fill the page.
+            private const val RESERVE_RERANK_PER_SOURCE = 16
             private const val MAX_SAVED_SEEDS = 5
             private const val SAVED_RELATED_SLOTS = 8
 
@@ -104,6 +130,14 @@ class HomeViewModel
 
             // Before the grid reports its viewport the first screen is still in view; never shift it.
             private const val LATE_SUBS_MIN_INDEX = 5
+            private const val SNAPSHOT_FEED_DEBOUNCE_MS = 2_000L
+
+            // Trace section the Home refresh benchmark reads (#1301).
+            private const val TRACE_WAVE1 = "home.wave1"
+
+            // Next pages of earlier searches a short load-more page may fetch.
+            private const val DEEPER_SEARCH_PAGES = 2
+            private const val SEARCH_TIMEOUT_MS = 6_000L
         }
 
         private val relatedPickIds = ConcurrentHashMap.newKeySet<String>()
@@ -134,11 +168,30 @@ class HomeViewModel
         private var subsBacklog: List<Video> = emptyList()
 
         private var currentQueryIndex = 0
+        private val searchPages = HomeSearchPages({ query, continuation -> repository.searchVideoPage(query, continuation) })
         private val discoveryQueries = mutableListOf<String>()
         private var wave2Job: Job? = null
         private var feedJob: Job? = null
         private var subsTopUpJob: Job? = null
         private var channelMemoryJob: Job? = null
+        private var neighbourJob: Job? = null
+        private var visibleMetadataJob: Job? = null
+
+        // Changes with every feed load, so work cancelled by leaving Home can tell it from a reload.
+        @Volatile
+        private var feedGeneration = 0
+
+        private val refreshFailureEvents = Channel<Unit>(Channel.CONFLATED)
+
+        /** A refresh that failed while the old feed stayed on screen. */
+        internal val refreshFailures: Flow<Unit> = refreshFailureEvents.receiveAsFlow()
+
+        // Neighbour cards already counted as shown; an ignored neighbour is dropped after a few.
+        private val shownNeighbourCards = ConcurrentHashMap.newKeySet<String>()
+
+        // Set while Diagnostics records Home snapshots: collects why each ranked card was admitted.
+        private var snapshotTrace: RankTrace? = null
+        private var snapshotFeedJob: Job? = null
 
         // The memory lane's share of the first page; late uploads and load-more pages stay within it.
         private var channelMemoryQuota = 0
@@ -336,7 +389,8 @@ class HomeViewModel
 
         private suspend fun drainHomePrefetchQueue(generation: Int) {
             var pagesLoaded = 0
-            var emptyPageAttempts = 0
+            var attempt = 0
+            var held: HeldPage? = null
             var allowRestart = true
             try {
                 wave2Job?.takeIf { it.isActive }?.join()
@@ -345,21 +399,33 @@ class HomeViewModel
                     val request = homePrefetchQueue.currentRequest(state.videos.size) ?: break
                     if (request.generation != generation || !state.hasMorePages) break
 
-                    _uiState.update { it.copy(isLoadingMore = true) }
-                    if (loadNextPrefetchPage(generation)) {
-                        pagesLoaded++
-                        continue
-                    }
+                    _uiState.update { it.copy(isLoadingMore = true, loadMoreFailed = false) }
+                    attempt++
+                    val result = loadNextPrefetchPage(generation, held, lastAttempt = attempt >= HOME_PREFETCH_EMPTY_PAGE_RETRIES)
+                    held = result.held
+                    if (!homePrefetchQueue.isCurrent(generation)) break
 
                     // A page that appended nothing leaves the feed at the same length, so the
                     // viewport index cannot change and nothing would re-arm this queue. Retry a
                     // few times — each attempt rotates queries and seeds — before giving up.
-                    emptyPageAttempts++
-                    if (emptyPageAttempts >= HOME_PREFETCH_EMPTY_PAGE_RETRIES) {
-                        allowRestart = false
-                        break
+                    when (val step = nextLoadMoreStep(result.outcome, attempt)) {
+                        LoadMoreStep.DONE -> {
+                            pagesLoaded++
+                        }
+
+                        LoadMoreStep.RETRY -> {
+                            if (result.outcome == LoadMoreOutcome.EXHAUSTED) delay(HOME_PREFETCH_EMPTY_PAGE_BACKOFF_MS * attempt)
+                        }
+
+                        LoadMoreStep.END_FEED, LoadMoreStep.STOP_FAILED -> {
+                            _uiState.update {
+                                if (step == LoadMoreStep.END_FEED) it.copy(hasMorePages = false) else it.copy(loadMoreFailed = true)
+                            }
+                            Log.w(TAG, "Load-more stopped: $step after $attempt attempts at ${state.videos.size} cards")
+                            allowRestart = false
+                            break
+                        }
                     }
-                    delay(HOME_PREFETCH_EMPTY_PAGE_BACKOFF_MS * emptyPageAttempts)
                 }
                 if (pagesLoaded >= HOME_PREFETCH_MAX_PAGES_PER_RUN) {
                     allowRestart = false
@@ -387,12 +453,18 @@ class HomeViewModel
             }
         }
 
+        /** The viewer's retry after a load-more that failed; the next scroll retries too. */
+        fun retryLoadMore() {
+            _uiState.update { it.copy(loadMoreFailed = false) }
+            startHomePrefetch(homePrefetchQueue.currentRequest(_uiState.value.videos.size))
+        }
+
         private fun resetHomePrefetch() {
             homePrefetchQueue.reset()
             synchronized(homePrefetchWorkerLock) {
                 homePrefetchJob?.cancel()
             }
-            _uiState.update { it.copy(isLoadingMore = false) }
+            _uiState.update { it.copy(isLoadingMore = false, loadMoreFailed = false) }
         }
 
         fun removeContinueWatchingEntry(videoId: String) {
@@ -442,11 +514,13 @@ class HomeViewModel
                         persistentHomeFeedCache.loadLastFeed(cacheFilters())
                     }.getOrElse { emptyList() }
                 if (cached.isEmpty()) return@launch
-                val hydratedCached = repository.enrichLikelyCollabAvatarStacks(cached, limit = 8)
 
+                // Shown before any network call: the collaboration avatars fill in after (#1301).
+                var shownIds = emptyList<String>()
                 _uiState.update { state ->
                     if (state.videos.isNotEmpty()) return@update state
-                    val videos = hydratedCached.filterWatched(watchedVideoIds.value)
+                    val videos = cached.filterWatched(watchedVideoIds.value)
+                    shownIds = videos.map { it.id }
                     HomeFeedCache.update(videos, state.shorts)
                     state.copy(
                         videos = videos,
@@ -454,6 +528,15 @@ class HomeViewModel
                         error = null,
                         lastRefreshTime = System.currentTimeMillis(),
                     )
+                }
+                if (shownIds.isEmpty()) return@launch
+                val hydratedCached = repository.enrichLikelyCollabAvatarStacks(cached, limit = 8)
+                if (hydratedCached != cached) {
+                    val hydratedById = hydratedCached.associateBy { it.id }
+                    _uiState.update { state ->
+                        if (state.videos.map { it.id } != shownIds) return@update state
+                        state.copy(videos = state.videos.map { hydratedById[it.id] ?: it })
+                    }
                 }
                 enrichVisibleChannelMetadata(hydratedCached)?.let {
                     persistentHomeFeedCache.saveLastFeed(it)
@@ -468,12 +551,15 @@ class HomeViewModel
             feedJob?.cancel()
             subsTopUpJob?.cancel()
             channelMemoryJob?.cancel()
+            visibleMetadataJob?.cancel()
+            feedGeneration++
             _uiState.update { it.copy(isLoading = true, error = null) }
 
             feedJob =
                 viewModelScope.launch(PerformanceDispatcher.networkIO) {
                     try {
                         discoveryQueries.clear()
+                        searchPages.reset()
                         // A refresh restarts the discovery tree at its roots (broad pass);
                         // load-more regenerations then dig deeper per cluster.
                         discoveryQueries.addAll(FlowNeuroEngine.generateDiscoveryQueries(resetDepth = true))
@@ -489,33 +575,35 @@ class HomeViewModel
                         currentQueryIndex = wave1QueryCount
 
                         val results =
-                            supervisorScope {
-                                val deferredDiscovery =
-                                    async {
-                                        wave1Queries
-                                            .map { query ->
-                                                async {
-                                                    query to
-                                                        runCatching {
-                                                            repository.searchVideos(query).first
-                                                        }.getOrElse { emptyList() }
-                                                }
-                                            }.awaitAll()
-                                    }
+                            traced(TRACE_WAVE1) {
+                                supervisorScope {
+                                    val deferredDiscovery =
+                                        async {
+                                            wave1Queries
+                                                .map { query ->
+                                                    async {
+                                                        query to
+                                                            runCatching {
+                                                                withTimeoutOrNull(SEARCH_TIMEOUT_MS) { searchPages.firstPage(query) }
+                                                            }.getOrNull().orEmpty()
+                                                    }
+                                                }.awaitAll()
+                                        }
 
-                                // ── Related-graph lane: harvest /next neighbours of recent positives ──
-                                val deferredRelated =
-                                    async {
-                                        val seedInputs = feedSources.historySeedInputs()
-                                        val longTermInputs = feedSources.longTermSeedInputs()
-                                        val seedIds = FlowNeuroEngine.selectRelatedSeeds(seedInputs, MAX_RELATED_SEEDS, longTermInputs)
-                                        feedSources.fetchRelatedGraph(seedInputs + longTermInputs, seedIds, ::cacheFilters)
-                                    }
+                                    // ── Related-graph lane: harvest /next neighbours of recent positives ──
+                                    val deferredRelated =
+                                        async {
+                                            val seedInputs = feedSources.historySeedInputs()
+                                            val longTermInputs = feedSources.longTermSeedInputs()
+                                            val seedIds = FlowNeuroEngine.selectRelatedSeeds(seedInputs, MAX_RELATED_SEEDS, longTermInputs)
+                                            feedSources.fetchRelatedGraph(seedInputs + longTermInputs, seedIds, ::cacheFilters)
+                                        }
 
-                                Wave1FeedResults(
-                                    discovery = deferredDiscovery.await(),
-                                    related = deferredRelated.await(),
-                                )
+                                    Wave1FeedResults(
+                                        discovery = deferredDiscovery.await(),
+                                        related = deferredRelated.await(),
+                                    )
+                                }
                             }
 
                         val discoveryPairs = results.discovery
@@ -572,6 +660,19 @@ class HomeViewModel
                         val watched = watchedVideoIds.value
                         // Cached uploads only: the network refresh runs after first paint.
                         val rawMemory = runCatching { channelMemory.storedUploads(now) }.getOrDefault(emptyList())
+                        val neighbours =
+                            runCatching {
+                                val followed =
+                                    subscriptionRepository.getAllSubscriptions().first().associate {
+                                        it.channelId to
+                                            it.channelName
+                                    }
+                                neighbourChannels.neighbours(followed, now)
+                            }.getOrDefault(emptyList())
+                        val rawNeighbours = runCatching { neighbourChannels.storedUploads(neighbours, now) }.getOrDefault(emptyList())
+                        val trace = if (snapshotRecorder.isRecording()) RankTrace() else null
+                        snapshotTrace = trace
+                        if (trace == null) snapshotFeedJob?.cancel()
                         val lanes =
                             buildHomeFeedLanes(
                                 rawSubs = storedFeed.storedSubscriptionVideos(now),
@@ -586,7 +687,13 @@ class HomeViewModel
                                 now = now,
                                 freshSlotTarget = dynamicFreshSubSlots(userSubs.size),
                                 subAvatarMap = subAvatarMap,
-                                rank = { pool -> FlowNeuroEngine.rank(pool, userSubs) },
+                                rank = { pool -> FlowNeuroEngine.rank(pool, userSubs, trace = trace) },
+                                rankRelevant = { pool ->
+                                    FlowNeuroEngine.rank(pool, userSubs, NeuroScoring.LANE_RELEVANCE_FLOOR, trace)
+                                },
+                                share = FlowNeuroEngine::shareByInterest,
+                                rawNeighbours = rawNeighbours,
+                                searchOf = queriesById(discoveryPairs)::get,
                             )
 
                         Log.d(
@@ -605,17 +712,13 @@ class HomeViewModel
                         val finalMix = mix.videos
                         subsBacklog = mix.subsBacklog
                         channelMemoryQuota = mix.quotas[FeedSource.CHANNEL_MEMORY] ?: 0
-                        val memoryIds =
-                            mix.sourceMix.items
-                                .filter { it.source == FeedSource.CHANNEL_MEMORY }
-                                .mapTo(HashSet()) { it.video.id }
                         relatedPickIds.clear()
                         mix.sourceMix.items
                             .filter { it.source == FeedSource.RELATED }
                             .mapTo(relatedPickIds) { it.video.id }
 
                         if (finalMix.isEmpty()) {
-                            settleWithoutFeed()
+                            settleWithoutFeed(error = null)
                             return@launch
                         }
                         val relatedMetrics =
@@ -641,25 +744,47 @@ class HomeViewModel
                                 "quotas=${mix.quotas}, selected=${mix.sourceMix.sourceCounts}",
                         )
 
+                        val sourceById = mix.sourceMix.items.associate { it.video.id to it.source }
                         val spacedMix =
                             repository.enrichLikelyCollabAvatarStacks(
-                                spaceByChannel(finalMix),
+                                spaceByChannel(
+                                    rhythmBySource(
+                                        finalMix,
+                                        isSubscribed = { it.channelId in userSubs },
+                                        sourceOf = { sourceById[it.id] },
+                                        keepTop = mix.freshAdded,
+                                        deferExtra = true,
+                                        minSize = FIRST_PAGE_MIN_SIZE,
+                                    ),
+                                    gap = CHANNEL_GAP,
+                                ),
                                 limit = 8,
                             )
                         val renderedIds = spacedMix.mapTo(HashSet()) { it.id }
+                        val origins =
+                            pageOrigins(
+                                spacedMix,
+                                sourceById::get,
+                                relatedSeedTitles(lanes.relatedCandidates, relatedFetch.seedInputs, relatedPickIds),
+                                queriesById(discoveryPairs),
+                                userSubs,
+                                neighbourPointerTexts(
+                                    neighbours,
+                                ) { a, b -> appContext.getString(R.string.home_origin_neighbour_pair, a, b) },
+                            )
                         val reserveCandidates =
                             cacheRelatedCandidates(lanes.bestRelated, lanes.relatedMetadata, renderedIds) +
-                                cacheCandidates(FeedSource.DISCOVERY, lanes.bestDiscovery, renderedIds) +
-                                cacheCandidates(FeedSource.SUBS, lanes.bestSubs, renderedIds)
+                                cacheCandidates(FeedSource.DISCOVERY, lanes.bestDiscovery, renderedIds)
                         var visibleFeed = emptyList<Video>()
                         _uiState.update { state ->
                             visibleFeed = spacedMix.filterWatched(watchedVideoIds.value)
                             state.copy(
                                 videos = visibleFeed,
-                                channelMemoryVideoIds = memoryIds,
+                                origins = origins,
                                 isLoading = false,
                                 isRefreshing = false,
                                 hasMorePages = true,
+                                loadMoreFailed = false,
                                 isFlowFeed = true,
                                 lastRefreshTime = now,
                             )
@@ -667,9 +792,28 @@ class HomeViewModel
                         HomeFeedCache.update(visibleFeed, _uiState.value.shorts)
                         persistentHomeFeedCache.saveLastFeed(spacedMix)
                         persistentHomeFeedCache.saveReserve(reserveCandidates)
-                        enrichVisibleChannelMetadata(spacedMix)?.let {
-                            persistentHomeFeedCache.saveLastFeed(it)
+                        if (trace != null) {
+                            snapshotRecorder.record(
+                                createdAt = now,
+                                subscriptions = userSubs,
+                                watched = watched,
+                                discovery = discoveryPairs,
+                                related = relatedFetch,
+                                subscriptionFeed = storedFeed,
+                                memory = rawMemory,
+                                page = spacedMix,
+                                sourceOf = sourceById::get,
+                                trace = trace,
+                            )
+                            recordShownFeed(trace)
                         }
+                        // Its own job: feedJob ends once the feed is on screen, so a pull never waits on these lookups.
+                        visibleMetadataJob =
+                            viewModelScope.launch(PerformanceDispatcher.networkIO) {
+                                enrichVisibleChannelMetadata(spacedMix)?.let {
+                                    persistentHomeFeedCache.saveLastFeed(it)
+                                }
+                            }
 
                         // Enrich (post-paint) with related neighbours of saved/watched videos.
                         enrichFeedWithSavedInterest(userSubs, taste)
@@ -677,19 +821,50 @@ class HomeViewModel
                         startWave2Discovery(finalMix, userSubs, taste)
                         startSubscriptionTopUp(userSubs, storedFeed)
                         startChannelMemoryRefresh(userSubs)
+                        val offTopicNeighbours = rawNeighbours.map { it.channelId }.toSet() - lanes.relevantNeighbourChannels
+                        startNeighbourRefresh(neighbours, offTopicNeighbours, storedFeed, userSubs)
                         chipFeeds.refreshChips()
                     } catch (cancellation: CancellationException) {
                         throw cancellation
                     } catch (e: Exception) {
-                        _uiState.update {
-                            it.copy(
-                                isLoading = false,
-                                isRefreshing = false,
-                                error = appContext.getString(R.string.error_failed_to_load_feed),
-                            )
-                        }
-                        settleWithoutFeed()
+                        Log.w(TAG, "Home feed load failed: ${e::class.simpleName}: ${e.message}")
+                        settleWithoutFeed(error = appContext.getString(R.string.error_failed_to_load_feed))
                     }
+                }
+        }
+
+        /** Keeps the recorded snapshot's shown feed current as wave 2, late uploads and load-more add to it. */
+        @OptIn(FlowPreview::class)
+        private fun recordShownFeed(trace: RankTrace) {
+            snapshotFeedJob?.cancel()
+            snapshotFeedJob =
+                viewModelScope.launch(PerformanceDispatcher.diskIO) {
+                    _uiState
+                        .map { it.videos }
+                        .distinctUntilChanged()
+                        .debounce(SNAPSHOT_FEED_DEBOUNCE_MS)
+                        .collect { videos -> snapshotRecorder.recordShown(videos, _uiState.value.origins, trace) }
+                }
+        }
+
+        /**
+         * After paint: fetches the newest uploads of neighbour channels for the next load, and lets two
+         * recent uploads of followed channels teach which channels sit beside them (#907).
+         */
+        private fun startNeighbourRefresh(
+            neighbours: List<NeighbourChannel>,
+            offTopic: Set<String>,
+            subscriptionFeed: List<Video>,
+            followed: Set<String>,
+        ) {
+            neighbourJob?.cancel()
+            neighbourJob =
+                viewModelScope.launch(PerformanceDispatcher.networkIO) {
+                    runCatching { neighbourChannels.dropOffTopic(offTopic) }.onFailure { if (it is CancellationException) throw it }
+                    runCatching { neighbourChannels.refresh(neighbours.filter { it.channelId !in offTopic }) }
+                        .onFailure { if (it is CancellationException) throw it else Log.d(TAG, "Neighbour refresh failed: ${it.message}") }
+                    runCatching { feedSources.learnFromFollowed(subscriptionFeed, followed, ::cacheFilters) }
+                        .onFailure { if (it is CancellationException) throw it else Log.d(TAG, "Followed co-watch failed: ${it.message}") }
                 }
         }
 
@@ -700,8 +875,11 @@ class HomeViewModel
             taste: FeedTasteProfile,
         ) {
             val wave2Queries = discoveryQueries.drop(currentQueryIndex)
+            // Asked once whatever they return: load-more must not search them again (#907).
+            currentQueryIndex = discoveryQueries.size
             if (wave2Queries.isNotEmpty()) {
                 val wave2FinalMixIds = finalMix.map { it.id }.toHashSet()
+                val generation = feedGeneration
                 wave2Job =
                     viewModelScope.launch(PerformanceDispatcher.networkIO) wave2@{
                         try {
@@ -712,7 +890,7 @@ class HomeViewModel
                                             q to (
                                                 withTimeoutOrNull(6_000L) {
                                                     try {
-                                                        repository.searchVideos(q).first
+                                                        searchPages.firstPage(q)
                                                     } catch (cancellation: CancellationException) {
                                                         throw cancellation
                                                     } catch (error: Exception) {
@@ -737,8 +915,13 @@ class HomeViewModel
                             if (wave2Valid.isEmpty()) return@wave2
 
                             val wave2Ranked =
-                                demoteByFit(FlowNeuroEngine.rank(wave2Valid, userSubs), taste)
-                                    .take(15)
+                                FlowNeuroEngine
+                                    .shareByInterest(
+                                        demoteByFit(
+                                            FlowNeuroEngine.rank(wave2Valid, userSubs, NeuroScoring.LANE_RELEVANCE_FLOOR, snapshotTrace),
+                                            taste,
+                                        ),
+                                    ).take(15)
 
                             if (wave2Ranked.isNotEmpty()) {
                                 var updatedSnapshot: List<Video>? = null
@@ -748,18 +931,25 @@ class HomeViewModel
                                         wave2Ranked
                                             .filterWatched(watchedVideoIds.value)
                                             .filter { !currentIds.contains(it.id) }
+                                            .filterNot { video -> state.videos.any { it.channelId == video.channelId } }
                                             .distinctBy { it.channelId }
                                     if (uniqueNew.isEmpty()) return@update state
                                     val updated = state.videos + uniqueNew
                                     updatedSnapshot = updated
                                     HomeFeedCache.update(updated, state.shorts)
-                                    state.copy(videos = updated)
+                                    state.copy(
+                                        videos = updated,
+                                        origins =
+                                            state.origins + pageOrigins(uniqueNew, { null }, emptyMap(), queriesById(wave2Raw), userSubs),
+                                    )
                                 }
                                 updatedSnapshot?.let { persistentHomeFeedCache.saveLastFeed(it) }
-                                currentQueryIndex = discoveryQueries.size
                                 Log.d(TAG, "Wave 2 merged ${wave2Ranked.size} extra candidates")
                             }
                         } catch (cancellation: CancellationException) {
+                            // Leaving Home cancelled it, not a reload: load-more asks them instead.
+                            // Any that finished come back from the page cache without a request.
+                            if (generation == feedGeneration) discoveryQueries.addAll(wave2Queries)
                             throw cancellation
                         } catch (error: Exception) {
                             Log.d(TAG, "Wave 2 failed: ${error.message}")
@@ -790,30 +980,49 @@ class HomeViewModel
             }
         }
 
-        /** Cheapest load-more source: candidates already fetched and persisted by an earlier pass. */
+        /**
+         * Cheapest load-more source: candidates already fetched and persisted by an earlier pass, ranked
+         * again because the viewer's taste may have moved since they were saved.
+         */
         private suspend fun fillPageFromReserve(
             page: MutableList<Video>,
             channelCounts: MutableMap<String, Int>,
             pageIds: MutableSet<String>,
+            userSubs: Set<String>,
             now: Long,
+            searchIds: MutableSet<String>,
         ): Int {
             val reserveRows =
                 try {
-                    persistentHomeFeedCache.loadReservePage(cacheFilters())
+                    persistentHomeFeedCache.loadReservePage(
+                        cacheFilters(),
+                        maxRelated = RESERVE_RERANK_PER_SOURCE,
+                        maxDiscovery = RESERVE_RERANK_PER_SOURCE,
+                    )
                 } catch (cancellation: CancellationException) {
                     throw cancellation
                 } catch (error: Exception) {
                     Log.d(TAG, "Reserve prefetch unavailable: ${error.message}")
                     emptyList()
                 }
-            reserveRows
-                .filter { it.source == HomeFeedCacheRepository.SOURCE_RELATED }
-                .mapTo(relatedPickIds) { it.video.id }
-            val reserveVideos =
+            if (reserveRows.isEmpty()) return 0
+            val relatedIds =
                 reserveRows
-                    .map { it.video }
-                    .filterValid()
-                    .filterRecentHomeSuggestion(now)
+                    .filter { it.source == HomeFeedCacheRepository.SOURCE_RELATED }
+                    .mapTo(HashSet()) { it.video.id }
+            val reserveVideos =
+                FlowNeuroEngine.shareByInterest(
+                    FlowNeuroEngine.rank(
+                        reserveRows
+                            .map { it.video }
+                            .filterValid()
+                            .filterRecentHomeSuggestion(now),
+                        userSubs,
+                        NeuroScoring.LANE_RELEVANCE_FLOOR,
+                        snapshotTrace,
+                    ),
+                )
+            val start = page.size
             val reserveAdded =
                 addUniquePageVideos(
                     candidates = reserveVideos,
@@ -822,10 +1031,12 @@ class HomeViewModel
                     usedVideoIds = pageIds,
                     targetSize = MIN_PAGE_SIZE,
                 )
-            if (reserveAdded > 0) {
-                runCatching {
-                    persistentHomeFeedCache.consumeReserve(page.take(reserveAdded).map { it.id })
-                }
+            // Channel memory may already be on the page, so the served rows are the ones added here.
+            val served = page.drop(start).map { it.id }
+            served.filterTo(relatedPickIds) { it in relatedIds }
+            served.filterNotTo(searchIds) { it in relatedIds }
+            if (served.isNotEmpty()) {
+                runCatching { persistentHomeFeedCache.consumeReserve(served) }
             }
             return reserveAdded
         }
@@ -842,12 +1053,14 @@ class HomeViewModel
             userSubs: Set<String>,
             taste: FeedTasteProfile,
             brain: UserBrain,
+            relatedTo: MutableMap<String, String>,
         ): Int {
             val seedInputs = loadMoreSeedInputs()
-            val seedIds = FlowNeuroEngine.selectRelatedSeeds(seedInputs, LOAD_MORE_GRAPH_SEEDS)
+            val longTermInputs = feedSources.longTermSeedInputs()
+            val seedIds = FlowNeuroEngine.selectRelatedSeeds(seedInputs, LOAD_MORE_GRAPH_SEEDS, longTermInputs)
             if (seedIds.isEmpty()) return 0
 
-            val graphFetch = feedSources.fetchRelatedGraph(seedInputs, seedIds, ::cacheFilters)
+            val graphFetch = feedSources.fetchRelatedGraph(seedInputs + longTermInputs, seedIds, ::cacheFilters)
             val graphCandidates =
                 graphFetch.candidates
                     .filterValidGraph()
@@ -855,12 +1068,19 @@ class HomeViewModel
                     .filterRecentHomeSuggestionGraph(now)
             val graphMetadata = graphCandidates.associateBy { it.video.id }
             val graphRanked =
-                demoteByFit(
-                    applyGraphBoost(
-                        FlowNeuroEngine.rank(graphCandidates.map { it.video }, userSubs),
-                        graphMetadata,
+                FlowNeuroEngine.shareByInterest(
+                    demoteByFit(
+                        applyGraphBoost(
+                            FlowNeuroEngine.rank(
+                                graphCandidates.map { it.video },
+                                userSubs,
+                                NeuroScoring.LANE_RELEVANCE_FLOOR,
+                                snapshotTrace,
+                            ),
+                            graphMetadata,
+                        ),
+                        taste,
                     ),
-                    taste,
                 )
             val graphStartIndex = page.size
             addUniquePageVideos(
@@ -870,7 +1090,9 @@ class HomeViewModel
                 usedVideoIds = pageIds,
                 targetSize = MIN_PAGE_SIZE,
             )
-            page.drop(graphStartIndex).mapTo(relatedPickIds) { it.id }
+            val graphAdded = page.drop(graphStartIndex).mapTo(HashSet()) { it.id }
+            relatedPickIds += graphAdded
+            relatedTo += relatedSeedTitles(graphCandidates, graphFetch.seedInputs, graphAdded)
             persistentHomeFeedCache.saveReserve(
                 cacheRelatedCandidates(graphRanked, graphMetadata, pageIds),
             )
@@ -894,7 +1116,15 @@ class HomeViewModel
             return seedIds.size
         }
 
-        private suspend fun loadNextPrefetchPage(generation: Int): Boolean {
+        /**
+         * One load-more attempt. Cards [held] from the run's earlier attempts start the page, and a
+         * page too small to show is handed back held unless this is the [lastAttempt].
+         */
+        private suspend fun loadNextPrefetchPage(
+            generation: Int,
+            held: HeldPage?,
+            lastAttempt: Boolean,
+        ): PrefetchAttempt {
             try {
                 val now = System.currentTimeMillis()
                 val userSubs = subscriptionScope().boosted
@@ -904,57 +1134,103 @@ class HomeViewModel
                     _uiState.value.videos
                         .map { it.id }
                         .toHashSet()
-                val page = mutableListOf<Video>()
-                val channelCounts = HashMap<String, Int>()
+                val page = held?.videos.orEmpty().toMutableList()
+                // Channels the viewer just scrolled past count as used, so a new page never repeats them.
+                val channelCounts =
+                    (_uiState.value.videos.takeLast(RECENT_CHANNEL_WINDOW) + page)
+                        .filter { it.channelId.isNotBlank() }
+                        .associateTo(HashMap()) { it.channelId to 1 }
                 val pageIds = HashSet<String>(currentIds)
+                page.mapTo(pageIds) { it.id }
+                val relatedTo = HashMap<String, String>()
+                val queries = HashMap<String, String>()
+                val requestFailed = AtomicBoolean(false)
+
+                val reserveSearchIds = HashSet<String>()
+
+                fun origins() =
+                    pageOrigins(
+                        page,
+                        {
+                            when (it) {
+                                in relatedPickIds -> FeedSource.RELATED
+                                in reserveSearchIds -> FeedSource.DISCOVERY
+                                else -> null
+                            }
+                        },
+                        relatedTo,
+                        queries,
+                        userSubs,
+                    ) + held?.origins.orEmpty()
+
+                suspend fun finish(): PrefetchAttempt =
+                    when (val outcome = loadMoreOutcome(page.size, lastAttempt, requestFailed.get())) {
+                        LoadMoreOutcome.APPENDED -> {
+                            val appended = appendLoadMorePage(page, generation, origins())
+                            appended?.let { persistentHomeFeedCache.saveLastFeed(it) }
+                            PrefetchAttempt(if (appended != null) LoadMoreOutcome.APPENDED else LoadMoreOutcome.EXHAUSTED)
+                        }
+
+                        LoadMoreOutcome.HELD -> {
+                            PrefetchAttempt(outcome, HeldPage(page.toList(), origins()))
+                        }
+
+                        else -> {
+                            PrefetchAttempt(outcome)
+                        }
+                    }
 
                 fillPageFromChannelMemory(page, channelCounts, pageIds, userSubs, now)
 
-                val reserveAdded = fillPageFromReserve(page, channelCounts, pageIds, now)
+                val reserveAdded = fillPageFromReserve(page, channelCounts, pageIds, userSubs, now, reserveSearchIds)
+                reserveSearchIds.forEach { id -> searchPages.queryOf(id)?.let { queries[id] = it } }
                 if (page.size >= MIN_PAGE_SIZE) {
-                    val appended = appendLoadMorePage(page, generation)
-                    appended?.let { persistentHomeFeedCache.saveLastFeed(it) }
                     Log.d(TAG, "Load-more filled from reserve: +$reserveAdded")
-                    return appended != null
+                    return finish()
                 }
 
-                val graphSeedCount = fillPageFromRelatedGraph(page, channelCounts, pageIds, now, userSubs, taste, brain)
+                val graphSeedCount = fillPageFromRelatedGraph(page, channelCounts, pageIds, now, userSubs, taste, brain, relatedTo)
                 if (page.size >= MIN_PAGE_SIZE) {
-                    val appended = appendLoadMorePage(page, generation)
-                    appended?.let { persistentHomeFeedCache.saveLastFeed(it) }
                     Log.d(TAG, "Load-more filled from reserve/graph: reserve=$reserveAdded graphSeeds=$graphSeedCount")
-                    return appended != null
+                    return finish()
                 }
 
                 if (currentQueryIndex >= discoveryQueries.size) {
-                    discoveryQueries.addAll(FlowNeuroEngine.generateDiscoveryQueries())
+                    discoveryQueries.addAll(unaskedQueries(FlowNeuroEngine.generateDiscoveryQueries(), discoveryQueries))
                 }
 
+                // The next page of a search already filling Home takes one of the two searches.
+                val continued = nextSearchPage(requestFailed) { searchPages.nextPageOfProductive(_uiState.value.origins) }
                 val queryA = discoveryQueries.getOrNull(currentQueryIndex++)
-                val queryB = discoveryQueries.getOrNull(currentQueryIndex++)
+                val queryB = if (continued == null) discoveryQueries.getOrNull(currentQueryIndex++) else null
 
                 val searchQueries = listOfNotNull(queryA, queryB)
 
-                val rawVideos =
-                    coroutineScope {
-                        searchQueries
-                            .map { query ->
-                                async {
-                                    withTimeoutOrNull(6_000L) {
-                                        try {
-                                            repository.searchVideos(query).first
-                                        } catch (cancellation: CancellationException) {
-                                            throw cancellation
-                                        } catch (error: Exception) {
-                                            Log.d(TAG, "Prefetch query failed for $query: ${error.message}")
-                                            emptyList()
-                                        }
-                                    } ?: emptyList()
-                                }
-                            }.awaitAll()
-                            .flatten()
-                    }
-                if (!homePrefetchQueue.isCurrent(generation)) return false
+                val searches =
+                    listOfNotNull(continued) +
+                        coroutineScope {
+                            searchQueries
+                                .map { query ->
+                                    async {
+                                        query to (
+                                            withTimeoutOrNull(SEARCH_TIMEOUT_MS) {
+                                                try {
+                                                    searchPages.firstPage(query)
+                                                } catch (cancellation: CancellationException) {
+                                                    throw cancellation
+                                                } catch (error: Exception) {
+                                                    Log.d(TAG, "Prefetch query failed for $query: ${error.message}")
+                                                    requestFailed.set(true)
+                                                    emptyList()
+                                                }
+                                            } ?: emptyList<Video>().also { requestFailed.set(true) }
+                                        )
+                                    }
+                                }.awaitAll()
+                        }
+                queries += queriesById(searches)
+                val rawVideos = searches.flatMap { it.second }
+                if (!homePrefetchQueue.isCurrent(generation)) return PrefetchAttempt(LoadMoreOutcome.EXHAUSTED)
 
                 // Extract shorts for shelf — rank through FlowNeuro
                 val moreShorts =
@@ -973,14 +1249,21 @@ class HomeViewModel
                     }
                 }
 
-                val newVideos =
-                    rawVideos
-                        .filterValid()
-                        .filterWatched(watchedVideoIds.value)
-                        .filterRecentHomeSuggestion(now)
-
-                if (newVideos.isNotEmpty()) {
-                    val rankedDiscovery = demoteByFit(FlowNeuroEngine.rank(newVideos, userSubs), taste)
+                suspend fun addDiscovery(videos: List<Video>) {
+                    val newVideos =
+                        videos
+                            .filterValid()
+                            .filterWatched(watchedVideoIds.value)
+                            .filterRecentHomeSuggestion(now)
+                    if (newVideos.isEmpty()) return
+                    val rankedDiscovery =
+                        FlowNeuroEngine
+                            .shareByInterest(
+                                demoteByFit(
+                                    FlowNeuroEngine.rank(newVideos, userSubs, NeuroScoring.LANE_RELEVANCE_FLOOR, snapshotTrace),
+                                    taste,
+                                ),
+                            ).let { spreadAcrossSearches(it, queries::get, it.size) }
                     addUniquePageVideos(
                         candidates = rankedDiscovery,
                         targetList = page,
@@ -991,6 +1274,15 @@ class HomeViewModel
                     persistentHomeFeedCache.saveReserve(
                         cacheCandidates(FeedSource.DISCOVERY, rankedDiscovery, pageIds),
                     )
+                }
+                addDiscovery(rawVideos)
+
+                // Still short: the next pages of searches already made, before any wider related pass (#907).
+                repeat(DEEPER_SEARCH_PAGES) {
+                    if (page.size >= MIN_PAGE_SIZE || !homePrefetchQueue.isCurrent(generation)) return@repeat
+                    val (query, deeper) = nextSearchPage(requestFailed) { searchPages.nextPageOfAny() } ?: return@repeat
+                    queries += queriesById(listOf(query to deeper))
+                    addDiscovery(deeper)
                 }
 
                 if (page.size < MIN_PAGE_SIZE && subsBacklog.isNotEmpty()) {
@@ -1012,11 +1304,12 @@ class HomeViewModel
                 // its scarcity fallback re-admits cooled seeds when the pool is thin.
                 if (page.size < MIN_PAGE_SIZE) {
                     val fallbackInputs = loadMoreSeedInputs()
+                    val fallbackLongTerm = feedSources.longTermSeedInputs()
                     val fallbackSeeds =
-                        FlowNeuroEngine.selectRelatedSeeds(fallbackInputs, LOAD_MORE_FALLBACK_SEEDS)
+                        FlowNeuroEngine.selectRelatedSeeds(fallbackInputs, LOAD_MORE_FALLBACK_SEEDS, fallbackLongTerm)
                     if (fallbackSeeds.isNotEmpty() && homePrefetchQueue.isCurrent(generation)) {
                         val fallbackFetch =
-                            feedSources.fetchRelatedGraph(fallbackInputs, fallbackSeeds, ::cacheFilters)
+                            feedSources.fetchRelatedGraph(fallbackInputs + fallbackLongTerm, fallbackSeeds, ::cacheFilters)
                         val fallbackCandidates =
                             fallbackFetch.candidates
                                 .filterValidGraph()
@@ -1024,12 +1317,19 @@ class HomeViewModel
                                 .filterRecentHomeSuggestionGraph(now)
                         val fallbackMetadata = fallbackCandidates.associateBy { it.video.id }
                         val fallbackRanked =
-                            demoteByFit(
-                                applyGraphBoost(
-                                    FlowNeuroEngine.rank(fallbackCandidates.map { it.video }, userSubs),
-                                    fallbackMetadata,
+                            FlowNeuroEngine.shareByInterest(
+                                demoteByFit(
+                                    applyGraphBoost(
+                                        FlowNeuroEngine.rank(
+                                            fallbackCandidates.map { it.video },
+                                            userSubs,
+                                            NeuroScoring.LANE_RELEVANCE_FLOOR,
+                                            snapshotTrace,
+                                        ),
+                                        fallbackMetadata,
+                                    ),
+                                    taste,
                                 ),
-                                taste,
                             )
                         val fallbackStartIndex = page.size
                         addUniquePageVideos(
@@ -1039,7 +1339,9 @@ class HomeViewModel
                             usedVideoIds = pageIds,
                             targetSize = MIN_PAGE_SIZE,
                         )
-                        page.drop(fallbackStartIndex).mapTo(relatedPickIds) { it.id }
+                        val fallbackAdded = page.drop(fallbackStartIndex).mapTo(HashSet()) { it.id }
+                        relatedPickIds += fallbackAdded
+                        relatedTo += relatedSeedTitles(fallbackCandidates, fallbackFetch.seedInputs, fallbackAdded)
                         persistentHomeFeedCache.saveReserve(
                             cacheRelatedCandidates(fallbackRanked, fallbackMetadata, pageIds),
                         )
@@ -1047,26 +1349,43 @@ class HomeViewModel
                     }
                 }
 
-                if (page.isNotEmpty()) {
-                    val appended = appendLoadMorePage(page, generation)
-                    appended?.let { persistentHomeFeedCache.saveLastFeed(it) }
-                    return appended != null
-                }
-                return false
+                return finish()
             } catch (cancellation: CancellationException) {
                 throw cancellation
             } catch (error: Exception) {
                 Log.d(TAG, "Home prefetch page failed: ${error.message}")
-                return false
+                return PrefetchAttempt(LoadMoreOutcome.FAILED)
             }
+        }
+
+        /** The next page [fetch] picks, or null when there is none or its request failed, which [failed] records. */
+        private suspend fun nextSearchPage(
+            failed: AtomicBoolean,
+            fetch: suspend () -> Pair<String, List<Video>>?,
+        ): Pair<String, List<Video>>? {
+            val attempt =
+                withTimeoutOrNull(SEARCH_TIMEOUT_MS) {
+                    try {
+                        Result.success(fetch())
+                    } catch (cancellation: CancellationException) {
+                        throw cancellation
+                    } catch (error: Exception) {
+                        Log.d(TAG, "Next search page failed: ${error.message}")
+                        Result.failure(error)
+                    }
+                }
+            if (attempt == null || attempt.isFailure) failed.set(true)
+            return attempt?.getOrNull()
         }
 
         private suspend fun appendLoadMorePage(
             page: List<Video>,
             generation: Int,
+            origins: Map<String, HomeCardOrigin>,
         ): List<Video>? {
             if (page.isEmpty() || !homePrefetchQueue.isCurrent(generation)) return null
             val exclusions = feedExclusions()
+            val followed = subscriptionScope().boosted
             var updatedSnapshot: List<Video>? = null
             var appendedPage = emptyList<Video>()
             _uiState.update { state ->
@@ -1077,16 +1396,25 @@ class HomeViewModel
                         .filterWatched(watchedVideoIds.value)
                         .filterNot { it.id in existingVideoIds || exclusions.hidesFromRecommendations(it) }
                 if (appendedPage.isEmpty()) return@update state
-                val tailChannels = state.videos.takeLast(2).map { it.channelId }
-                val updated = state.videos + spaceByChannel(appendedPage, seedRecent = tailChannels)
+                val tailChannels = state.videos.takeLast(CHANNEL_GAP).map { it.channelId }
+                val updated =
+                    state.videos +
+                        spaceByChannel(
+                            rhythmBySource(appendedPage, isSubscribed = { it.channelId in followed }),
+                            gap = CHANNEL_GAP,
+                            seedRecent = tailChannels,
+                        )
                 updatedSnapshot = updated
                 HomeFeedCache.update(updated, state.shorts)
+                val appendedIds = appendedPage.mapTo(HashSet()) { it.id }
                 state.copy(
                     videos = updated,
                     hasMorePages = true,
+                    origins = state.origins + origins.filterKeys { it in appendedIds },
                 )
             }
             if (appendedPage.isEmpty()) return null
+            Log.d(TAG, "Load-more appended ${appendedPage.size} cards")
             return enrichVisibleChannelMetadata(appendedPage) ?: updatedSnapshot
         }
 
@@ -1151,22 +1479,37 @@ class HomeViewModel
         /**
          * Nothing to fall back to: the trending kiosk this used to load is retired, and the charts
          * that replaced it belong on Explore, not mixed into the feed. The screen settles empty and
-         * offers a refresh instead of filling itself with unrelated content.
+         * offers a refresh instead of filling itself with unrelated content. A feed already on
+         * screen stays, still loading more, and the viewer is told the refresh failed (#1317).
          */
-        private fun settleWithoutFeed() {
+        private fun settleWithoutFeed(error: String?) {
+            var keptFeed = false
             _uiState.update {
-                it.copy(
-                    isLoading = false,
-                    isRefreshing = false,
-                    hasMorePages = false,
-                    isFlowFeed = false,
-                )
+                keptFeed = it.isFlowFeed && it.videos.isNotEmpty()
+                if (keptFeed) {
+                    it.copy(isLoading = false, isRefreshing = false)
+                } else {
+                    it.copy(
+                        isLoading = false,
+                        isRefreshing = false,
+                        hasMorePages = false,
+                        isFlowFeed = false,
+                        error = error,
+                    )
+                }
             }
+            if (keptFeed) refreshFailureEvents.trySend(Unit)
         }
 
-        /** The viewer's refresh. Ignored while a load is running, so repeated taps cannot stack pipelines (#1171). */
+        /**
+         * The viewer's refresh. A load already running is the refresh: the indicator stays until it
+         * lands, and repeated pulls cannot stack pipelines (#1171).
+         */
         fun refreshFeed() {
-            if (feedJob?.isActive == true) return
+            if (feedJob?.isActive == true) {
+                _uiState.update { it.copy(isRefreshing = true) }
+                return
+            }
             reloadFeed()
         }
 
@@ -1236,12 +1579,18 @@ class HomeViewModel
             _uiState.update { state ->
                 if (state.isLoading || state.videos.isEmpty()) return@update state
                 val below = lastVisibleVideoIndex.coerceAtLeast(LATE_SUBS_MIN_INDEX)
-                val updated = insertBelowViewport(state.videos, late.filterWatched(watchedVideoIds.value), below)
+                val updated =
+                    insertBelowViewport(
+                        state.videos,
+                        late.filterWatched(watchedVideoIds.value),
+                        below,
+                        isGrouped = { it.channelId in userSubs },
+                    )
                 if (updated.size == state.videos.size) return@update state
                 added = updated.size - state.videos.size
                 merged = updated
                 HomeFeedCache.update(updated, state.shorts)
-                state.copy(videos = updated)
+                state.copy(videos = updated, origins = state.origins + late.associate { it.id to HomeCardOrigin.subscription })
             }
             merged?.let {
                 persistentHomeFeedCache.saveLastFeed(it)
@@ -1284,7 +1633,7 @@ class HomeViewModel
                     var added = 0
                     _uiState.update { state ->
                         if (state.isLoading || state.videos.isEmpty()) return@update state
-                        val memoryOnScreen = state.videos.filter { it.id in state.channelMemoryVideoIds }
+                        val memoryOnScreen = state.videos.filter { state.origins[it.id]?.kind == HomeCardOrigin.Kind.CHANNEL_MEMORY }
                         val late =
                             channelMemoryPicks(
                                 ranked = ranked,
@@ -1297,7 +1646,7 @@ class HomeViewModel
                         added = updated.size - state.videos.size
                         if (added == 0) return@update state
                         HomeFeedCache.update(updated, state.shorts)
-                        state.copy(videos = updated, channelMemoryVideoIds = state.channelMemoryVideoIds + late.map { it.id })
+                        state.copy(videos = updated, origins = state.origins + late.associate { it.id to HomeCardOrigin.channelMemory })
                     }
                     if (added > 0) Log.d(TAG, "Channel memory added $added uploads below the viewport")
                 }
@@ -1328,7 +1677,7 @@ class HomeViewModel
                     room = 1,
                 ).firstOrNull() ?: return
             if (addUniqueVideo(pick, page, channelCounts, pageIds, maxPerChannel = 1)) {
-                _uiState.update { it.copy(channelMemoryVideoIds = it.channelMemoryVideoIds + pick.id) }
+                _uiState.update { it.copy(origins = it.origins + (pick.id to HomeCardOrigin.channelMemory)) }
             }
         }
 
@@ -1406,23 +1755,17 @@ class HomeViewModel
                 viewModelScope.launch(PerformanceDispatcher.networkIO) {
                     try {
                         val now = System.currentTimeMillis()
-                        val seedInputs =
-                            savedInterestSeedInputs(
-                                feedSources.gatherSavedSeedSources(),
-                                feedSources.activeSavedSeedCooldown(now),
-                            )
-                        val seeds =
-                            FlowNeuroEngine.selectRelatedSeeds(
-                                seedInputs,
-                                MAX_SAVED_SEEDS,
-                            )
+                        val cooldown = feedSources.activeSavedSeedCooldown(now)
+                        val seedInputs = savedInterestSeedInputs(feedSources.gatherSavedSeedSources(), cooldown)
+                        val longTermInputs = feedSources.longTermSeedInputs().filterNot { it.id in cooldown }
+                        val seeds = FlowNeuroEngine.selectRelatedSeeds(seedInputs, MAX_SAVED_SEEDS, longTermInputs)
                         if (seeds.isEmpty()) return@launch
                         feedSources.markSeedsUsed(seeds, now)
 
                         val exclusions = feedExclusions()
                         val relatedCandidates =
                             feedSources
-                                .fetchRelatedGraphCandidates(seedInputs, seeds, ::cacheFilters)
+                                .fetchRelatedGraphCandidates(seedInputs + longTermInputs, seeds, ::cacheFilters)
                                 .filterValidGraph()
                                 .filterWatchedGraph(watchedVideoIds.value)
                                 .filterRecentHomeSuggestionGraph(now)
@@ -1432,27 +1775,42 @@ class HomeViewModel
                         val existing = _uiState.value.videos.mapTo(HashSet()) { it.id }
                         val relatedMetadata = relatedCandidates.associateBy { it.video.id }
                         val enriched =
-                            demoteByFit(
-                                applyGraphBoost(
-                                    FlowNeuroEngine.rank(
-                                        relatedCandidates
-                                            .map { it.video }
-                                            .filterNot { existing.contains(it.id) },
-                                        userSubs,
+                            FlowNeuroEngine
+                                .shareByInterest(
+                                    demoteByFit(
+                                        applyGraphBoost(
+                                            FlowNeuroEngine.rank(
+                                                relatedCandidates
+                                                    .map { it.video }
+                                                    .filterNot { existing.contains(it.id) },
+                                                userSubs,
+                                                NeuroScoring.LANE_RELEVANCE_FLOOR,
+                                                snapshotTrace,
+                                            ),
+                                            relatedMetadata,
+                                        ),
+                                        taste,
                                     ),
-                                    relatedMetadata,
-                                ),
-                                taste,
-                            ).take(SAVED_RELATED_SLOTS)
+                                ).take(SAVED_RELATED_SLOTS)
                         if (enriched.isEmpty()) return@launch
                         enriched.mapTo(relatedPickIds) { it.id }
 
                         _uiState.update { state ->
-                            val visibleEnriched = enriched.filterWatched(watchedVideoIds.value)
-                            val tail = state.videos.takeLast(2).map { it.channelId }
-                            val merged = state.videos + spaceByChannel(visibleEnriched, seedRecent = tail)
+                            val recentChannels = state.videos.takeLast(RECENT_CHANNEL_WINDOW).mapTo(HashSet()) { it.channelId }
+                            val visibleEnriched =
+                                enriched
+                                    .filterWatched(watchedVideoIds.value)
+                                    .filter { it.channelId.isBlank() || it.channelId !in recentChannels }
+                                    .distinctBy { it.channelId.ifBlank { it.id } }
+                            val tail = state.videos.takeLast(CHANNEL_GAP).map { it.channelId }
+                            val merged = state.videos + spaceByChannel(visibleEnriched, gap = CHANNEL_GAP, seedRecent = tail)
                             HomeFeedCache.update(merged, state.shorts)
-                            state.copy(videos = merged)
+                            val shownIds = visibleEnriched.mapTo(HashSet()) { it.id }
+                            val seedTitles = relatedSeedTitles(relatedCandidates, seedInputs + longTermInputs, shownIds)
+                            state.copy(
+                                videos = merged,
+                                origins = state.origins + shownIds.associateWith { HomeCardOrigin.related(seedTitles[it]) },
+                            )
                         }
                         Log.d(TAG, "Saved-interest enrichment: +${enriched.size} from ${seeds.size} seeds")
                     } catch (e: Exception) {
@@ -1475,5 +1833,11 @@ class HomeViewModel
             val ids = feedImpressionIds(visibleKeys, knownIds)
             if (ids.isEmpty()) return
             viewModelScope.launch { FlowNeuroEngine.recordFeedImpressions(ids) }
+            val state = _uiState.value
+            val neighbourChannelIds =
+                ids
+                    .filter { state.origins[it]?.kind == HomeCardOrigin.Kind.NEIGHBOUR && shownNeighbourCards.add(it) }
+                    .mapNotNull { id -> state.videos.firstOrNull { it.id == id }?.channelId }
+            if (neighbourChannelIds.isNotEmpty()) viewModelScope.launch { neighbourChannels.noteShown(neighbourChannelIds) }
         }
     }
