@@ -2681,9 +2681,7 @@
     <string name="search_filter_group_type">Тип</string>
     <string name="search_filter_group_duration">Продолжительность</string>
     <string name="search_filter_group_upload_date">Дата загрузки</string>
-    <plurals name="search_watch_empty_watched">
-        <item quantity="one">Просмотренных видео нет</item>
-    </plurals>
+    <string name="search_watch_empty_watched">Просмотренных видео нет</string>
     <string name="search_feature_subtitles">Субтитры/СС</string>
     <string name="search_results_estimated">Результаты по %1$s</string>
     <string name="search_shelf_show_more">Показать ещё</string>

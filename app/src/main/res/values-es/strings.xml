@@ -2814,12 +2814,8 @@
     <string name="search_filter_watch_any">Vistos y no vistos</string>
     <string name="search_filter_unwatched">No vistos</string>
     <string name="search_filter_watched">Vistos</string>
-    <plurals name="search_watch_empty_watched">
-        <item quantity="one">No hay vídeos vistos</item>
-    </plurals>
-    <plurals name="search_watch_empty_unwatched">
-        <item quantity="one">No hay vídeos pendientes de ver</item>
-    </plurals>
+    <string name="search_watch_empty_watched">No hay vídeos vistos</string>
+    <string name="search_watch_empty_unwatched">No hay vídeos pendientes de ver</string>
     <string name="search_feature_hd">HD</string>
     <string name="search_feature_4k">4K</string>
     <string name="search_feature_hdr">HDR</string>
@@ -3003,9 +2999,7 @@
     <string name="category_learning">Aprendizaje</string>
     <string name="category_fashion">Moda</string>
     <string name="categories_chart_source">Listas de YouTube Music</string>
-    <plurals name="categories_rate_limited">
-        <item quantity="one">YouTube está limitando las solicitudes ahora mismo. Inténtalo de nuevo mas tarde.</item>
-    </plurals>
+    <string name="categories_rate_limited">YouTube está limitando las solicitudes ahora mismo. Inténtalo de nuevo mas tarde.</string>
     <string name="categories_shelf_see_all">Ver todo</string>
     <string name="categories_shelf_back">Volver a todas las secciones</string>
     <string name="proxy_settings_bypass_vpn">Omitir el proxy en la VPN</string>
