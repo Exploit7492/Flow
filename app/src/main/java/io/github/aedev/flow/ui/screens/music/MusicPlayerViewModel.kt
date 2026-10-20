@@ -334,6 +334,15 @@ class MusicPlayerViewModel
                                 }.toMap()
                         }
 
+                    // Campaign injection is the last step, on top of an order the app has already
+                    // settled. A campaign-scoped queue keeps its genre: a genre-tagged source
+                    // resolves through the tile mapping, an untagged one asks for any eligible.
+                    val (campaignQueue, _) =
+                        EnhancedMusicPlayerManager.injectCampaigns(
+                            baseQueue = activeQueue,
+                            genreTerm = contextGenre,
+                        )
+
                     // ─── PHASE 1: Instant start ───────────────────────────────────────────
                     _uiState.update {
                         it.copy(
@@ -353,7 +362,7 @@ class MusicPlayerViewModel
                         EnhancedMusicPlayerManager.playTrack(
                             track = track,
                             audioUrl = "music://${track.videoId}",
-                            queue = activeQueue,
+                            queue = campaignQueue,
                             sourceName = finalSourceName,
                             localUriOverrides = localUriOverrides,
                         )

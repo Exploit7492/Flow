@@ -91,6 +91,16 @@ class FlowApplication :
         appContext = applicationContext
         YouTube.cacheDirectory = cacheDir.resolve("innertube_http_cache")
 
+        // Campaigns are read-only here: the app only asks which campaign plays in a queue slot and
+        // reports qualified plays. Blank config disables injection rather than failing, so this is
+        // safe on any build. See [Campaigns].
+        io.github.aedev.flow.campaign.Campaigns.init(
+            context = this,
+            supabaseUrl = BuildConfig.SUPABASE_URL,
+            anonKey = BuildConfig.SUPABASE_ANON_KEY,
+            genreTileHost = BuildConfig.CAMPAIGN_GENRE_TILE_HOST,
+        )
+
         DiscordPresenceRuntime.initialize(this, okHttpClient)
 
         val playerPreferences = PlayerPreferences(this)

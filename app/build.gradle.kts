@@ -65,6 +65,12 @@ android {
         // Last.fm keys come from the CI secrets; builds without them ask the viewer for their own key.
         buildConfigField("String", "LASTFM_API_KEY", "\"${secretValue("lastfmApiKey", "lastfm.apiKey", "LASTFM_API_KEY")}\"")
         buildConfigField("String", "LASTFM_API_SECRET", "\"${secretValue("lastfmApiSecret", "lastfm.apiSecret", "LASTFM_API_SECRET")}\"")
+        // Campaigns are read-only here: the app only asks which campaign plays in a queue slot and
+        // reports qualified plays. Blank either value disables injection rather than failing, so a
+        // build with no campaign backend configured plays a normal queue.
+        buildConfigField("String", "SUPABASE_URL", "\"${secretValue("supabaseUrl", "supabase.url", "SUPABASE_URL")}\"")
+        buildConfigField("String", "SUPABASE_ANON_KEY", "\"${secretValue("supabaseAnonKey", "supabase.anonKey", "SUPABASE_ANON_KEY")}\"")
+        buildConfigField("String", "CAMPAIGN_GENRE_TILE_HOST", "\"${secretValue("campaignGenreTileHost", "campaign.genreTileHost", "CAMPAIGN_GENRE_TILE_HOST")}\"")
 
         testInstrumentationRunner = "io.github.aedev.flow.HiltTestRunner"
         vectorDrawables {

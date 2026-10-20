@@ -13,6 +13,9 @@ import androidx.media3.session.MediaController
 import androidx.media3.session.SessionToken
 import com.google.common.util.concurrent.ListenableFuture
 import com.google.common.util.concurrent.MoreExecutors
+import io.github.aedev.flow.campaign.CampaignPlaybackTracker
+import io.github.aedev.flow.campaign.CampaignQueueInjection
+import io.github.aedev.flow.campaign.Campaigns
 import io.github.aedev.flow.data.local.AudioSettingsPersistence
 import io.github.aedev.flow.data.local.QueuePersistence
 import io.github.aedev.flow.data.localmedia.LocalMediaIds
@@ -510,6 +513,13 @@ object EnhancedMusicPlayerManager {
         useCacheKey: Boolean = !LocalMediaIds.isLocal(track.videoId),
     ): MediaItem = musicMediaItem(track, uri, useCacheKey)
 
+    /** The campaign row playing as [mediaId], or null when it is an ordinary track. */
+    private fun campaignTrackFor(mediaId: String?): MusicTrack? {
+        if (mediaId.isNullOrBlank()) return null
+        val track = _queue.value.firstOrNull { it.videoId == mediaId } ?: _currentTrack.value
+        return track?.takeIf { it.videoId == mediaId && it.campaignId != null }
+    }
+
     private fun clearPendingPlayNext() {
         pendingPlayNextMediaId = null
         pendingPlayNextMediaIndex = MusicQueuePlanner.INDEX_UNSET
@@ -540,6 +550,13 @@ object EnhancedMusicPlayerManager {
                     if (p != null && p.isPlaying) {
                         val position = p.currentPosition
                         _currentPosition.value = position
+
+                        // A campaign play is a paid event, so it is sampled from the same
+                        // audio-is-playing tick the rest of the UI uses, never from a raw position
+                        // read — see [CampaignPlaybackTracker] for why seeking must not count.
+                        p.currentMediaItem?.mediaId?.let { mediaId ->
+                            campaignTrackFor(mediaId)?.let { CampaignPlaybackTracker.onSample(it, p.duration) }
+                        }
 
                         // Coarsened deliberately. Every consumer of playerState renders seconds, but a
                         // copy here emits a whole new MusicPlayerState to the mini player and the
@@ -596,6 +613,35 @@ object EnhancedMusicPlayerManager {
 
     fun showPlaybackWarning(message: String) {
         _playbackWarnings.tryEmit(message)
+    }
+
+    /**
+     * Splices campaign slots into [baseQueue] and returns the order to play, with [startIndex]
+     * remapped. Called by the queue builder, last, on top of an order the app has already settled.
+     *
+     * Campaign injection is a property of playback, not of one queue type, so every queue the app
+     * starts runs through here. A null campaign for a slot (nothing eligible, or no backend) simply
+     * skips that slot — the base queue is returned unchanged when the whole splice adds nothing.
+     */
+    suspend fun injectCampaigns(
+        baseQueue: List<MusicTrack>,
+        startIndex: Int = -1,
+        genreTerm: String? = null,
+    ): Pair<List<MusicTrack>, Int> {
+        if (baseQueue.isEmpty() || !Campaigns.enabled) {
+            return baseQueue to startIndex.coerceAtLeast(0)
+        }
+        val injected =
+            CampaignQueueInjection.inject(
+                baseItems = baseQueue,
+                targetOriginalIndex = startIndex,
+            ) { Campaigns.nextForSlotResolvingGenre(genreTerm) }
+        val playIndex =
+            injected.adjustedTargetIndex
+                .takeIf { it >= 0 }
+                ?.coerceIn(0, injected.items.lastIndex)
+                ?: startIndex.coerceIn(0, injected.items.lastIndex)
+        return injected.items to playIndex
     }
 
     fun playTrack(

@@ -1258,6 +1258,8 @@ class Media3MusicService : MediaLibraryService() {
         MusicServiceState.isRunning = false
         // Flush the in-flight listen session before the player goes away.
         finalizeListenSession()
+        // A stopped campaign must not carry progress into its next appearance.
+        io.github.aedev.flow.campaign.CampaignPlaybackTracker.onStopped()
 
         // Clear audio session ID so external processors know we're gone
         audioSessions.close(currentAudioSessionId)

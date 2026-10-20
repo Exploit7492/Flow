@@ -55,6 +55,18 @@ data class MusicTrack(
     val albumId: String? = null,
     val artists: List<MusicArtist> = emptyList(),
     val itemType: MusicItemType = MusicItemType.SONG,
+    /**
+     * True only on a promoted row the campaign queue RPC placed in a queue slot. It marks a track
+     * as advertising for the UI and keeps it out of the surfaces that mean "the queue's own
+     * context" (shuffle canonical order, "playing from" provenance).
+     */
+    val isCampaign: Boolean = false,
+    /**
+     * The campaign's own id (`track_campaigns.id`), present only on a promoted row. Reported to
+     * `record_campaign_stream` when the play qualifies, so the backend can attribute it. Null on
+     * every ordinary track.
+     */
+    val campaignId: String? = null,
 ) {
     val highResThumbnailUrl: String
         get() = ThumbnailUrlResolver.resolveMusicThumbnail(videoId, thumbnailUrl, 1080)
