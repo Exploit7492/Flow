@@ -107,6 +107,20 @@ object Campaigns {
     /** Registers this device as a listener; returns the listener id, or null. */
     suspend fun ensureDeviceListener(deviceId: String): String? = repository?.ensureDeviceListener(deviceId)
 
+    /**
+     * The campaigns eligible for the home banner right now, most useful first. Empty when no
+     * backend is configured or nothing is live, so the banner renders nothing.
+     */
+    suspend fun liveCampaignsForBanner(): List<CampaignCard> =
+        repository?.fetchLiveCampaignsForBanner() ?: emptyList()
+
+    /**
+     * The campaign's gathered stream total, read fresh for the banner's refresh tick. Null on any
+     * failure, so the card keeps the snapshot it loaded with.
+     */
+    suspend fun campaignTotalStreams(campaignId: String): Long? =
+        repository?.fetchCampaignTotalStreams(campaignId)
+
     /** Reports a qualified campaign play. Fire-and-forget. */
     suspend fun recordStream(
         campaignId: String,

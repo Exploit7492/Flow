@@ -11,7 +11,9 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.longOrNull
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
@@ -261,6 +263,115 @@ class CampaignRepository(
             }
         }
     }
+
+    /**
+     * The campaigns eligible for the home banner right now.
+     *
+     * Mirrors Velune's own banner query: the live, unpaused, not-completed/cancelled rows of
+     * `track_campaigns`, with the track and artist pulled in through PostgREST's embedded-resource
+     * syntax (they are not columns on this table). A row that carries no playable video id — a
+     * Spotify link the runtime resolver cannot place — is dropped rather than rendered as a card
+     * that does nothing when tapped.
+     */
+    suspend fun fetchLiveCampaignsForBanner(): List<CampaignCard> =
+        withContext(Dispatchers.IO) {
+            if (!configured) return@withContext emptyList()
+            try {
+                val request =
+                    Request
+                        .Builder()
+                        .url(
+                            "$supabaseUrl/rest/v1/track_campaigns" +
+                                "?select=id,source_url,resolved_song_id,total_streams,current_stage," +
+                                "tracks(title,cover_url),users(artist_name)" +
+                                "&is_active=eq.true&is_paused=eq.false" +
+                                "&current_stage=neq.completed&current_stage=neq.cancelled"
+                        )
+                        .header("apikey", anonKey)
+                        .header("Authorization", "Bearer $anonKey")
+                        .get()
+                        .build()
+                val body =
+                    http.get().newCall(request).execute().use { response ->
+                        if (!response.isSuccessful) return@use null
+                        response.body.string()
+                    } ?: return@withContext emptyList()
+                val array =
+                    runCatching { json.parseToJsonElement(body) as? JsonArray }.getOrNull()
+                        ?: return@withContext emptyList()
+                array.mapNotNull { element ->
+                    val row = element as? JsonObject ?: return@mapNotNull null
+                    val id = (row["id"] as? JsonPrimitive)?.contentOrNull?.takeIf { it.isNotBlank() }
+                        ?: return@mapNotNull null
+                    val sourceUrl = (row["source_url"] as? JsonPrimitive)?.contentOrNull.orEmpty()
+                    val resolvedSongId =
+                        (row["resolved_song_id"] as? JsonPrimitive)?.contentOrNull?.takeIf { it.isNotBlank() }
+                    val videoId =
+                        resolvedSongId
+                            ?: CampaignUrlResolver.extractVideoId(sourceUrl)
+                            ?: SpotifyLink.parse(sourceUrl)?.let { CampaignSpotifyResolver.resolve(it)?.videoId }
+                            ?: return@mapNotNull null
+                    val track = row["tracks"] as? JsonObject
+                    val artistRow = row["users"] as? JsonObject
+                    val stage = (row["current_stage"] as? JsonPrimitive)?.contentOrNull.orEmpty()
+                    CampaignCard(
+                        id = id,
+                        songId = videoId,
+                        title =
+                            (track?.get("title") as? JsonPrimitive)?.contentOrNull?.takeIf { it.isNotBlank() }
+                                ?: "Untitled",
+                        artist =
+                            (artistRow?.get("artist_name") as? JsonPrimitive)?.contentOrNull?.takeIf { it.isNotBlank() }
+                                ?: "Unknown Artist",
+                        thumbnailUrl = (track?.get("cover_url") as? JsonPrimitive)?.contentOrNull.orEmpty(),
+                        totalStreams = (row["total_streams"] as? JsonPrimitive)?.longOrNull ?: 0L,
+                        currentStage = stage.takeIf { it.isNotBlank() } ?: "planting",
+                        certified = stageIsCertified(stage),
+                        isLive = true,
+                    )
+                }
+            } catch (e: Exception) {
+                Log.w(TAG, "fetchLiveCampaignsForBanner failed: ${e.message}")
+                emptyList()
+            }
+        }
+
+    /**
+     * The campaign's gathered stream total, read fresh for the banner's own refresh tick. Null on
+     * any failure, so the card keeps the snapshot it loaded with rather than showing a zero.
+     */
+    suspend fun fetchCampaignTotalStreams(campaignId: String): Long? =
+        withContext(Dispatchers.IO) {
+            if (!configured || campaignId.isBlank()) return@withContext null
+            try {
+                val request =
+                    Request
+                        .Builder()
+                        .url("$supabaseUrl/rest/v1/track_campaigns?select=total_streams&id=eq.$campaignId")
+                        .header("apikey", anonKey)
+                        .header("Authorization", "Bearer $anonKey")
+                        .get()
+                        .build()
+                http.get().newCall(request).execute().use { response ->
+                    if (!response.isSuccessful) return@use null
+                    val array =
+                        runCatching { json.parseToJsonElement(response.body.string()) as? JsonArray }
+                            .getOrNull()
+                            ?: return@use null
+                    ((array.firstOrNull() as? JsonObject)?.get("total_streams") as? JsonPrimitive)?.longOrNull
+                }
+            } catch (e: Exception) {
+                Log.w(TAG, "fetchCampaignTotalStreams failed for $campaignId: ${e.message}")
+                null
+            }
+        }
+
+    /** The stages a reviewer has signed off on, matching the server's own stage rule. */
+    private fun stageIsCertified(stage: String?): Boolean =
+        when (stage) {
+            "branching", "full_bloom" -> true
+            else -> false
+        }
 
     /** POST a Supabase RPC and return its raw body, or null on a non-2xx. */
     private fun rpc(

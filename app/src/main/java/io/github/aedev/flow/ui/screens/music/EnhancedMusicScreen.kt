@@ -23,6 +23,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
@@ -31,6 +32,9 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import io.github.aedev.flow.R
+import io.github.aedev.flow.campaign.CampaignCard
+import io.github.aedev.flow.campaign.Campaigns
+import io.github.aedev.flow.campaign.toMusicTrack
 import io.github.aedev.flow.data.music.model.MusicTrack
 import io.github.aedev.flow.data.music.model.audioMusicOnly
 import io.github.aedev.flow.innertube.pages.MoodAndGenres
@@ -39,6 +43,7 @@ import io.github.aedev.flow.ui.components.layout.LocalFlowBottomInsets
 import io.github.aedev.flow.ui.components.layout.floatAboveBottomChrome
 import io.github.aedev.flow.ui.components.layout.flowBottomContentPadding
 import io.github.aedev.flow.ui.components.layout.topbar.FlowTopBar
+import io.github.aedev.flow.ui.components.music.campaign.CampaignBanner
 import io.github.aedev.flow.ui.components.music.section.HomeSectionType
 import io.github.aedev.flow.ui.components.music.section.MusicHomeLibrary
 import io.github.aedev.flow.ui.components.music.section.musicHomeFeed
@@ -99,6 +104,18 @@ fun EnhancedMusicScreen(
             )
         }
     val musicListState = rememberLazyListState()
+
+    // The promoted campaign for the banner, refreshed with the feed. The first live campaign wins;
+    // a rotation across several is a later refinement, and drawing one is what makes the slot read as
+    // a promotion rather than an ad break. A campaign tap starts the campaign's own track through the
+    // ordinary song path, so it plays exactly like any other row.
+    var featuredCampaign by remember { mutableStateOf<CampaignCard?>(null) }
+    LaunchedEffect(Unit) {
+        featuredCampaign = Campaigns.liveCampaignsForBanner().firstOrNull()
+    }
+    val onCampaignClick: (CampaignCard) -> Unit = { campaign ->
+        campaign.toMusicTrack()?.let { onSongClick(it, listOf(it), null) }
+    }
     val quickPicksGridState = rememberLazyGridState()
 
     // Planner-lite: the brain's maturity decides which sections lead the page —
@@ -227,6 +244,17 @@ fun EnhancedMusicScreen(
                             modifier = Modifier.fillMaxSize(),
                             contentPadding = PaddingValues(bottom = flowBottomContentPadding(FeedBottomClearance)),
                         ) {
+                            // The promoted campaign leads the feed. Drawn before the shelves so it
+                            // reads as the page's own promotion, not a row inside a section.
+                            featuredCampaign?.let { campaign ->
+                                item(key = "campaign_banner") {
+                                    CampaignBanner(
+                                        campaign = campaign,
+                                        onClick = { onCampaignClick(campaign) },
+                                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                                    )
+                                }
+                            }
                             musicHomeFeed(
                                 uiState = uiState,
                                 sectionOrder = sectionOrder,
