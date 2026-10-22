@@ -70,7 +70,11 @@ android {
         // build with no campaign backend configured plays a normal queue.
         buildConfigField("String", "SUPABASE_URL", "\"${secretValue("supabaseUrl", "supabase.url", "SUPABASE_URL")}\"")
         buildConfigField("String", "SUPABASE_ANON_KEY", "\"${secretValue("supabaseAnonKey", "supabase.anonKey", "SUPABASE_ANON_KEY")}\"")
-        buildConfigField("String", "CAMPAIGN_GENRE_TILE_HOST", "\"${secretValue("campaignGenreTileHost", "campaign.genreTileHost", "CAMPAIGN_GENRE_TILE_HOST")}\"")
+        buildConfigField(
+            "String",
+            "CAMPAIGN_GENRE_TILE_HOST",
+            "\"${secretValue("campaignGenreTileHost", "campaign.genreTileHost", "CAMPAIGN_GENRE_TILE_HOST")}\"",
+        )
 
         testInstrumentationRunner = "io.github.aedev.flow.HiltTestRunner"
         vectorDrawables {
