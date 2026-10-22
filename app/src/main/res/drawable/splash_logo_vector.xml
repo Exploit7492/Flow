@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Splash icon: the YouTube-X badge with the same flare the website's hero cards draw —
+     a bright arc that sweeps around the icon. The logo is a bitmap (the badge is artwork,
+     not paths), inset into the API 31+ safe zone; `flare` is the arc group the
+     AnimatedVectorDrawable spins. Keep both inside the 66dp safe circle so no mask clips them. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:aapt="http://schemas.android.com/aapt"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+
+    <bitmap
+        android:src="@mipmap/ic_splash_logo"
+        android:gravity="fill" />
+
+    <group
+        android:name="flare"
+        android:pivotX="54"
+        android:pivotY="54">
+        <path
+            android:pathData="M54,23 a31,31 0 0,1 0,62 a31,31 0 0,1 0,-62"
+            android:strokeWidth="3"
+            android:strokeLineCap="round"
+            android:fillColor="#00000000">
+            <aapt:attr name="android:strokeColor">
+                <gradient
+                    android:type="sweep"
+                    android:centerX="54"
+                    android:centerY="54">
+                    <item android:offset="0" android:color="#00FFFFFF" />
+                    <item android:offset="0.55" android:color="#00FFFFFF" />
+                    <item android:offset="0.80" android:color="#8CFFFFFF" />
+                    <item android:offset="0.95" android:color="#FFFFFFFF" />
+                    <item android:offset="1" android:color="#00FFFFFF" />
+                </gradient>
+            </aapt:attr>
+        </path>
+    </group>
+</vector>

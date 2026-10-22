@@ -92,7 +92,8 @@ android {
 
     splits {
         abi {
-            isEnable = true
+            // ABI splits are incompatible with app bundles; keep them for APK builds only.
+            isEnable = gradle.startParameter.taskNames.none { it.contains("bundle", ignoreCase = true) }
             reset()
             include("armeabi-v7a", "arm64-v8a", "x86", "x86_64")
             isUniversalApk = true

@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- One turn of the flare, matching the website hero ring (glassRingSpin, 4.8s linear). -->
+<objectAnimator xmlns:android="http://schemas.android.com/apk/res/android"
+    android:propertyName="rotation"
+    android:valueFrom="0"
+    android:valueTo="360"
+    android:duration="4800"
+    android:repeatCount="infinite"
+    android:interpolator="@android:interpolator/linear" />

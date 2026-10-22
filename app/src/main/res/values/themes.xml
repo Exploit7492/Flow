@@ -15,7 +15,7 @@
          and launcher icon the user chose. -->
     <style name="Theme.Flow.Starting" parent="Theme.SplashScreen">
         <item name="windowSplashScreenBackground">@color/splash_background</item>
-        <item name="windowSplashScreenAnimatedIcon">@drawable/ic_splash_logo</item>
+        <item name="windowSplashScreenAnimatedIcon">@drawable/ic_splash_logo_animated</item>
         <item name="postSplashScreenTheme">@style/Theme.Flow</item>
     </style>
 

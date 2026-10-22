@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The animated splash icon: the YouTube-X badge with the website's flare sweeping around it. -->
+<animated-vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:drawable="@drawable/splash_logo_vector">
+    <target
+        android:name="flare"
+        android:animation="@animator/splash_flare_rotate" />
+</animated-vector>
