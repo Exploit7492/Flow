@@ -34,6 +34,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import io.github.aedev.flow.R
 import io.github.aedev.flow.campaign.CampaignCard
 import io.github.aedev.flow.campaign.Campaigns
+import io.github.aedev.flow.campaign.rememberCampaignCarouselState
 import io.github.aedev.flow.campaign.toMusicTrack
 import io.github.aedev.flow.data.music.model.MusicTrack
 import io.github.aedev.flow.data.music.model.audioMusicOnly
@@ -105,14 +106,16 @@ fun EnhancedMusicScreen(
         }
     val musicListState = rememberLazyListState()
 
-    // The promoted campaign for the banner, refreshed with the feed. The first live campaign wins;
-    // a rotation across several is a later refinement, and drawing one is what makes the slot read as
-    // a promotion rather than an ad break. A campaign tap starts the campaign's own track through the
+    // The promoted campaigns for the banner, refreshed with the feed. The banner slides through them
+    // one at a time on its own timer; drawing one at a time is what makes the slot read as a
+    // promotion rather than an ad break. A campaign tap starts the campaign's own track through the
     // ordinary song path, so it plays exactly like any other row.
-    var featuredCampaign by remember { mutableStateOf<CampaignCard?>(null) }
+    var liveCampaigns by remember { mutableStateOf<List<CampaignCard>>(emptyList()) }
     LaunchedEffect(Unit) {
-        featuredCampaign = Campaigns.liveCampaignsForBanner().firstOrNull()
+        liveCampaigns = Campaigns.liveCampaignsForBanner()
     }
+    val campaignCarousel = rememberCampaignCarouselState(liveCampaigns)
+    val featuredCampaign = campaignCarousel.current
     val onCampaignClick: (CampaignCard) -> Unit = { campaign ->
         campaign.toMusicTrack()?.let { onSongClick(it, listOf(it), null) }
     }

@@ -327,7 +327,10 @@ class CampaignRepository(
                         artist =
                             (artistRow?.get("artist_name") as? JsonPrimitive)?.contentOrNull?.takeIf { it.isNotBlank() }
                                 ?: "Unknown Artist",
-                        thumbnailUrl = (track?.get("cover_url") as? JsonPrimitive)?.contentOrNull.orEmpty(),
+                        thumbnailUrl =
+                            (track?.get("cover_url") as? JsonPrimitive)?.contentOrNull
+                                ?.takeIf { it.isNotBlank() }
+                                ?: "https://i.ytimg.com/vi/$videoId/hqdefault.jpg",
                         totalStreams = (row["total_streams"] as? JsonPrimitive)?.longOrNull ?: 0L,
                         currentStage = stage.takeIf { it.isNotBlank() } ?: "planting",
                         certified = stageIsCertified(stage),
