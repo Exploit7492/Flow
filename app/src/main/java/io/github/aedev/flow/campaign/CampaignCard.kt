@@ -40,8 +40,9 @@ fun CampaignCard.toMusicTrack(): MusicTrack? {
         videoId = songId,
         title = title,
         artist = artist,
-        thumbnailUrl = thumbnailUrl.takeIf { it.isNotBlank() }
-            ?: "https://i.ytimg.com/vi/$songId/hqdefault.jpg",
+        thumbnailUrl =
+            thumbnailUrl.takeIf { it.isNotBlank() }
+                ?: "https://i.ytimg.com/vi/$songId/hqdefault.jpg",
         duration = 0,
         isCampaign = true,
         campaignId = id,

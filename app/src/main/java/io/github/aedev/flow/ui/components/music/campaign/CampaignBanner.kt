@@ -109,22 +109,23 @@ fun CampaignBanner(
                     .fillMaxSize()
                     .background(
                         Brush.linearGradient(
-                            colors = listOf(
-                                Color.Black.copy(alpha = 0.78f),
-                                Color.Black.copy(alpha = 0.45f),
-                                Color.Black.copy(alpha = 0.62f),
-                            ),
+                            colors =
+                                listOf(
+                                    Color.Black.copy(alpha = 0.78f),
+                                    Color.Black.copy(alpha = 0.45f),
+                                    Color.Black.copy(alpha = 0.62f),
+                                ),
                         ),
-                    )
-                    .border(
+                    ).border(
                         width = 1.dp,
                         brush =
                             Brush.linearGradient(
-                                colors = listOf(
-                                    Color.White.copy(alpha = 0.38f),
-                                    Color.White.copy(alpha = 0.08f),
-                                    Color.Transparent,
-                                ),
+                                colors =
+                                    listOf(
+                                        Color.White.copy(alpha = 0.38f),
+                                        Color.White.copy(alpha = 0.08f),
+                                        Color.Transparent,
+                                    ),
                             ),
                         shape = cardShape,
                     ),

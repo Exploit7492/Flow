@@ -257,7 +257,11 @@ class CampaignRepository(
                         .header("Content-Type", "application/json")
                         .post(payload.toRequestBody("application/json".toMediaType()))
                         .build()
-                http.get().newCall(request).execute().use { }
+                http
+                    .get()
+                    .newCall(request)
+                    .execute()
+                    .use { }
             } catch (e: Exception) {
                 Log.w(TAG, "ingestGenreTile failed for $tileTitle: ${e.message}")
             }
@@ -285,9 +289,8 @@ class CampaignRepository(
                                 "?select=id,source_url,resolved_song_id,total_streams,current_stage," +
                                 "tracks(title,cover_url),users(artist_name)" +
                                 "&is_active=eq.true&is_paused=eq.false" +
-                                "&current_stage=neq.completed&current_stage=neq.cancelled"
-                        )
-                        .header("apikey", anonKey)
+                                "&current_stage=neq.completed&current_stage=neq.cancelled",
+                        ).header("apikey", anonKey)
                         .header("Authorization", "Bearer $anonKey")
                         .get()
                         .build()
@@ -301,8 +304,9 @@ class CampaignRepository(
                         ?: return@withContext emptyList()
                 array.mapNotNull { element ->
                     val row = element as? JsonObject ?: return@mapNotNull null
-                    val id = (row["id"] as? JsonPrimitive)?.contentOrNull?.takeIf { it.isNotBlank() }
-                        ?: return@mapNotNull null
+                    val id =
+                        (row["id"] as? JsonPrimitive)?.contentOrNull?.takeIf { it.isNotBlank() }
+                            ?: return@mapNotNull null
                     val sourceUrl = (row["source_url"] as? JsonPrimitive)?.contentOrNull.orEmpty()
                     val resolvedSongId =
                         (row["resolved_song_id"] as? JsonPrimitive)?.contentOrNull?.takeIf { it.isNotBlank() }

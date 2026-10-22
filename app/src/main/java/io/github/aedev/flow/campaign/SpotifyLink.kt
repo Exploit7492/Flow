@@ -50,6 +50,5 @@ object SpotifyLink {
 
     /** The embed page: for track links the track's own title/artists, for artist/album links a
      *  `trackList` whose first entry is the entity's headline track. */
-    fun embedUrl(target: Target): String =
-        "https://open.spotify.com/embed/${target.kind.name.lowercase()}/${target.id}"
+    fun embedUrl(target: Target): String = "https://open.spotify.com/embed/${target.kind.name.lowercase()}/${target.id}"
 }

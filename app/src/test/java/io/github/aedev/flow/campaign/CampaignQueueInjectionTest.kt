@@ -6,8 +6,7 @@ import kotlinx.coroutines.test.runTest
 import org.junit.Test
 
 class CampaignQueueInjectionTest {
-    private fun track(id: String) =
-        MusicTrack(videoId = id, title = "Song $id", artist = "Artist", thumbnailUrl = "", duration = 200)
+    private fun track(id: String) = MusicTrack(videoId = id, title = "Song $id", artist = "Artist", thumbnailUrl = "", duration = 200)
 
     private fun campaign(id: String) = track(id).copy(isCampaign = true, campaignId = "campaign-$id")
 

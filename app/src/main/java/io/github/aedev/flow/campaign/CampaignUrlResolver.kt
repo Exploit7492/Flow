@@ -29,7 +29,11 @@ object CampaignUrlResolver {
         val trimmed = sourceUrl.trim()
         if (trimmed.isEmpty()) return null
         for (pattern in URL_PATTERNS) {
-            pattern.find(trimmed)?.groupValues?.getOrNull(1)?.let { return it }
+            pattern
+                .find(trimmed)
+                ?.groupValues
+                ?.getOrNull(1)
+                ?.let { return it }
         }
         return if (VIDEO_ID_REGEX.matches(trimmed)) trimmed else null
     }

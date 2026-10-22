@@ -69,14 +69,25 @@ object CampaignSpotifyResolver {
         val trackList = entity["trackList"] as? JsonArray
         if (trackList != null && trackList.isNotEmpty()) {
             val first = trackList.firstOrNull()?.jsonObject ?: return null
-            val title = first["title"]?.jsonPrimitive?.content?.normalized().orEmpty()
-            val artist = first["subtitle"]?.jsonPrimitive?.content?.normalized().orEmpty()
+            val title =
+                first["title"]
+                    ?.jsonPrimitive
+                    ?.content
+                    ?.normalized()
+                    .orEmpty()
+            val artist =
+                first["subtitle"]
+                    ?.jsonPrimitive
+                    ?.content
+                    ?.normalized()
+                    .orEmpty()
             if (title.isNotBlank()) return Track(title, artist)
         }
 
         val title =
             (entity["name"]?.jsonPrimitive?.content ?: entity["title"]?.jsonPrimitive?.content)
-                ?.normalized().orEmpty()
+                ?.normalized()
+                .orEmpty()
         if (title.isBlank()) return null
         return Track(title, artistNames(entity))
     }
@@ -84,8 +95,12 @@ object CampaignSpotifyResolver {
     private fun artistNames(entity: JsonObject): String {
         val artists = entity["artists"] as? JsonArray ?: return ""
         return artists
-            .mapNotNull { it.jsonObject["name"]?.jsonPrimitive?.content?.takeIf { n -> n.isNotBlank() } }
-            .joinToString(", ") { it.normalized() }
+            .mapNotNull {
+                it.jsonObject["name"]
+                    ?.jsonPrimitive
+                    ?.content
+                    ?.takeIf { n -> n.isNotBlank() }
+            }.joinToString(", ") { it.normalized() }
     }
 
     /**
@@ -93,8 +108,7 @@ object CampaignSpotifyResolver {
      * left as-is it defeats any `", "`-based split downstream, so it is normalised at the read.
      * Collapsing runs also guards the search query against doubled spaces.
      */
-    private fun String.normalized(): String =
-        replace('\u00A0', ' ').replace('\u202F', ' ').trim().replace(Regex("\\s+"), " ")
+    private fun String.normalized(): String = replace('\u00A0', ' ').replace('\u202F', ' ').trim().replace(Regex("\\s+"), " ")
 
     /** The best YouTube Music song for a title/artist, or null. Reuses the app-wide search. */
     private suspend fun findYouTubeMatch(
@@ -114,7 +128,11 @@ object CampaignSpotifyResolver {
         return MusicTrack(
             videoId = song.id,
             title = song.title,
-            artist = song.artists.firstOrNull()?.name.orEmpty(),
+            artist =
+                song.artists
+                    .firstOrNull()
+                    ?.name
+                    .orEmpty(),
             thumbnailUrl = song.thumbnail,
             duration = song.duration ?: 0,
         )
@@ -127,11 +145,16 @@ object CampaignSpotifyResolver {
             json
                 .parseToJsonElement(nextData)
                 .jsonObject
-                .get("props")?.jsonObject
-                ?.get("pageProps")?.jsonObject
-                ?.get("state")?.jsonObject
-                ?.get("data")?.jsonObject
-                ?.get("entity")?.jsonObject
+                .get("props")
+                ?.jsonObject
+                ?.get("pageProps")
+                ?.jsonObject
+                ?.get("state")
+                ?.jsonObject
+                ?.get("data")
+                ?.jsonObject
+                ?.get("entity")
+                ?.jsonObject
         } catch (e: Exception) {
             null
         }
@@ -151,7 +174,12 @@ object CampaignSpotifyResolver {
     private suspend fun fetchOEmbedTitle(url: String): String? {
         val body = fetch(url) ?: return null
         return try {
-            json.parseToJsonElement(body).jsonObject["title"]?.jsonPrimitive?.content?.takeIf { it.isNotBlank() }
+            json
+                .parseToJsonElement(body)
+                .jsonObject["title"]
+                ?.jsonPrimitive
+                ?.content
+                ?.takeIf { it.isNotBlank() }
         } catch (e: Exception) {
             null
         }
