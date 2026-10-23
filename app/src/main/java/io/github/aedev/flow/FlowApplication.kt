@@ -91,14 +91,14 @@ class FlowApplication :
         appContext = applicationContext
         YouTube.cacheDirectory = cacheDir.resolve("innertube_http_cache")
 
-        // Campaigns are read-only here: the app only asks which campaign plays in a queue slot and
-        // reports qualified plays. Blank config disables injection rather than failing, so this is
-        // safe on any build. See [Campaigns].
-        io.github.aedev.flow.campaign.Campaigns.init(
+        // The campaign SDK, not a vendored copy: this one call provisions the device's listener
+        // identity, loads and refreshes the home banner, and enables queue injection. Blank config
+        // disables the feature rather than failing, so this is safe on any build.
+        com.mavins.campaign.Campaigns.init(
             context = this,
+            host = BuildConfig.CAMPAIGN_GENRE_TILE_HOST.ifBlank { com.mavins.campaign.Campaigns.DEFAULT_HOST },
             supabaseUrl = BuildConfig.SUPABASE_URL,
             anonKey = BuildConfig.SUPABASE_ANON_KEY,
-            genreTileHost = BuildConfig.CAMPAIGN_GENRE_TILE_HOST,
         )
 
         DiscordPresenceRuntime.initialize(this, okHttpClient)

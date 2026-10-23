@@ -85,13 +85,11 @@ object CampaignPlaybackTracker {
             val country = Locale.getDefault().country
             scope.launch {
                 try {
-                    // A device listener row must exist before the play event's foreign key can
-                    // reference it, so this is awaited before the report — never blocking playback,
-                    // since both calls live off the player's own thread.
-                    val listenerId = Campaigns.ensureDeviceListener(Campaigns.deviceId())
-                    Campaigns.recordStream(
+                    // The SDK provisions the listener row itself before reporting (a play event's
+                    // foreign key needs it to exist), so this is one call rather than an
+                    // ensure-then-report pair, and it cannot race the provisioning.
+                    com.mavins.campaign.Campaigns.recordPlay(
                         campaignId = campaignId,
-                        userId = listenerId,
                         listenDurationSeconds = seconds,
                         countryCode = country,
                         isFullListen = full,

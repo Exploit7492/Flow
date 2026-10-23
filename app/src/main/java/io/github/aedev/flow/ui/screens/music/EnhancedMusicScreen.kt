@@ -32,9 +32,6 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import io.github.aedev.flow.R
-import io.github.aedev.flow.campaign.CampaignCard
-import io.github.aedev.flow.campaign.Campaigns
-import io.github.aedev.flow.campaign.rememberCampaignCarouselState
 import io.github.aedev.flow.campaign.toMusicTrack
 import io.github.aedev.flow.data.music.model.MusicTrack
 import io.github.aedev.flow.data.music.model.audioMusicOnly
@@ -44,7 +41,6 @@ import io.github.aedev.flow.ui.components.layout.LocalFlowBottomInsets
 import io.github.aedev.flow.ui.components.layout.floatAboveBottomChrome
 import io.github.aedev.flow.ui.components.layout.flowBottomContentPadding
 import io.github.aedev.flow.ui.components.layout.topbar.FlowTopBar
-import io.github.aedev.flow.ui.components.music.campaign.CampaignBanner
 import io.github.aedev.flow.ui.components.music.section.HomeSectionType
 import io.github.aedev.flow.ui.components.music.section.MusicHomeLibrary
 import io.github.aedev.flow.ui.components.music.section.musicHomeFeed
@@ -106,17 +102,11 @@ fun EnhancedMusicScreen(
         }
     val musicListState = rememberLazyListState()
 
-    // The promoted campaigns for the banner, refreshed with the feed. The banner slides through them
-    // one at a time on its own timer; drawing one at a time is what makes the slot read as a
-    // promotion rather than an ad break. A campaign tap starts the campaign's own track through the
-    // ordinary song path, so it plays exactly like any other row.
-    var liveCampaigns by remember { mutableStateOf<List<CampaignCard>>(emptyList()) }
-    LaunchedEffect(Unit) {
-        liveCampaigns = Campaigns.liveCampaignsForBanner()
-    }
-    val campaignCarousel = rememberCampaignCarouselState(liveCampaigns)
-    val featuredCampaign = campaignCarousel.current
-    val onCampaignClick: (CampaignCard) -> Unit = { campaign ->
+    // The promoted campaigns for the banner. The SDK owns the fetch, the rotation and the slide
+    // timer; this screen only says where the card goes and what a tap does, so the behaviour cannot
+    // drift from every other app the SDK ships into. A campaign tap starts the campaign's own track
+    // through the ordinary song path, so it plays exactly like any other row.
+    val onCampaignClick: (com.mavins.campaign.CampaignCard) -> Unit = { campaign ->
         campaign.toMusicTrack()?.let { onSongClick(it, listOf(it), null) }
     }
     val quickPicksGridState = rememberLazyGridState()
@@ -248,15 +238,14 @@ fun EnhancedMusicScreen(
                             contentPadding = PaddingValues(bottom = flowBottomContentPadding(FeedBottomClearance)),
                         ) {
                             // The promoted campaign leads the feed. Drawn before the shelves so it
-                            // reads as the page's own promotion, not a row inside a section.
-                            featuredCampaign?.let { campaign ->
-                                item(key = "campaign_banner") {
-                                    CampaignBanner(
-                                        campaign = campaign,
-                                        onClick = { onCampaignClick(campaign) },
-                                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
-                                    )
-                                }
+                            // reads as the page's own promotion, not a row inside a section. The
+                            // SDK owns the card, the slideshow and the stream count; this says
+                            // only where it goes and what a tap plays.
+                            item(key = "campaign_banner") {
+                                com.mavins.campaign.CampaignBanner(
+                                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                                    onCampaignClick = onCampaignClick,
+                                )
                             }
                             musicHomeFeed(
                                 uiState = uiState,

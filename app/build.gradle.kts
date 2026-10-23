@@ -285,6 +285,18 @@ composeCompiler {
 }
 
 dependencies {
+    // The Mavins campaign SDK owns the whole promoted-campaign feature: the
+    // backend read, the home banner and its slideshow, and the queue splice.
+    // This app used to vendor all of that, and its copy drifted — the banner
+    // read the table directly instead of the canonical function and drew blank
+    // covers, and the slideshow only ever showed one card.
+    //
+    // A dynamic version on purpose: the SDK ships fixes that must reach every
+    // app without a coordinated edit per app, which is what a pinned version
+    // requires. JitPack publishes maven-metadata.xml for the repository, so
+    // `1.+` resolves the newest 1.x release on each build.
+    implementation("com.github.King-Fisher000:mavins-web:1.+")
+
     // --- Core Android ---
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.core.splashscreen)

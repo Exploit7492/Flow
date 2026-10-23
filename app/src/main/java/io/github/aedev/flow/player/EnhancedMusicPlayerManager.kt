@@ -14,8 +14,7 @@ import androidx.media3.session.SessionToken
 import com.google.common.util.concurrent.ListenableFuture
 import com.google.common.util.concurrent.MoreExecutors
 import io.github.aedev.flow.campaign.CampaignPlaybackTracker
-import io.github.aedev.flow.campaign.CampaignQueueInjection
-import io.github.aedev.flow.campaign.Campaigns
+import io.github.aedev.flow.campaign.toMusicTrack
 import io.github.aedev.flow.data.local.AudioSettingsPersistence
 import io.github.aedev.flow.data.local.QueuePersistence
 import io.github.aedev.flow.data.localmedia.LocalMediaIds
@@ -628,14 +627,18 @@ object EnhancedMusicPlayerManager {
         startIndex: Int = -1,
         genreTerm: String? = null,
     ): Pair<List<MusicTrack>, Int> {
-        if (baseQueue.isEmpty() || !Campaigns.enabled) {
+        if (baseQueue.isEmpty() || !com.mavins.campaign.Campaigns.enabled) {
             return baseQueue to startIndex.coerceAtLeast(0)
         }
+        // The SDK owns the run-of-four rule and the per-slot fetch, so every app that injects
+        // campaigns builds the same shape and honours the same one-fetch-per-slot guarantee. This
+        // only adapts a campaign to this app's own track type.
         val injected =
-            CampaignQueueInjection.inject(
+            com.mavins.campaign.CampaignQueue.inject(
                 baseItems = baseQueue,
+                genre = genreTerm,
                 targetOriginalIndex = startIndex,
-            ) { Campaigns.nextForSlotResolvingGenre(genreTerm) }
+            ) { card -> card.toMusicTrack() }
         val playIndex =
             injected.adjustedTargetIndex
                 .takeIf { it >= 0 }
