@@ -57,8 +57,8 @@ class CrashSummaryTest {
         val url = parseCrashSummary(report).issueUrl()
 
         assertThat(url).contains("&steps=Not%20known.")
-        assertThat(url).contains("&expected=Flow%20keeps%20running.")
-        assertThat(url).contains("&actual=Flow%20crashed%20with%20IllegalArgumentException%3A%20Padding%20must%20be%20non-negative&")
+        assertThat(url).contains("&expected=YouTube-X%20keeps%20running.")
+        assertThat(url).contains("&actual=YouTube-X%20crashed%20with%20IllegalArgumentException%3A%20Padding%20must%20be%20non-negative&")
     }
 
     @Test
