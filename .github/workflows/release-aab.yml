@@ -50,7 +50,7 @@ jobs:
       name: ${{ steps.plan.outputs.name }}
       bundle_id: ${{ steps.plan.outputs.bundle_id }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           persist-credentials: false
 
@@ -120,16 +120,16 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 45
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           persist-credentials: false
 
-      - uses: actions/setup-java@v4
+      - uses: actions/setup-java@v6
         with:
           distribution: temurin
           java-version: "21"
 
-      - uses: gradle/actions/setup-gradle@v4
+      - uses: gradle/actions/setup-gradle@v6
 
       # The store re-signs, so the bundle only has to satisfy Gradle. A throwaway
       # keystore keeps the release signing config valid without shipping a real key.
@@ -165,7 +165,7 @@ jobs:
           echo "aab=$aab" >> "$GITHUB_OUTPUT"
 
       - name: Upload the bundle artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: flow-aab
           path: ${{ steps.aab.outputs.aab }}
