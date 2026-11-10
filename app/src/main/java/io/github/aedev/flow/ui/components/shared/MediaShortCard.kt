@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -38,6 +39,7 @@ import io.github.aedev.flow.ui.components.shared.quickactions.VideoQuickActionsB
 import io.github.aedev.flow.ui.components.shared.quickactions.sharedQuickActionsViewModel
 import io.github.aedev.flow.ui.theme.extendedColors
 import io.github.aedev.flow.utils.formatViewCount
+import io.github.aedev.flow.utils.youtubeWatchUrl
 
 /** The one size every Shorts grid and strip agrees on, so cells line up across screens. */
 object ShortCardDefaults {
@@ -72,6 +74,7 @@ fun MediaShortCard(
 ) {
     var showQuickActions by remember { mutableStateOf(false) }
     val interactionSource = remember { MutableInteractionSource() }
+    val quickActions = sharedQuickActionsViewModel()
     Column(
         modifier =
             modifier
@@ -101,6 +104,13 @@ fun MediaShortCard(
                 portrait = true,
             )
             ShortWatchedIndicator(videoId = video.id)
+            MediaDownloadBadge(
+                onClick = { quickActions.requestCobaltDownload(youtubeWatchUrl(video.id)) },
+                modifier =
+                    Modifier
+                        .align(Alignment.TopEnd)
+                        .padding(MediaThumbnailDefaults.BadgePadding),
+            )
         }
         Spacer(modifier = Modifier.height(TitleSpacing))
         Text(
@@ -125,7 +135,6 @@ fun MediaShortCard(
     }
 
     if (showQuickActions) {
-        val quickActions = sharedQuickActionsViewModel()
         VideoQuickActionsBottomSheet(
             video = video,
             onDismiss = { showQuickActions = false },

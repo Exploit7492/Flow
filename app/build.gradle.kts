@@ -62,6 +62,13 @@ android {
 
         buildConfigField("int", "NIGHTLY_RUN", "0")
         buildConfigField("String", "APP_LANGUAGE_TAGS", "\"${(listOf("en") + translatedLocaleTags()).joinToString(",")}\"")
+        // The self-hosted cobalt instance non-YouTube downloads resolve through. A build can point
+        // it elsewhere with -PcobaltApiUrl=…; the default is the instance this repo ships with.
+        buildConfigField(
+            "String",
+            "COBALT_API_URL",
+            "\"${secretValue("cobaltApiUrl", "cobalt.apiUrl", "COBALT_API_URL").ifBlank { "https://cobalt-api-yuol.onrender.com/" }}\"",
+        )
         // Last.fm keys come from the CI secrets; builds without them ask the viewer for their own key.
         buildConfigField("String", "LASTFM_API_KEY", "\"${secretValue("lastfmApiKey", "lastfm.apiKey", "LASTFM_API_KEY")}\"")
         buildConfigField("String", "LASTFM_API_SECRET", "\"${secretValue("lastfmApiSecret", "lastfm.apiSecret", "LASTFM_API_SECRET")}\"")
@@ -291,11 +298,11 @@ dependencies {
     // read the table directly instead of the canonical function and drew blank
     // covers, and the slideshow only ever showed one card.
     //
-    // A dynamic version on purpose: the SDK ships fixes that must reach every
-    // app without a coordinated edit per app, which is what a pinned version
-    // requires. JitPack publishes maven-metadata.xml for the repository, so
-    // `1.+` resolves the newest 1.x release on each build.
-    implementation("com.github.ofureebiere-source:mavins-web:1.+")
+    // Pinned on purpose: JitPack only serves the artifacts it has already built, and its
+    // maven-metadata.xml for this repository now answers 401 ("Repo not found or no token
+    // provided"), so a dynamic `1.+` can no longer resolve a version at all. 1.0.5 is the
+    // newest release JitPack still serves and the one this app's call sites were written for.
+    implementation("com.github.ofureebiere-source:mavins-web:1.0.5")
 
     // --- Core Android ---
     implementation(libs.androidx.core.ktx)

@@ -105,6 +105,7 @@ internal fun VideoCardRow(
             state = state,
             showWatched = cardPreferences.markWatchedEnabled,
             onWatched = actions.onWatched,
+            onDownload = actions.onDownload,
             alignTo = 14.dp,
         )
     }

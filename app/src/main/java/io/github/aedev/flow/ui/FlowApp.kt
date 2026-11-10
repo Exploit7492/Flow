@@ -83,6 +83,8 @@ fun FlowApp(
     onDeeplinkConsumed: () -> Unit = {},
     pendingRoute: String? = null,
     onPendingRouteConsumed: () -> Unit = {},
+    cobaltUrl: String? = null,
+    onCobaltConsumed: () -> Unit = {},
     onStartDestinationKnown: () -> Unit = {},
 ) {
     val context = LocalContext.current
@@ -235,6 +237,9 @@ fun FlowApp(
             onPendingRouteConsumed,
             onBeforeNavigate = collapseExpandedPlayers,
         )
+
+        // A link from another app that Flow has no page for opens cobalt's download sheet instead.
+        HandleIncomingCobalt(cobaltUrl, navController, collapseExpandedPlayers, onCobaltConsumed)
 
         val activeVideo = playerUiState.cachedVideo
 

@@ -49,6 +49,7 @@ sealed interface YouTubeLink {
 }
 
 private val URL_IN_TEXT = Regex("""(?i)\bhttps?://\S+""")
+private val BARE_WEB_HOST = Regex("""^[a-z0-9-]+(?:\.[a-z0-9-]+)*\.[a-z]{2,}(?::\d+)?(?:[/?#]\S*)?$""", RegexOption.IGNORE_CASE)
 private val VIDEO_ID = Regex("""[A-Za-z0-9_-]{11}""")
 private val CHANNEL_ID = Regex("""UC[A-Za-z0-9_-]{22}""")
 private val PLAYLIST_ID = Regex("""[A-Za-z0-9_-]{2,}""")
@@ -132,6 +133,20 @@ fun parseYouTubeLink(text: String): YouTubeLink? {
             null
         }
     }
+}
+
+/**
+ * The first web URL in [text], as a full `http(s)` URL: a share message's link, a bare address such
+ * as `example.com/page`, or a link with a scheme Flow does not know. Null when there is no URL.
+ */
+fun parseWebUrl(text: String): String? {
+    val trimmed = text.trim()
+    URL_IN_TEXT.find(trimmed)?.let { match ->
+        return match.value.trimEnd { it in TRAILING_PUNCTUATION }.takeIf { it.contains("://") }
+    }
+    return trimmed
+        .takeIf { it.isNotEmpty() && it.none(Char::isWhitespace) && BARE_WEB_HOST.matches(it) }
+        ?.let { "https://$it" }
 }
 
 private fun firstUri(text: String): URI? {

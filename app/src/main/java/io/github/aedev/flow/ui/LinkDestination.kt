@@ -25,7 +25,7 @@ internal sealed interface LinkDestination {
 internal fun linkTextOf(intent: Intent): String? =
     when (intent.action) {
         Intent.ACTION_VIEW -> intent.dataString
-        Intent.ACTION_SEND -> intent.takeIf { it.type == "text/plain" }?.getStringExtra(Intent.EXTRA_TEXT)
+        Intent.ACTION_SEND -> intent.takeIf { it.type?.startsWith("text/") == true }?.getStringExtra(Intent.EXTRA_TEXT)
         else -> null
     }
 

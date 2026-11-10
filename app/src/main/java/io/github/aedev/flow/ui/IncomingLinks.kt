@@ -3,6 +3,7 @@ package io.github.aedev.flow.ui
 import androidx.compose.runtime.State
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
+import io.github.aedev.flow.utils.parseWebUrl
 import io.github.aedev.flow.utils.parseYouTubeLink
 
 /**
@@ -26,6 +27,10 @@ internal class IncomingLinks {
     private val _route = mutableStateOf<String?>(null)
     val route: State<String?> = _route
 
+    /** A non-YouTube link from outside, for the shell to open cobalt's download sheet on. */
+    private val _cobaltUrl = mutableStateOf<String?>(null)
+    val cobaltUrl: State<String?> = _cobaltUrl
+
     fun openVideo(
         videoId: String,
         isShort: Boolean = false,
@@ -43,6 +48,15 @@ internal class IncomingLinks {
     fun openMusicPlayer() {
         consumeVideo()
         _musicPlayerRequest.intValue += 1
+    }
+
+    /** Asks the shell to open cobalt's download sheet for a non-YouTube link. */
+    fun openCobalt(url: String) {
+        _cobaltUrl.value = url
+    }
+
+    fun consumeCobalt() {
+        _cobaltUrl.value = null
     }
 
     fun consumeVideo() {
@@ -65,11 +79,26 @@ internal class IncomingLinks {
         isShared: Boolean,
         isRestoring: Boolean,
     ): Boolean {
-        when (val destination = parseYouTubeLink(text)?.let(::linkDestination)) {
-            is LinkDestination.Video -> if (!(isShared && isRestoring)) openVideo(destination.videoId, isShared = isShared)
-            is LinkDestination.Short -> openVideo(destination.videoId, isShort = true)
-            is LinkDestination.Page -> if (!isRestoring) openRoute(destination.route)
-            null -> return false
+        val link = parseYouTubeLink(text)
+        when (val destination = link?.let(::linkDestination)) {
+            is LinkDestination.Video -> {
+                if (!(isShared && isRestoring)) openVideo(destination.videoId, isShared = isShared)
+            }
+
+            is LinkDestination.Short -> {
+                openVideo(destination.videoId, isShort = true)
+            }
+
+            is LinkDestination.Page -> {
+                if (!isRestoring) openRoute(destination.route)
+            }
+
+            null -> {
+                // A link Flow has no page for is handed to cobalt, which resolves any URL it supports.
+                if (link != null) return false
+                val webUrl = parseWebUrl(text) ?: return false
+                if (!isRestoring) openCobalt(webUrl)
+            }
         }
         return true
     }

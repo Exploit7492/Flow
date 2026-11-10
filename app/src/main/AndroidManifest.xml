@@ -199,6 +199,13 @@
                 <data android:mimeType="text/plain" />
             </intent-filter>
 
+            <!-- Any other shared text, which is usually a URL: Flow offers to download it with cobalt. -->
+            <intent-filter>
+                <action android:name="android.intent.action.SEND" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="text/*" />
+            </intent-filter>
+
             <!-- A playlist file shared from Flow opens here and is imported. -->
             <intent-filter>
                 <action android:name="android.intent.action.VIEW" />

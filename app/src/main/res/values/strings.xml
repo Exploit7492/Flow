@@ -2411,6 +2411,14 @@
     <string name="download_no_compatible_audio">No compatible audio stream — download cannot proceed</string>
     <!-- Quality shown in the downloads list for a SABR download, whose resolution is not known up front -->
     <string name="download_quality_best">Best</string>
+    <string name="cobalt_download_title">Download</string>
+    <string name="cobalt_download_subtitle">Choose a quality</string>
+    <string name="cobalt_download_resolving">Resolving link…</string>
+    <string name="cobalt_download_failed">Couldn\'t resolve this link</string>
+    <string name="cobalt_download_audio_only">Audio only</string>
+    <string name="cobalt_download_audio_format">Sound format</string>
+    <string name="cobalt_download_start">Download</string>
+    <string name="cobalt_download_started">Download started: %1$s</string>
     <string name="audio_format_unknown">Audio</string>
     <!-- Approximate download size shown beside a quality; %1$s is a platform-formatted file size -->
     <string name="download_size_estimate">~%1$s</string>

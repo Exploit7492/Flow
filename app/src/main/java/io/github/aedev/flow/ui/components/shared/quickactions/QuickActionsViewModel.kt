@@ -94,6 +94,11 @@ class QuickActionsViewModel
         /** The video whose download dialog is open, with its formats already loaded. */
         val pendingDownload: StateFlow<VideoDownloadOptions?> = _pendingDownload.asStateFlow()
 
+        private val _pendingCobaltUrl = MutableStateFlow<String?>(null)
+
+        /** A non-YouTube link whose cobalt download sheet is open. */
+        val pendingCobaltUrl: StateFlow<String?> = _pendingCobaltUrl.asStateFlow()
+
         private var downloadJob: Job? = null
 
         /** Channels already being observed; each collector lives as long as this ViewModel, so one per channel. */
@@ -244,6 +249,16 @@ class QuickActionsViewModel
                     val options = downloadOptions.load(video)
                     if (options == null) emit(R.string.toast_no_download_source) else _pendingDownload.value = options
                 }
+        }
+
+        /** Opens the cobalt quality sheet for a link Flow has no YouTube page for. */
+        fun requestCobaltDownload(url: String) {
+            if (url.isBlank()) return
+            _pendingCobaltUrl.value = url
+        }
+
+        fun dismissCobaltDownload() {
+            _pendingCobaltUrl.value = null
         }
 
         /** Confirms something the menu did without the ViewModel, such as a copy on an Android that shows no confirmation. */

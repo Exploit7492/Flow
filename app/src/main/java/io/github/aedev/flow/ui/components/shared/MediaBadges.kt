@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Download
 import androidx.compose.material.icons.rounded.OfflinePin
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -132,6 +133,33 @@ fun MediaIconBadge(
         Icon(
             imageVector = icon,
             contentDescription = contentDescription,
+            modifier =
+                Modifier
+                    .padding(BadgeIconPadding)
+                    .size(BadgeIconSize),
+        )
+    }
+}
+
+/**
+ * The download affordance a card carries on its artwork. Tapping it opens the quality sheet for the
+ * card's link, so the download starts from the sheet rather than the card.
+ */
+@Composable
+fun MediaDownloadBadge(
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Surface(
+        onClick = onClick,
+        modifier = modifier,
+        shape = MaterialTheme.shapes.extraSmall,
+        color = artworkScrim(BADGE_SCRIM_ALPHA),
+        contentColor = ArtworkScrimContent,
+    ) {
+        Icon(
+            imageVector = Icons.Outlined.Download,
+            contentDescription = stringResource(R.string.download),
             modifier =
                 Modifier
                     .padding(BadgeIconPadding)

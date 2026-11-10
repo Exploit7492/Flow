@@ -443,6 +443,38 @@ rows, bespoke empty/error states, bespoke badges, bespoke formatters, or a secon
 4. **Strings move with the component**, and only in `values/strings.xml`. Never touch other locales.
 5. **Run `graphify update .`** after each landed refactor step so the next query is accurate.
 
+## Downloads — YouTube streams vs. cobalt
+
+Two backends resolve a download's bytes, selected by `DownloadSource` on the stored `DownloadRequest`:
+
+- `YOUTUBE` — the native/NewPipe extraction path (`DownloadRunner`), streams merged locally.
+- `COBALT` — a self-hosted cobalt instance resolves any supported source URL into one ready file
+  (`CobaltDownloadRunner`). There is no merge and no per-stream resume: cobalt hands back a single
+  URL, the runner streams it once into staging, tags it and places it. `DownloadQueue` branches on
+  `QueuedDownload.source` (decoded from `requestJson`), so a cobalt row never touches the YouTube
+  runner.
+
+`CobaltClient` (`data/cobalt/`) is the only place that talks to the instance. Its base URL comes
+from `BuildConfig.COBALT_API_URL`, set in `app/build.gradle.kts` from the `cobaltApiUrl` Gradle
+property / `cobalt.apiUrl` local property / `COBALT_API_URL` env var, defaulting to the project's
+instance. Resolve is one POST (`CobaltRequest` → `CobaltResult.Ready`/`Unavailable`); the tunnel
+body is opened separately (`CobaltClient.open` → `CobaltStream.Ready`), because cobalt tunnels
+answer every request with the whole body and ignore `Range`.
+
+Entry points that hand a URL to cobalt all go through `QuickActionsViewModel.requestCobaltDownload`,
+which sets `pendingCobaltUrl`; `QuickActionsHost` (mounted once in the shell) shows
+`CobaltDownloadSheet` for it:
+
+1. Searchbar — `rememberSearchSubmitter` routes any non-YouTube URL (`parseWebUrl`) to the sheet.
+2. Share intents — the `SEND`/`text/*` manifest filter plus `IncomingLinks.openLink` → `openCobalt`
+   → `FlowApp` → `HandleIncomingCobalt` resolves an arbitrary shared URL.
+3. Card affordances — the download badge/side action on video and Short cards opens the sheet for
+   that card's `youtubeWatchUrl`.
+
+`parseWebUrl` (in `utils/YouTubeLink.kt`) pulls the first `http(s)` URL out of a share message or
+turns a bare `host/path` into an `https://` URL; it returns null for ordinary search text so the
+searchbar still searches. It is unit-tested in `YouTubeLinkTest`.
+
 ## Rules for working on the project
 
 1. Always pull the latest changes from `main` before starting work to minimize merge conflicts.

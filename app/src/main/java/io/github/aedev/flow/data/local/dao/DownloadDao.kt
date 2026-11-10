@@ -11,6 +11,8 @@ import io.github.aedev.flow.data.local.entity.DownloadEntity
 import io.github.aedev.flow.data.local.entity.DownloadItemEntity
 import io.github.aedev.flow.data.local.entity.DownloadItemStatus
 import io.github.aedev.flow.data.local.entity.DownloadWithItems
+import io.github.aedev.flow.data.video.downloader.request.DownloadRequest
+import io.github.aedev.flow.data.video.downloader.request.DownloadSource
 import kotlinx.coroutines.flow.Flow
 
 /** One row of the download queue. */
@@ -18,7 +20,12 @@ data class QueuedDownload(
     val videoId: String,
     val createdAt: Long,
     val status: DownloadItemStatus,
-)
+    /** The stored request, so the queue can tell a cobalt download from a YouTube one without a join. */
+    val requestJson: String? = null,
+) {
+    val source: DownloadSource
+        get() = DownloadRequest.decode(requestJson)?.source ?: DownloadSource.YOUTUBE
+}
 
 @Dao
 interface DownloadDao {
@@ -278,7 +285,8 @@ interface DownloadDao {
      */
     @Query(
         """
-        SELECT d.videoId AS videoId, MIN(d.createdAt) AS createdAt, di.status AS status FROM downloads d
+        SELECT d.videoId AS videoId, MIN(d.createdAt) AS createdAt, di.status AS status, d.requestJson AS requestJson
+        FROM downloads d
         INNER JOIN download_items di ON d.videoId = di.videoId
         GROUP BY d.videoId
         ORDER BY createdAt

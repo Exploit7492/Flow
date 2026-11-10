@@ -278,6 +278,7 @@ class MainActivity : ComponentActivity() {
                                 val isDeeplinkShared by links.isShared
                                 val openMusicPlayerRequest by links.musicPlayerRequest
                                 val pendingRoute by links.route
+                                val cobaltUrl by links.cobaltUrl
 
                                 ProvideChannelGroupLabels {
                                     if (appUiRoot == AppUiRoot.TV) {
@@ -300,6 +301,8 @@ class MainActivity : ComponentActivity() {
                                             onDeeplinkConsumed = links::consumeVideo,
                                             pendingRoute = pendingRoute,
                                             onPendingRouteConsumed = links::consumeRoute,
+                                            cobaltUrl = cobaltUrl,
+                                            onCobaltConsumed = links::consumeCobalt,
                                             onStartDestinationKnown = { splashController.contentReady = true },
                                         )
                                     }

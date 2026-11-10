@@ -50,6 +50,30 @@ fun HandlePendingRoute(
     }
 }
 
+/**
+ * A non-YouTube link from another app opens cobalt's download sheet: the shell drops any expanded
+ * player first, hands the link to the shared quick-actions ViewModel, then marks it consumed.
+ */
+@Composable
+fun HandleIncomingCobalt(
+    cobaltUrl: String?,
+    navController: NavController,
+    onBeforeOpen: () -> Unit = {},
+    onConsumed: () -> Unit,
+) {
+    val quickActions: io.github.aedev.flow.ui.components.shared.quickactions.QuickActionsViewModel =
+        io.github.aedev.flow.ui.components.shared.quickactions
+            .sharedQuickActionsViewModel()
+    LaunchedEffect(cobaltUrl) {
+        cobaltUrl?.let { url ->
+            navController.awaitGraph()
+            onBeforeOpen()
+            quickActions.requestCobaltDownload(url)
+            onConsumed()
+        }
+    }
+}
+
 /** [asksFirst] turns a video into a question instead: [onAsk] gets it and nothing plays yet. */
 @Composable
 fun HandleDeepLinks(

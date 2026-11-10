@@ -41,6 +41,7 @@ import io.github.aedev.flow.ui.components.shared.FlowEmptyState
 import io.github.aedev.flow.ui.components.shared.FlowErrorState
 import io.github.aedev.flow.ui.components.shared.quickactions.QuickActionsViewModel
 import io.github.aedev.flow.utils.YouTubeLink
+import io.github.aedev.flow.utils.parseWebUrl
 import io.github.aedev.flow.utils.parseYouTubeLink
 
 private val FilterBarVerticalPadding = 4.dp
@@ -64,11 +65,21 @@ internal fun rememberSearchSubmitter(
                 state.onSubmit(query)
                 viewModel.submit(query, filters)
             }
-            when {
-                text.isEmpty() -> Unit
-                link == null -> search(text)
-                link is YouTubeLink.Search -> search(link.query)
-                !mediaNavigator.openLink(link) -> quickActions.announce(R.string.link_not_supported)
+            if (text.isNotEmpty()) {
+                when {
+                    link == null -> {
+                        val webUrl = parseWebUrl(text)
+                        if (webUrl != null) quickActions.requestCobaltDownload(webUrl) else search(text)
+                    }
+
+                    link is YouTubeLink.Search -> {
+                        search(link.query)
+                    }
+
+                    !mediaNavigator.openLink(link) -> {
+                        parseWebUrl(text)?.let(quickActions::requestCobaltDownload) ?: quickActions.announce(R.string.link_not_supported)
+                    }
+                }
             }
         }
     }

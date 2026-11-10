@@ -6,6 +6,25 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.json.Json
 
+/** Where a download's bytes come from: YouTube's own streams, or a cobalt instance for anything else. */
+@Serializable
+enum class DownloadSource {
+    YOUTUBE,
+    COBALT,
+}
+
+/**
+ * What a cobalt download asked the instance for. cobalt resolves a source URL into one ready file,
+ * so there is nothing to merge: the quality and the sound format are the whole choice.
+ */
+@Serializable
+data class CobaltSelection(
+    val url: String,
+    val videoQuality: String? = null,
+    val audioFormat: String? = null,
+    val audioBitrate: String? = null,
+)
+
 /**
  * What the user asked to download, stored with the download row. Streams are resolved from this
  * only when a download slot is free, so a request that waits in the queue for hours never runs on
@@ -32,6 +51,9 @@ data class DownloadRequest(
     val subtitle: DownloadSubtitle? = null,
     /** Where that file was written, so deleting the download removes it too. */
     val subtitleFile: String? = null,
+    /** Which backend resolves the bytes. A cobalt request carries [cobalt] and needs no extraction. */
+    val source: DownloadSource = DownloadSource.YOUTUBE,
+    val cobalt: CobaltSelection? = null,
 ) {
     val videoId: String get() = tags.videoId
     val kind: DownloadKind get() = tags.kind

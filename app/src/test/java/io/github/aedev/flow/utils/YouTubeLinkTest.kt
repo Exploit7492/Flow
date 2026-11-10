@@ -184,4 +184,43 @@ class YouTubeLinkTest {
             "https://youtu.be/",
         )
     }
+
+    private fun assertWebUrl(
+        expected: String?,
+        vararg texts: String,
+    ) = texts.forEach { assertThat(parseWebUrl(it)).isEqualTo(expected) }
+
+    @Test
+    fun `a web url is read out of a share message`() {
+        assertWebUrl(
+            "https://vimeo.com/123456",
+            "https://vimeo.com/123456",
+            "check this out https://vimeo.com/123456",
+            "https://vimeo.com/123456 — worth a look",
+        )
+    }
+
+    @Test
+    fun `a bare address becomes an https url`() {
+        assertWebUrl(
+            "https://example.com/page",
+            "example.com/page",
+            "  example.com/page  ",
+        )
+    }
+
+    @Test
+    fun `trailing punctuation is not part of the url`() {
+        assertWebUrl("https://vimeo.com/123456", "https://vimeo.com/123456.", "see https://vimeo.com/123456,")
+    }
+
+    @Test
+    fun `a youtube link is still a web url`() {
+        assertWebUrl("https://www.youtube.com/watch?v=$video", "https://www.youtube.com/watch?v=$video")
+    }
+
+    @Test
+    fun `ordinary text is not a web url`() {
+        assertWebUrl(null, "", "sam sulek", "how to build a pc", "cats")
+    }
 }

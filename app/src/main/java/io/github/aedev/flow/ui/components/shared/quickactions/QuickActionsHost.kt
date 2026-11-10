@@ -14,10 +14,13 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.platform.LocalContext
+import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import io.github.aedev.flow.R
 import io.github.aedev.flow.data.local.DownloadDialogStyle
 import io.github.aedev.flow.data.local.PlayerPreferences
+import io.github.aedev.flow.ui.cobalt.CobaltDownloadSheet
+import io.github.aedev.flow.ui.cobalt.CobaltDownloadViewModel
 import io.github.aedev.flow.ui.components.shared.MediaDownloadDialog
 import io.github.aedev.flow.ui.components.shared.MediaDownloadDialogCompact
 import kotlinx.coroutines.flow.collectLatest
@@ -35,6 +38,24 @@ fun QuickActionsHost(
     val preferences = remember(context) { PlayerPreferences(context) }
     val dialogStyle by preferences.downloadDialogStyle.collectAsStateWithLifecycle(DownloadDialogStyle.FULL)
     val pending by viewModel.pendingDownload.collectAsStateWithLifecycle()
+    val pendingCobaltUrl by viewModel.pendingCobaltUrl.collectAsStateWithLifecycle()
+
+    pendingCobaltUrl?.let { url ->
+        val cobaltViewModel: CobaltDownloadViewModel = hiltViewModel()
+        LaunchedEffect(url) { cobaltViewModel.open(url) }
+        val cobaltState by cobaltViewModel.state.collectAsStateWithLifecycle()
+        CobaltDownloadSheet(
+            state = cobaltState,
+            onSelectQuality = cobaltViewModel::selectQuality,
+            onSetAudioOnly = cobaltViewModel::setAudioOnly,
+            onSelectAudioFormat = cobaltViewModel::selectAudioFormat,
+            onStart = {
+                cobaltViewModel.start { title -> viewModel.announce(R.string.cobalt_download_started, title) }
+                viewModel.dismissCobaltDownload()
+            },
+            onDismiss = viewModel::dismissCobaltDownload,
+        )
+    }
 
     pending?.let { options ->
         when (dialogStyle) {

@@ -21,8 +21,12 @@ plugins {
 }
 
 spotless {
-    // Adopt formatting incrementally from the main commit that introduced linting.
-    ratchetFrom("52c4928e5af05141080f46f6c1e41cbf9c457023")
+    // Adopt formatting incrementally from the commit that introduced linting (dcb3d696e). The
+    // historical value 52c4928e was removed from this repository when its history was rewritten
+    // after a storage mirror loss, which made spotless abort with a jgit MissingObjectException
+    // before it could check anything. Its pre-lint parent 4d6f59f8 is the same baseline: it is
+    // the last revision before the formatter was adopted.
+    ratchetFrom("4d6f59f80d40adee608ea8000eb1092bb1a2d0ef")
     lineEndings = LineEnding.UNIX
 
     val ktlintConfig =

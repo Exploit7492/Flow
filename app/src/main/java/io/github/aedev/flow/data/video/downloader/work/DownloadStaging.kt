@@ -20,13 +20,20 @@ internal class DownloadStaging(
 
     /** Everything this download wrote to staging, including a half-made output. */
     fun clear() {
-        listOf(videoPart, audioPart, state, File("${state.path}.tmp"), output("mp4"), output("m4a"), output("webm"))
-            .forEach { it.delete() }
+        listOf(videoPart, audioPart, state, File("${state.path}.tmp")).forEach { it.delete() }
+        clearOutputs()
     }
 
-    /** A half-made output, keeping the fetched parts for a retry. */
+    /**
+     * A half-made output, keeping the fetched parts for a retry. A cobalt download can name its
+     * output with any extension the source hands back, so every `*.out.*` beside the stem goes.
+     */
     fun clearOutputs() {
-        listOf(output("mp4"), output("m4a"), output("webm")).forEach { it.delete() }
+        val stemName = File(stem).name
+        File(stem)
+            .parentFile
+            ?.listFiles { file -> file.name.startsWith("$stemName.out.") }
+            ?.forEach { it.delete() }
     }
 
     /** The part files only, for a transfer that has to start over rather than resume. */

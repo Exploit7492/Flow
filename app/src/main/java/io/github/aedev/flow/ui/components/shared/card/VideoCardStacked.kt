@@ -77,6 +77,7 @@ internal fun VideoCardStacked(
                     state = state,
                     showWatched = false,
                     onWatched = actions.onWatched,
+                    onDownload = actions.onDownload,
                     alignTo = 12.dp,
                 )
             },

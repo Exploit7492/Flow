@@ -14,6 +14,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.Visibility
+import androidx.compose.material.icons.outlined.Download
 import androidx.compose.material.icons.outlined.Visibility
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -135,8 +136,9 @@ internal fun Modifier.videoCardChannelClickable(state: VideoCardState): Modifier
 }
 
 /**
- * The ⋮ button and, on a row whose thumbnail leaves the height for it, the watched toggle beneath,
- * both at the full 48 dp target. [alignTo] pulls them up so the ⋮ icon sits on the title's first line.
+ * The download button and the ⋮ button and, on a row whose thumbnail leaves the height for it, the
+ * watched toggle beneath, all at the full 48 dp target. [alignTo] pulls them up so the ⋮ icon sits
+ * on the title's first line. The download button opens the quality sheet for [onDownload]'s link.
  * A stacked card keeps its watched toggle in the feedback group instead, so its text keeps the width.
  * On a D-pad the card's long press and the Menu key open the same menu, so the title takes the room.
  */
@@ -145,11 +147,19 @@ internal fun VideoCardSideActions(
     state: VideoCardState,
     showWatched: Boolean,
     onWatched: (Video) -> Unit,
+    onDownload: (Video) -> Unit,
     alignTo: Dp,
     modifier: Modifier = Modifier,
 ) {
     if (LocalDpadNavigation.current) return
     Column(modifier = modifier.offset(y = -alignTo)) {
+        IconButton(onClick = { onDownload(state.video) }) {
+            Icon(
+                imageVector = Icons.Outlined.Download,
+                contentDescription = stringResource(R.string.download),
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
         IconButton(onClick = { state.sheets.showQuickActions = true }) {
             Icon(
                 imageVector = Icons.Default.MoreVert,

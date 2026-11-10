@@ -53,6 +53,50 @@ fun Video.toDownloadRequest(
     )
 }
 
+/**
+ * The request for a URL cobalt resolved: Flow only knows the URL and whatever the sheet shows, so
+ * the tags carry those and the cobalt selection is stored for the runner to post back.
+ */
+fun CobaltSelection.toDownloadRequest(
+    title: String,
+    kind: DownloadKind = DownloadKind.VIDEO,
+    thumbnailUrl: String? = null,
+    channelName: String? = null,
+    durationSeconds: Int = 0,
+    audioOnly: Boolean = false,
+    collectionId: String? = null,
+): DownloadRequest {
+    val id = cobaltVideoId(url)
+    return DownloadRequest(
+        tags =
+            DownloadTags(
+                kind = kind,
+                videoId = id,
+                title = title.ifBlank { id },
+                channelName = channelName?.takeIf { it.isNotBlank() },
+                sourceUrl = url,
+                thumbnailUrl = thumbnailUrl?.takeIf { it.isNotBlank() },
+            ),
+        audioOnly = audioOnly,
+        collectionId = collectionId,
+        durationSeconds = durationSeconds,
+        source = DownloadSource.COBALT,
+        cobalt = this,
+    )
+}
+
+/**
+ * A stable id for a URL cobalt resolves, since a non-YouTube source has no video id. The same URL
+ * hashes to the same id, so re-queuing it replaces the download rather than duplicating it.
+ */
+internal fun cobaltVideoId(url: String): String =
+    "cobalt-" +
+        url
+            .trim()
+            .hashCode()
+            .toUInt()
+            .toString(16)
+
 /** The request for a song, carrying its album and credited artists into the file's tags. */
 fun MusicTrack.toDownloadRequest(
     collectionId: String? = null,
