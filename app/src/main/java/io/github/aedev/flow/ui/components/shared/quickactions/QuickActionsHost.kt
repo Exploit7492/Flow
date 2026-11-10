@@ -46,11 +46,8 @@ fun QuickActionsHost(
         val cobaltState by cobaltViewModel.state.collectAsStateWithLifecycle()
         CobaltDownloadSheet(
             state = cobaltState,
-            onSelectQuality = cobaltViewModel::selectQuality,
-            onSetAudioOnly = cobaltViewModel::setAudioOnly,
-            onSelectAudioFormat = cobaltViewModel::selectAudioFormat,
-            onStart = {
-                cobaltViewModel.start { title -> viewModel.announce(R.string.cobalt_download_started, title) }
+            onChoose = { choice ->
+                cobaltViewModel.choose(choice) { title -> viewModel.announce(R.string.cobalt_download_started, title) }
                 viewModel.dismissCobaltDownload()
             },
             onDismiss = viewModel::dismissCobaltDownload,

@@ -5,6 +5,7 @@ import io.github.aedev.flow.BuildConfig
 import io.github.aedev.flow.network.ProxyAwareClient
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
 import okhttp3.MediaType.Companion.toMediaType
@@ -32,8 +33,23 @@ class CobaltClient
                 retryOnConnectionFailure(true)
             }.get()
 
-        /** Resolves [request] against the configured instance. Never throws: a failure is a result. */
-        suspend fun resolve(request: CobaltRequest): CobaltResult =
+        /**
+         * Resolves [request] against the configured instance. Never throws: a failure is a result.
+         * A transient refusal — a 5xx, a network drop, or cobalt's own session hiccup — is retried a
+         * few times with a short backoff, because the instance is one shared service that can blip.
+         */
+        suspend fun resolve(request: CobaltRequest): CobaltResult {
+            var result = resolveOnce(request)
+            var attempt = 1
+            while (attempt < MAX_RESOLVE_ATTEMPTS && result.isRetryable()) {
+                delay(RETRY_BACKOFF_MS * attempt)
+                result = resolveOnce(request)
+                attempt++
+            }
+            return result
+        }
+
+        private suspend fun resolveOnce(request: CobaltRequest): CobaltResult =
             withContext(Dispatchers.IO) {
                 try {
                     val body = json.encodeToString(CobaltRequest.serializer(), request).toRequestBody(JSON_MEDIA_TYPE)
@@ -97,9 +113,12 @@ class CobaltClient
                         Log.w(TAG, "tunnel answered $code for ${url.take(120)}")
                         return@withContext CobaltStream.Unavailable("error.api.http.$code")
                     }
+                    // Prefer the exact Content-Length; cobalt's own estimate runs high, so it is only
+                    // the fallback for a chunked tunnel, where the true size is not known up front.
                     val length =
-                        response.header("Estimated-Content-Length")?.toLongOrNull()
-                            ?: response.body.contentLength()
+                        response.body.contentLength().takeIf { it > 0L }
+                            ?: response.header("Estimated-Content-Length")?.toLongOrNull()
+                            ?: 0L
                     CobaltStream.Ready(response, length.coerceAtLeast(0L), response.header("Content-Disposition")?.fileName())
                 } catch (e: CancellationException) {
                     throw e
@@ -118,6 +137,8 @@ class CobaltClient
             const val STATUS_ERROR = "error"
             const val CONNECT_TIMEOUT_S = 20L
             const val READ_TIMEOUT_S = 60L
+            const val MAX_RESOLVE_ATTEMPTS = 3
+            const val RETRY_BACKOFF_MS = 700L
             val JSON_MEDIA_TYPE = "application/json; charset=utf-8".toMediaType()
             val json =
                 Json {

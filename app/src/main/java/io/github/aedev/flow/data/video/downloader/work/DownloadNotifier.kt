@@ -11,6 +11,7 @@ import androidx.core.app.NotificationCompat
 import dagger.hilt.android.qualifiers.ApplicationContext
 import io.github.aedev.flow.MainActivity
 import io.github.aedev.flow.R
+import io.github.aedev.flow.notification.NotificationTheming
 import java.util.concurrent.ConcurrentHashMap
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -74,7 +75,8 @@ class DownloadNotifier
                     } else {
                         context.getString(R.string.download_started_toast)
                     },
-                ).setSmallIcon(android.R.drawable.stat_sys_download)
+                ).setSmallIcon(R.drawable.ic_notification_download)
+                .setColor(accent())
                 .setOnlyAlertOnce(true)
                 .setOngoing(true)
                 .setSilent(true)
@@ -114,7 +116,8 @@ class DownloadNotifier
                 NotificationCompat
                     .Builder(context, CHANNEL_ID)
                     .setContentTitle(title)
-                    .setSmallIcon(android.R.drawable.stat_sys_download)
+                    .setSmallIcon(R.drawable.ic_notification_download)
+                    .setColor(accent())
                     .setOnlyAlertOnce(true)
                     .setSilent(true)
                     .setContentIntent(openApp(notificationId(videoId)))
@@ -163,7 +166,7 @@ class DownloadNotifier
                     builder
                         .setContentText(phase.message)
                         .setStyle(NotificationCompat.BigTextStyle().bigText(phase.message))
-                        .setSmallIcon(android.R.drawable.stat_notify_error)
+                        .setSmallIcon(R.drawable.ic_notification_download_error)
                         .addAction(action(videoId, DownloadActionReceiver.ACTION_RETRY, R.string.retry))
                 }
 
@@ -174,7 +177,7 @@ class DownloadNotifier
                     builder
                         .setContentText(text)
                         .setStyle(NotificationCompat.BigTextStyle().bigText(text))
-                        .setSmallIcon(android.R.drawable.stat_sys_download_done)
+                        .setSmallIcon(R.drawable.ic_notification_download_done)
                         .setAutoCancel(true)
                 }
             }
@@ -207,6 +210,9 @@ class DownloadNotifier
                 Intent(context, MainActivity::class.java).setFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP),
                 PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
             )
+
+        /** The app's active accent, so a download notification wears the palette the app is in. */
+        private fun accent(): Int = NotificationTheming.accent(context)
 
         companion object {
             const val CHANNEL_ID = "flow_downloads"

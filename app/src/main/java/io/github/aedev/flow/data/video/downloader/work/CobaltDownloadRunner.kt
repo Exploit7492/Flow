@@ -4,6 +4,7 @@ import android.content.Context
 import android.util.Log
 import dagger.hilt.android.qualifiers.ApplicationContext
 import io.github.aedev.flow.R
+import io.github.aedev.flow.data.cobalt.CobaltAudio
 import io.github.aedev.flow.data.cobalt.CobaltClient
 import io.github.aedev.flow.data.cobalt.CobaltResult
 import io.github.aedev.flow.data.cobalt.CobaltStream
@@ -183,7 +184,15 @@ class CobaltDownloadRunner
             withContext(NonCancellable) {
                 val path = placed.path
                 val mimeType = mimeTypeFor(extension)
-                downloadDao.completeItem(itemId, path, placed.fileName, extension, mimeType, qualityLabel(request.cobalt), size)
+                downloadDao.completeItem(
+                    itemId,
+                    path,
+                    placed.fileName,
+                    extension,
+                    mimeType,
+                    qualityLabel(request.cobalt, request.wantsAudioOnly),
+                    size,
+                )
                 cover
                     ?.let {
                         DownloadCovers.save(
@@ -244,14 +253,25 @@ class CobaltDownloadRunner
                 when {
                     code.contains("fetch.empty") || code.contains("content") -> R.string.download_failed_unavailable
                     code.contains("link.unsupported") || code.contains("service") -> R.string.link_not_supported
+                    code.contains("login") || code.contains("sign") -> R.string.download_failed_refused
                     code.contains("network") || code.contains("http.5") -> R.string.download_failed_try_again
                     code.contains("rate") || code.contains("http.429") -> R.string.download_failed_refused
                     else -> R.string.download_failed_try_again
                 },
             )
 
-        private fun qualityLabel(selection: CobaltSelection?): String =
-            selection?.videoQuality?.takeIf { it.isNotBlank() } ?: context.getString(R.string.download_quality_best)
+        private fun qualityLabel(
+            selection: CobaltSelection?,
+            audioOnly: Boolean,
+        ): String {
+            val format = selection?.audioFormat?.takeIf { audioOnly && it.isNotBlank() }
+            if (format != null) {
+                if (format == CobaltAudio.BEST) return context.getString(R.string.download_quality_best)
+                val bitrate = selection.audioBitrate?.takeIf { it.isNotBlank() }
+                return if (bitrate != null) "${format.uppercase()} ${bitrate}K" else format.uppercase()
+            }
+            return selection?.videoQuality?.takeIf { it.isNotBlank() } ?: context.getString(R.string.download_quality_best)
+        }
 
         private companion object {
             const val TAG = "CobaltDownloadRunner"

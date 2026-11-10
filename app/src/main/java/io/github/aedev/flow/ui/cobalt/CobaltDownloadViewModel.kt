@@ -3,7 +3,6 @@ package io.github.aedev.flow.ui.cobalt
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
-import io.github.aedev.flow.data.cobalt.CobaltAudio
 import io.github.aedev.flow.data.repository.YouTubeRepository
 import io.github.aedev.flow.data.video.downloader.request.CobaltSelection
 import io.github.aedev.flow.data.video.downloader.request.toDownloadRequest
@@ -18,6 +17,20 @@ import kotlinx.coroutines.launch
 import java.net.URI
 import javax.inject.Inject
 
+/** What the cobalt sheet is set to download: one video height, or one sound format. */
+sealed interface CobaltDownloadChoice {
+    /** A video download: cobalt's best when [quality] is null, otherwise the height it asked for. */
+    data class Video(
+        val quality: String?,
+    ) : CobaltDownloadChoice
+
+    /** A sound-only download in [format], at [bitrate] when the format is lossy. */
+    data class Audio(
+        val format: String,
+        val bitrate: String?,
+    ) : CobaltDownloadChoice
+}
+
 /** What the cobalt download sheet shows: the link, its details once known, and the current choice. */
 data class CobaltDownloadUiState(
     val url: String = "",
@@ -26,10 +39,7 @@ data class CobaltDownloadUiState(
     val thumbnailUrl: String? = null,
     val durationSeconds: Int = 0,
     val isLoading: Boolean = true,
-    /** A height cobalt takes, or null for its best. */
-    val selectedQuality: String? = null,
-    val audioOnly: Boolean = false,
-    val audioFormat: String = CobaltAudio.BEST,
+    val selection: CobaltDownloadChoice = CobaltDownloadChoice.Video(null),
     val isStarting: Boolean = false,
 )
 
@@ -64,11 +74,26 @@ class CobaltDownloadViewModel
             }
         }
 
-        fun selectQuality(quality: String?) = _state.update { it.copy(selectedQuality = quality) }
+        /** Picks a video height: null is cobalt's best. */
+        fun selectVideoQuality(quality: String?) = _state.update { it.copy(selection = CobaltDownloadChoice.Video(quality)) }
 
-        fun setAudioOnly(audioOnly: Boolean) = _state.update { it.copy(audioOnly = audioOnly) }
+        /** Picks a sound-only format, [bitrate] null for a format that carries its own. */
+        fun selectAudio(
+            format: String,
+            bitrate: String?,
+        ) = _state.update { it.copy(selection = CobaltDownloadChoice.Audio(format, bitrate)) }
 
-        fun selectAudioFormat(format: String) = _state.update { it.copy(audioFormat = format) }
+        /** Sets [choice] and queues it in one step, which is how a tapped ladder row behaves. */
+        fun choose(
+            choice: CobaltDownloadChoice,
+            onStarted: (String) -> Unit,
+        ) {
+            when (choice) {
+                is CobaltDownloadChoice.Video -> selectVideoQuality(choice.quality)
+                is CobaltDownloadChoice.Audio -> selectAudio(choice.format, choice.bitrate)
+            }
+            start(onStarted)
+        }
 
         /** Queues the download with the current choice, then hands the title to the caller's confirmation. */
         fun start(onStarted: (String) -> Unit) {
@@ -76,12 +101,16 @@ class CobaltDownloadViewModel
             if (current.isStarting) return
             _state.update { it.copy(isStarting = true) }
             val title = current.title.ifBlank { hostOf(current.url) ?: current.url }
-            val selection =
-                CobaltSelection(
-                    url = current.url,
-                    videoQuality = current.selectedQuality,
-                    audioFormat = current.audioFormat.takeIf { current.audioOnly },
-                )
+            val (selection, audioOnly) =
+                when (val choice = current.selection) {
+                    is CobaltDownloadChoice.Video -> {
+                        CobaltSelection(url = current.url, videoQuality = choice.quality) to false
+                    }
+
+                    is CobaltDownloadChoice.Audio -> {
+                        CobaltSelection(url = current.url, audioFormat = choice.format, audioBitrate = choice.bitrate) to true
+                    }
+                }
             downloadController.submit(
                 request =
                     selection.toDownloadRequest(
@@ -89,7 +118,7 @@ class CobaltDownloadViewModel
                         thumbnailUrl = current.thumbnailUrl,
                         channelName = current.channelName,
                         durationSeconds = current.durationSeconds,
-                        audioOnly = current.audioOnly,
+                        audioOnly = audioOnly,
                     ),
                 replaceExisting = true,
             )

@@ -44,6 +44,20 @@ sealed interface CobaltResult {
 }
 
 /**
+ * Whether a refusal is worth trying again. A blip — a dropped connection, an overloaded instance, a
+ * body that did not parse — is; a settled answer such as an unsupported link or a source that needs
+ * a login is not, because the next call returns it too.
+ */
+fun CobaltResult.isRetryable(): Boolean {
+    val code = (this as? CobaltResult.Unavailable)?.code ?: return false
+    return code.contains("network") ||
+        code.contains("http.5") ||
+        code.contains("http.429") ||
+        code.contains("rate") ||
+        code.contains("unreadable")
+}
+
+/**
  * An opened file from a cobalt tunnel. [response] must be closed by the caller once its body has
  * been read. cobalt tunnels answer every request with the whole body and ignore Range, so a
  * download reads this once, straight through.
@@ -69,10 +83,20 @@ object CobaltQualities {
 /** The sound formats cobalt takes. `best` is whatever the source already carries, untouched. */
 object CobaltAudio {
     const val BEST = "best"
-    val FORMATS = listOf(BEST, "mp3", "m4a", "ogg", "opus", "wav")
 
-    /** Bitrates cobalt accepts, highest first; only the lossy formats use them. */
-    val BITRATES = listOf("320", "256", "128", "96", "64", "8")
+    /** One audio row of the quality sheet: a container, and a bitrate for the lossy ones. */
+    data class Choice(
+        val format: String,
+        val bitrate: String? = null,
+    )
+
+    /**
+     * The audio ladder the sheet shows, highest fidelity first: the source's own sound untouched,
+     * then the two MP3 bitrates. A row is identified by its [Choice]; [BEST] is the untouched row.
+     * cobalt rejects `m4a` as a format and hands back an M4A container for [BEST], so `m4a` is not a
+     * row of its own.
+     */
+    val LADDER = listOf(Choice(BEST), Choice("mp3", "256"), Choice("mp3", "128"))
 }
 
 /**

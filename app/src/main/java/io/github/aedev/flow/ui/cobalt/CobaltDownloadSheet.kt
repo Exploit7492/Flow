@@ -1,7 +1,7 @@
 package io.github.aedev.flow.ui.cobalt
 
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -9,50 +9,61 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.rounded.Check
+import androidx.compose.material.icons.rounded.ExpandMore
 import androidx.compose.material.icons.rounded.MusicNote
+import androidx.compose.material.icons.rounded.VideoLibrary
 import androidx.compose.material3.BottomSheetDefaults
-import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import io.github.aedev.flow.R
 import io.github.aedev.flow.data.cobalt.CobaltAudio
 import io.github.aedev.flow.data.cobalt.CobaltQualities
 import io.github.aedev.flow.ui.components.shared.FlowModalSheetDefaults
 import io.github.aedev.flow.ui.components.shared.rememberFlowSheetState
 
-private val ContentPadding = 24.dp
-private val RowVerticalPadding = 14.dp
+private val HorizontalPadding = 20.dp
+private val RowHeight = 56.dp
+private val IconSize = 24.dp
+private val IconLabelGap = 16.dp
+
+/** The video heights the sheet shows before "More": the common ladder, tallest first. */
+private val CommonHeights = CobaltQualities.HEIGHTS.drop(2)
+
+/** The two tallest heights, behind "More". */
+private val MoreHeights = CobaltQualities.HEIGHTS.take(2)
 
 /**
- * The quality sheet for a link cobalt resolves. It slides up over the app, offers cobalt's video
- * heights and, when asked for sound alone, its formats, then queues the download.
+ * The quality sheet for a link cobalt resolves. It slides up over the app as one flat ladder — the
+ * sound ladder, then cobalt's video heights, then its own best — and starts the download on the row
+ * that is tapped, the way a downloader's own picker does.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun CobaltDownloadSheet(
     state: CobaltDownloadUiState,
-    onSelectQuality: (String?) -> Unit,
-    onSetAudioOnly: (Boolean) -> Unit,
-    onSelectAudioFormat: (String) -> Unit,
-    onStart: () -> Unit,
+    onChoose: (CobaltDownloadChoice) -> Unit,
     onDismiss: () -> Unit,
 ) {
     ModalBottomSheet(
@@ -63,141 +74,151 @@ fun CobaltDownloadSheet(
         modifier = FlowModalSheetDefaults.modifier,
         contentWindowInsets = FlowModalSheetDefaults.contentWindowInsets,
     ) {
-        Column(
-            modifier =
-                Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = ContentPadding),
-        ) {
-            Text(
-                text = stringResource(R.string.cobalt_download_title),
-                style = MaterialTheme.typography.titleLarge,
-                fontWeight = FontWeight.Bold,
-            )
-            Text(
-                text = state.title.ifBlank { stringResource(R.string.cobalt_download_subtitle) },
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis,
-            )
-            Spacer(Modifier.height(8.dp))
+        Column(modifier = Modifier.fillMaxWidth()) {
+            Header(state)
 
             if (state.isLoading) {
                 Text(
                     text = stringResource(R.string.cobalt_download_resolving),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(vertical = 24.dp),
+                    modifier = Modifier.padding(horizontal = HorizontalPadding, vertical = 24.dp),
                 )
                 return@Column
             }
 
-            AudioOnlyRow(audioOnly = state.audioOnly, onSetAudioOnly = onSetAudioOnly)
-
-            if (state.audioOnly) {
-                AudioFormats(state, onSelectAudioFormat)
-            } else {
-                VideoQualities(state.selectedQuality, onSelectQuality)
-            }
-
+            QualityLadder(state, onChoose)
             Spacer(Modifier.height(8.dp))
-            Button(
-                onClick = onStart,
+        }
+    }
+}
+
+@Composable
+private fun Header(state: CobaltDownloadUiState) {
+    Column(modifier = Modifier.padding(horizontal = HorizontalPadding, vertical = 4.dp)) {
+        Text(
+            text = stringResource(R.string.cobalt_download_title),
+            style = MaterialTheme.typography.titleLarge,
+            fontWeight = FontWeight.Bold,
+        )
+        Text(
+            text = state.title.ifBlank { stringResource(R.string.cobalt_download_subtitle) },
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis,
+        )
+        Spacer(Modifier.height(8.dp))
+    }
+}
+
+@Composable
+private fun QualityLadder(
+    state: CobaltDownloadUiState,
+    onChoose: (CobaltDownloadChoice) -> Unit,
+) {
+    var showMore by remember { mutableStateOf(false) }
+    val selected = state.selection
+    LazyColumn(modifier = Modifier.heightIn(max = 460.dp)) {
+        items(CobaltAudio.LADDER, key = { "audio-${it.format}-${it.bitrate}" }) { choice ->
+            QualityRow(
+                icon = Icons.Rounded.MusicNote,
+                label = audioLabel(choice),
+                selected = selected == CobaltDownloadChoice.Audio(choice.format, choice.bitrate),
                 enabled = !state.isStarting,
-                modifier =
-                    Modifier
-                        .fillMaxWidth()
-                        .padding(vertical = 16.dp),
-            ) {
-                Text(stringResource(R.string.cobalt_download_start))
+                onClick = { onChoose(CobaltDownloadChoice.Audio(choice.format, choice.bitrate)) },
+            )
+        }
+        item(key = "divider") {
+            HorizontalDivider(
+                modifier = Modifier.padding(start = HorizontalPadding + IconSize + IconLabelGap),
+                color = MaterialTheme.colorScheme.outlineVariant,
+            )
+        }
+        items(videoHeights(showMore), key = { "video-$it" }) { quality ->
+            QualityRow(
+                icon = Icons.Rounded.VideoLibrary,
+                label = "$quality" + "p",
+                selected = selected == CobaltDownloadChoice.Video(quality),
+                enabled = !state.isStarting,
+                onClick = { onChoose(CobaltDownloadChoice.Video(quality)) },
+            )
+        }
+        if (!showMore) {
+            item(key = "more") {
+                QualityRow(
+                    icon = Icons.Rounded.ExpandMore,
+                    label = stringResource(R.string.download_quality_more),
+                    selected = false,
+                    enabled = !state.isStarting,
+                    onClick = { showMore = true },
+                )
             }
         }
-    }
-}
-
-@Composable
-private fun AudioOnlyRow(
-    audioOnly: Boolean,
-    onSetAudioOnly: (Boolean) -> Unit,
-) {
-    Row(
-        modifier =
-            Modifier
-                .fillMaxWidth()
-                .clickable { onSetAudioOnly(!audioOnly) }
-                .padding(vertical = RowVerticalPadding),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.SpaceBetween,
-    ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Icon(Icons.Rounded.MusicNote, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
-            Spacer(Modifier.width(12.dp))
-            Text(stringResource(R.string.cobalt_download_audio_only), style = MaterialTheme.typography.bodyLarge)
-        }
-        Switch(checked = audioOnly, onCheckedChange = onSetAudioOnly)
-    }
-}
-
-@Composable
-private fun VideoQualities(
-    selected: String?,
-    onSelect: (String?) -> Unit,
-) {
-    val choices: List<String?> = listOf(null) + CobaltQualities.HEIGHTS
-    LazyColumn(modifier = Modifier.heightIn(max = 360.dp)) {
-        items(choices, key = { it ?: "best" }) { quality ->
-            ChoiceRow(
-                label = quality?.let { "$it" + "p" } ?: stringResource(R.string.download_quality_best),
-                selected = quality == selected,
-                onClick = { onSelect(quality) },
+        item(key = "best") {
+            QualityRow(
+                icon = Icons.Rounded.VideoLibrary,
+                label = stringResource(R.string.download_quality_best),
+                selected = selected == CobaltDownloadChoice.Video(null),
+                enabled = !state.isStarting,
+                onClick = { onChoose(CobaltDownloadChoice.Video(null)) },
             )
         }
     }
 }
 
-@Composable
-private fun AudioFormats(
-    state: CobaltDownloadUiState,
-    onSelect: (String) -> Unit,
-) {
-    Text(
-        text = stringResource(R.string.cobalt_download_audio_format),
-        style = MaterialTheme.typography.labelLarge,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
-        modifier = Modifier.padding(top = 8.dp, bottom = 4.dp),
-    )
-    LazyColumn(modifier = Modifier.heightIn(max = 360.dp)) {
-        items(CobaltAudio.FORMATS, key = { it }) { format ->
-            ChoiceRow(
-                label = if (format == CobaltAudio.BEST) stringResource(R.string.download_quality_best) else format.uppercase(),
-                selected = format == state.audioFormat,
-                onClick = { onSelect(format) },
-            )
-        }
-    }
-}
+private fun videoHeights(showMore: Boolean): List<String> = if (showMore) CommonHeights + MoreHeights else CommonHeights
 
 @Composable
-private fun ChoiceRow(
+private fun audioLabel(choice: CobaltAudio.Choice): String =
+    when {
+        choice.format == CobaltAudio.BEST -> stringResource(R.string.download_quality_best)
+        choice.bitrate == null -> choice.format.uppercase()
+        else -> "${choice.format.uppercase()} ${choice.bitrate}K"
+    }
+
+@Composable
+private fun QualityRow(
+    icon: ImageVector,
     label: String,
     selected: Boolean,
+    enabled: Boolean,
     onClick: () -> Unit,
 ) {
     Row(
         modifier =
             Modifier
                 .fillMaxWidth()
-                .clickable(onClick = onClick)
-                .padding(vertical = RowVerticalPadding),
+                .height(RowHeight)
+                .clickable(enabled = enabled, onClick = onClick)
+                .padding(horizontal = HorizontalPadding),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.SpaceBetween,
     ) {
+        Icon(
+            imageVector = icon,
+            contentDescription = null,
+            tint = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.size(IconSize),
+        )
+        Spacer(Modifier.width(IconLabelGap))
         Text(
             text = label,
             style = MaterialTheme.typography.bodyLarge,
             fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
+            color = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
+            modifier = Modifier.weight(1f),
         )
-        if (selected) Icon(Icons.Filled.Check, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+        Box(
+            modifier = Modifier.size(IconSize),
+            contentAlignment = Alignment.Center,
+        ) {
+            if (selected) {
+                Icon(
+                    imageVector = Icons.Rounded.Check,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                )
+            }
+        }
     }
 }
