@@ -18,9 +18,12 @@ internal class DownloadStaging(
 
     fun output(extension: String) = File("$stem.out.$extension")
 
+    /** The flattened copy of a fragmented download, written before tagging and then renamed over the original. */
+    fun flattened() = File("$stem.flat.mp4")
+
     /** Everything this download wrote to staging, including a half-made output. */
     fun clear() {
-        listOf(videoPart, audioPart, state, File("${state.path}.tmp")).forEach { it.delete() }
+        listOf(videoPart, audioPart, state, flattened(), File("${state.path}.tmp")).forEach { it.delete() }
         clearOutputs()
     }
 

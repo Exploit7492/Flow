@@ -10,6 +10,8 @@ internal object Mp4Boxes {
     const val LARGE_HEADER_SIZE = 16
     private const val FULL_BOX_FIELDS = 4
     private const val HDLR = "hdlr"
+    private const val MOOF = "moof"
+    private const val MFRA = "mfra"
 
     /**
      * One box: [start] is the offset of its header, [size] includes the header. [extendsToEnd]
@@ -43,6 +45,29 @@ internal object Mp4Boxes {
             position = span.end
         }
         return spans
+    }
+
+    /**
+     * Whether [channel] is a fragmented MP4: it carries movie fragments (`moof`) or a movie-fragment
+     * random-access index (`mfra`). Such a file's `moov` is an init segment, and its `mfra`/`tfra`
+     * entries are absolute offsets into the fragments, so it must not be edited in place.
+     */
+    fun isFragmented(channel: FileChannel): Boolean {
+        val fileSize = channel.size()
+        var position = 0L
+        val header = ByteBuffer.allocate(LARGE_HEADER_SIZE)
+        while (position < fileSize) {
+            if (fileSize - position < HEADER_SIZE) return false
+            header.clear()
+            header.limit(minOf(LARGE_HEADER_SIZE.toLong(), fileSize - position).toInt())
+            while (header.hasRemaining()) {
+                if (channel.read(header, position + header.position()) < 0) break
+            }
+            val span = runCatching { parseHeader(header.array(), 0, header.position(), position, fileSize) }.getOrNull() ?: return false
+            if (span.type == MOOF || span.type == MFRA) return true
+            position = span.end
+        }
+        return false
     }
 
     fun children(

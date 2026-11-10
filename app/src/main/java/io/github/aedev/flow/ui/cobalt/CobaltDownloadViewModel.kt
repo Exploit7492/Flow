@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import io.github.aedev.flow.data.repository.YouTubeRepository
 import io.github.aedev.flow.data.video.downloader.request.CobaltSelection
+import io.github.aedev.flow.data.video.downloader.request.DownloadEngine
 import io.github.aedev.flow.data.video.downloader.request.toDownloadRequest
 import io.github.aedev.flow.data.video.downloader.work.DownloadController
 import io.github.aedev.flow.utils.YouTubeLink
@@ -40,6 +41,8 @@ data class CobaltDownloadUiState(
     val durationSeconds: Int = 0,
     val isLoading: Boolean = true,
     val selection: CobaltDownloadChoice = CobaltDownloadChoice.Video(null),
+    /** The muxer the download is finished with. */
+    val engine: DownloadEngine = DownloadEngine.COBALT,
     val isStarting: Boolean = false,
 )
 
@@ -83,6 +86,9 @@ class CobaltDownloadViewModel
             bitrate: String?,
         ) = _state.update { it.copy(selection = CobaltDownloadChoice.Audio(format, bitrate)) }
 
+        /** Picks the muxer the download is finished with. */
+        fun selectEngine(engine: DownloadEngine) = _state.update { it.copy(engine = engine) }
+
         /** Sets [choice] and queues it in one step, which is how a tapped ladder row behaves. */
         fun choose(
             choice: CobaltDownloadChoice,
@@ -104,11 +110,16 @@ class CobaltDownloadViewModel
             val (selection, audioOnly) =
                 when (val choice = current.selection) {
                     is CobaltDownloadChoice.Video -> {
-                        CobaltSelection(url = current.url, videoQuality = choice.quality) to false
+                        CobaltSelection(url = current.url, videoQuality = choice.quality, engine = current.engine) to false
                     }
 
                     is CobaltDownloadChoice.Audio -> {
-                        CobaltSelection(url = current.url, audioFormat = choice.format, audioBitrate = choice.bitrate) to true
+                        CobaltSelection(
+                            url = current.url,
+                            audioFormat = choice.format,
+                            audioBitrate = choice.bitrate,
+                            engine = current.engine,
+                        ) to true
                     }
                 }
             downloadController.submit(

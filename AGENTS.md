@@ -475,6 +475,32 @@ which sets `pendingCobaltUrl`; `QuickActionsHost` (mounted once in the shell) sh
 turns a bare `host/path` into an `https://` URL; it returns null for ordinary search text so the
 searchbar still searches. It is unit-tested in `YouTubeLinkTest`.
 
+### The quality sheet and the muxer choice
+
+`CobaltDownloadSheet` is a chip grid, not a stacked list: a labelled section per axis — `Video`
+heights (with cobalt's own `Best`, and the two tallest heights behind a `More` chip) and `Audio`
+(`CobaltAudio.LADDER`) — each a `FlowRow` of `FlowFilterChip`s so a short screen shows the whole
+ladder at a glance. The `Muxer` section picks the `DownloadEngine` the fetched bytes are finished
+with; it is stored on `CobaltSelection.engine` and read back by `CobaltDownloadRunner`:
+
+- `COBALT` (default) — keep cobalt's single merged file; it is rewritten only when it arrives
+  fragmented.
+- `NATIVE` — the app's own Kotlin remuxer (`Mp4Remuxer`, Media3 `Mp4Muxer`). Always available.
+- `FFMPEG` — copy streams through an FFmpeg binary when one is bundled (`FfmpegFinalizer`); falls
+  back to `NATIVE` when none is present. No FFmpeg binary ships with the app today, so the chip is
+  only offered when `FfmpegFinalizer.isAvailable()` is true.
+
+### Fragmented MP4 must be flattened before tagging
+
+cobalt (and any fMP4 source) hands back a *fragmented* MP4: `ftyp | moov | moof | mdat … | mfra`,
+where `moof`/`mdat` repeat and the trailing `mfra` holds absolute `tfra` offsets. `Mp4TagWriter`
+moves `moov` to the end and frees the old one, which invalidates every `tfra` offset and breaks the
+file — the download then looks failed. `Mp4Boxes.isFragmented(channel)` detects this layout, and
+`CobaltDownloadRunner.flattenIfFragmented` rewrites the file into a plain progressive MP4 (via the
+chosen engine) *before* tagging. `Mp4Remuxer.flatten` / `openAll` do the single-file rewrite
+(re-interleaving every MP4-able track by timestamp and dropping the fragment index). Covered by
+`Mp4FragmentationTest`.
+
 ## Rules for working on the project
 
 1. Always pull the latest changes from `main` before starting work to minimize merge conflicts.

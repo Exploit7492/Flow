@@ -2416,6 +2416,10 @@
     <string name="cobalt_download_subtitle">Choose a quality</string>
     <string name="cobalt_download_resolving">Resolving link…</string>
     <string name="cobalt_download_started">Download started: %1$s</string>
+    <string name="download_engine">Muxer</string>
+    <string name="download_engine_cobalt">cobalt</string>
+    <string name="download_engine_native">Kotlin</string>
+    <string name="download_engine_ffmpeg">FFmpeg</string>
     <string name="audio_format_unknown">Audio</string>
     <!-- Approximate download size shown beside a quality; %1$s is a platform-formatted file size -->
     <string name="download_size_estimate">~%1$s</string>

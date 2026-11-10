@@ -50,6 +50,7 @@ fun QuickActionsHost(
                 cobaltViewModel.choose(choice) { title -> viewModel.announce(R.string.cobalt_download_started, title) }
                 viewModel.dismissCobaltDownload()
             },
+            onEngine = cobaltViewModel::selectEngine,
             onDismiss = viewModel::dismissCobaltDownload,
         )
     }

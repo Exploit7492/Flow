@@ -107,6 +107,16 @@ internal object Mp4Fixtures {
         return Layout(ftyp + moov + mdat, MDAT_PAYLOAD)
     }
 
+    /** `ftyp | moov | moof | mdat | mfra`, the fragmented layout cobalt's own muxer writes. */
+    fun fragmented(): Layout {
+        val ftyp = ftyp()
+        val moov = box("moov", box("mvhd", ByteArray(100)), box("mvex", box("trex", ByteArray(24))))
+        val moof = box("moof", box("mfhd", int(1)), box("traf", box("tfhd", ByteArray(8))))
+        val mdat = box("mdat", MDAT_PAYLOAD)
+        val mfra = box("mfra", box("tfra", ByteArray(16)), box("mfro", int(0)))
+        return Layout(ftyp + moov + moof + mdat + mfra, MDAT_PAYLOAD)
+    }
+
     fun parse(
         bytes: ByteArray,
         from: Int = 0,

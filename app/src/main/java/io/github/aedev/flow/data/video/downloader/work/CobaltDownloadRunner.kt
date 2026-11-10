@@ -14,8 +14,12 @@ import io.github.aedev.flow.data.local.entity.DownloadItemStatus
 import io.github.aedev.flow.data.video.DownloadProgressUpdate
 import io.github.aedev.flow.data.video.VideoDownloadManager
 import io.github.aedev.flow.data.video.downloader.request.CobaltSelection
+import io.github.aedev.flow.data.video.downloader.request.DownloadEngine
 import io.github.aedev.flow.data.video.downloader.request.DownloadRequest
 import io.github.aedev.flow.data.video.downloader.tags.CoverArtLoader
+import io.github.aedev.flow.data.video.downloader.tags.FfmpegFinalizer
+import io.github.aedev.flow.data.video.downloader.tags.Mp4Boxes
+import io.github.aedev.flow.data.video.downloader.tags.Mp4Remuxer
 import io.github.aedev.flow.data.video.downloader.tags.Mp4TagWriter
 import io.github.aedev.flow.data.video.storage.DownloadCovers
 import io.github.aedev.flow.data.video.storage.DownloadFiles
@@ -31,6 +35,7 @@ import kotlinx.coroutines.isActive
 import kotlinx.coroutines.withContext
 import java.io.File
 import java.io.IOException
+import java.io.RandomAccessFile
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -48,6 +53,8 @@ class CobaltDownloadRunner
         private val downloads: VideoDownloadManager,
         private val cobalt: CobaltClient,
         private val tagWriter: Mp4TagWriter,
+        private val remuxer: Mp4Remuxer,
+        private val ffmpeg: FfmpegFinalizer,
         private val coverArt: CoverArtLoader,
         private val placement: DownloadPlacement,
         private val notifier: DownloadNotifier,
@@ -150,6 +157,51 @@ class CobaltDownloadRunner
             }
         }
 
+        /**
+         * A fragmented MP4 (cobalt's own container, and any fMP4 a source hands back) is rewritten
+         * into a plain progressive MP4 before it is tagged: tagging such a file moves its `moov` and
+         * invalidates the absolute offsets in its trailing `mfra`, which makes the file unplayable and
+         * the download look failed. The chosen [DownloadEngine] does the rewrite — the bundled FFmpeg
+         * binary when asked for and present, otherwise the app's own Kotlin remuxer. Returns the
+         * original when it is already plain, or when the rewrite cannot improve it.
+         */
+        private fun flattenIfFragmented(
+            request: DownloadRequest,
+            staging: DownloadStaging,
+            output: File,
+        ): File {
+            val fragmented =
+                runCatching { RandomAccessFile(output, "r").use { Mp4Boxes.isFragmented(it.channel) } }
+                    .getOrDefault(false)
+            if (!fragmented) return output
+            val flat = staging.flattened()
+            flat.delete()
+            val engine = request.cobalt?.engine ?: DownloadEngine.COBALT
+            val viaFfmpeg = engine == DownloadEngine.FFMPEG && ffmpeg.remuxToMp4(listOf(output), flat)
+            if (viaFfmpeg && replace(output, flat)) return output
+            if (viaFfmpeg) {
+                Log.w(TAG, "${request.videoId}: FFmpeg flatten could not replace the original")
+            }
+            return when (val result = remuxer.flatten(output.path, flat.path)) {
+                is Mp4Remuxer.Result.Success -> {
+                    if (!replace(output, flat)) flat.delete()
+                    output
+                }
+
+                is Mp4Remuxer.Result.Failure -> {
+                    Log.w(TAG, "${request.videoId}: could not flatten fragmented MP4 (${result.reason})")
+                    flat.delete()
+                    output
+                }
+            }
+        }
+
+        /** Puts [flat] in [output]'s place, in place of it; false when the swap could not be made. */
+        private fun replace(
+            output: File,
+            flat: File,
+        ): Boolean = flat.renameTo(output) || (output.delete() && flat.renameTo(output))
+
         private fun emit(
             request: DownloadRequest,
             itemId: Int,
@@ -170,13 +222,14 @@ class CobaltDownloadRunner
             cover: ByteArray?,
         ) {
             notifier.show(request.videoId, request.tags.title, DownloadPhase.Finishing)
+            val ready = withContext(Dispatchers.IO) { flattenIfFragmented(request, staging, output) }
             try {
-                tagWriter.write(output, request.tags, cover)
+                tagWriter.write(ready, request.tags, cover)
             } catch (e: IOException) {
                 Log.w(TAG, "${request.videoId}: tags not written", e)
             }
             currentCoroutineContext().ensureActive()
-            val placed = placement.place(output, request, extension)
+            val placed = placement.place(ready, request, extension)
             if (placed == null) {
                 fail(request, staging, context.getString(R.string.download_failed_save), keepParts = true)
                 return

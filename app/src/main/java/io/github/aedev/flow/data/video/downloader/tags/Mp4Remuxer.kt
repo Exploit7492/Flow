@@ -66,44 +66,52 @@ class Mp4Remuxer
             tags: DownloadTags? = null,
             isCancelled: () -> Boolean = { false },
             onProgress: ((Float) -> Unit)? = null,
+        ): Result =
+            writeOutput(outputPath, tags, isCancelled, onProgress) {
+                buildList {
+                    videoPath?.let { add(open(it, isVideo = true)) }
+                    add(open(audioPath, isVideo = false))
+                }
+            }
+
+        /**
+         * Rewrites one already-muxed file into a plain progressive MP4 with its `moov` at the end.
+         *
+         * A cobalt download, and anything else that arrives as a fragmented MP4, carries `moof`/`mdat`
+         * runs and a trailing `mfra` index whose entries are absolute offsets. Tagging such a file in
+         * place moves the `moov` and invalidates every one of those offsets, so the file is flattened
+         * here first: the fragments are re-interleaved by timestamp and the index is dropped. Fails
+         * when a track cannot go into MP4, so the caller keeps the original rather than a broken copy.
+         */
+        fun flatten(
+            inputPath: String,
+            outputPath: String,
+            tags: DownloadTags? = null,
+            isCancelled: () -> Boolean = { false },
+            onProgress: ((Float) -> Unit)? = null,
+        ): Result = writeOutput(outputPath, tags, isCancelled, onProgress) { openAll(inputPath) }
+
+        /** Opens the tracks [openInputs] selects, writes them into [outputPath], and cleans up on failure. */
+        private fun writeOutput(
+            outputPath: String,
+            tags: DownloadTags?,
+            isCancelled: () -> Boolean,
+            onProgress: ((Float) -> Unit)?,
+            openInputs: () -> List<Input>,
         ): Result {
             val inputs = mutableListOf<Input>()
             val output = File(outputPath)
             var completed = false
             return try {
-                videoPath?.let { inputs += open(it, isVideo = true) }
-                inputs += open(audioPath, isVideo = false)
-                output.parentFile?.mkdirs()
-                FileOutputStream(output).use { stream ->
-                    val muxer = Mp4Muxer.Builder(SeekableMuxerOutput.of(stream)).setAttemptStreamableOutputEnabled(false).build()
-                    var closed = false
-                    try {
-                        inputs.forEach { it.muxerTrack = muxer.addTrack(MediaFormatUtil.createFormatFromMediaFormat(it.format)) }
-                        tags?.let { FlowTagFields.encode(it) }?.forEach { (field, value) ->
-                            muxer.addMetadataEntry(
-                                MdtaMetadataEntry(
-                                    FlowTagFields.mdtaKey(field),
-                                    value.toByteArray(Charsets.UTF_8),
-                                    MdtaMetadataEntry.TYPE_INDICATOR_STRING,
-                                ),
-                            )
-                        }
-                        val written = copyInterleaved(inputs, muxer, isCancelled, onProgress)
-                        if (written == 0L) throw Rejection(Result.Failure(Reason.NO_TRACK, "No samples to write"))
-                        muxer.close()
-                        closed = true
-                    } finally {
-                        if (!closed) runCatching { muxer.close() }
-                    }
-                }
+                inputs += openInputs()
+                mux(inputs, output, tags, isCancelled, onProgress)
                 onProgress?.invoke(1f)
                 completed = true
-                val audioMime = inputs.last().mime
                 val videoMime = inputs.firstOrNull { it.isVideo }?.mime
                 Result.Success(
                     containerMimeType = if (videoMime == null) MimeTypes.AUDIO_MP4 else MimeTypes.VIDEO_MP4,
                     videoMimeType = videoMime,
-                    audioMimeType = audioMime,
+                    audioMimeType = inputs.firstOrNull { !it.isVideo }?.mime.orEmpty(),
                 )
             } catch (rejection: Rejection) {
                 rejection.failure
@@ -116,12 +124,75 @@ class Mp4Remuxer
             }
         }
 
+        private fun mux(
+            inputs: List<Input>,
+            output: File,
+            tags: DownloadTags?,
+            isCancelled: () -> Boolean,
+            onProgress: ((Float) -> Unit)?,
+        ) {
+            output.parentFile?.mkdirs()
+            FileOutputStream(output).use { stream ->
+                val muxer = Mp4Muxer.Builder(SeekableMuxerOutput.of(stream)).setAttemptStreamableOutputEnabled(false).build()
+                var closed = false
+                try {
+                    inputs.forEach { it.muxerTrack = muxer.addTrack(MediaFormatUtil.createFormatFromMediaFormat(it.format)) }
+                    tags?.let { FlowTagFields.encode(it) }?.forEach { (field, value) ->
+                        muxer.addMetadataEntry(
+                            MdtaMetadataEntry(
+                                FlowTagFields.mdtaKey(field),
+                                value.toByteArray(Charsets.UTF_8),
+                                MdtaMetadataEntry.TYPE_INDICATOR_STRING,
+                            ),
+                        )
+                    }
+                    val written = copyInterleaved(inputs, muxer, isCancelled, onProgress)
+                    if (written == 0L) throw Rejection(Result.Failure(Reason.NO_TRACK, "No samples to write"))
+                    muxer.close()
+                    closed = true
+                } finally {
+                    if (!closed) runCatching { muxer.close() }
+                }
+            }
+        }
+
         private fun open(
             path: String,
             isVideo: Boolean,
         ): Input {
+            requireReadable(path)
+            return openTrackOrNull(path, isVideo)
+                ?: throw Rejection(Result.Failure(Reason.NO_TRACK, "No ${if (isVideo) "video/" else "audio/"} track in $path"))
+        }
+
+        /**
+         * Opens every MP4-able track of one file, each on its own extractor: a `MediaExtractor` reads
+         * from a single selected track, so the video and audio tracks are opened separately and the
+         * muxer re-interleaves them. A missing track is skipped; an unsupported codec still rejects.
+         */
+        private fun openAll(path: String): List<Input> {
+            requireReadable(path)
+            val inputs = mutableListOf<Input>()
+            try {
+                openTrackOrNull(path, isVideo = true)?.let { inputs += it }
+                openTrackOrNull(path, isVideo = false)?.let { inputs += it }
+            } catch (e: Exception) {
+                inputs.forEach { runCatching { it.extractor.release() } }
+                throw e
+            }
+            if (inputs.isEmpty()) throw Rejection(Result.Failure(Reason.NO_TRACK, "No playable track in $path"))
+            return inputs
+        }
+
+        private fun requireReadable(path: String) {
             val file = File(path)
             if (!file.isFile || file.length() == 0L) throw Rejection(Result.Failure(Reason.INPUT_MISSING, "Missing or empty input: $path"))
+        }
+
+        private fun openTrackOrNull(
+            path: String,
+            isVideo: Boolean,
+        ): Input? {
             val extractor = MediaExtractor()
             try {
                 extractor.setDataSource(path)
@@ -129,7 +200,11 @@ class Mp4Remuxer
                 val index =
                     (0 until extractor.trackCount).firstOrNull {
                         extractor.getTrackFormat(it).getString(MediaFormat.KEY_MIME)?.startsWith(prefix) == true
-                    } ?: throw Rejection(Result.Failure(Reason.NO_TRACK, "No $prefix track in $path"))
+                    }
+                if (index == null) {
+                    extractor.release()
+                    return null
+                }
                 val format = extractor.getTrackFormat(index)
                 val mime = format.getString(MediaFormat.KEY_MIME).orEmpty()
                 if (isVideo && mime !in SUPPORTED_VIDEO) {

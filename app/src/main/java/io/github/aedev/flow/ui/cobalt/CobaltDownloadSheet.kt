@@ -1,8 +1,11 @@
 package io.github.aedev.flow.ui.cobalt
 
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.FlowRowScope
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -10,17 +13,13 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.Check
-import androidx.compose.material.icons.rounded.ExpandMore
+import androidx.compose.material.icons.rounded.Memory
 import androidx.compose.material.icons.rounded.MusicNote
 import androidx.compose.material.icons.rounded.VideoLibrary
 import androidx.compose.material3.BottomSheetDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
@@ -40,30 +39,36 @@ import androidx.compose.ui.unit.dp
 import io.github.aedev.flow.R
 import io.github.aedev.flow.data.cobalt.CobaltAudio
 import io.github.aedev.flow.data.cobalt.CobaltQualities
+import io.github.aedev.flow.data.video.downloader.request.DownloadEngine
+import io.github.aedev.flow.ui.components.shared.FlowFilterChip
 import io.github.aedev.flow.ui.components.shared.FlowModalSheetDefaults
 import io.github.aedev.flow.ui.components.shared.rememberFlowSheetState
 
 private val HorizontalPadding = 20.dp
-private val RowHeight = 56.dp
-private val IconSize = 24.dp
-private val IconLabelGap = 16.dp
+private val SectionSpacing = 20.dp
+private val ChipSpacing = 8.dp
+private val HeaderSpacing = 8.dp
+private val HeaderIconSize = 18.dp
+private val MaxGridHeight = 460.dp
 
-/** The video heights the sheet shows before "More": the common ladder, tallest first. */
+/** The video heights the grid shows before "More": the common ladder, tallest first. */
 private val CommonHeights = CobaltQualities.HEIGHTS.drop(2)
 
 /** The two tallest heights, behind "More". */
 private val MoreHeights = CobaltQualities.HEIGHTS.take(2)
 
 /**
- * The quality sheet for a link cobalt resolves. It slides up over the app as one flat ladder — the
- * sound ladder, then cobalt's video heights, then its own best — and starts the download on the row
- * that is tapped, the way a downloader's own picker does.
+ * The quality sheet for a link cobalt resolves. The choices are two labelled grids of chips — the
+ * video heights with cobalt's own "Best", then the sound ladder — that wrap into rows, so the whole
+ * ladder reads at a glance instead of as one long stacked list. Tapping a chip starts the download
+ * with that choice, the way a downloader's own picker does.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun CobaltDownloadSheet(
     state: CobaltDownloadUiState,
     onChoose: (CobaltDownloadChoice) -> Unit,
+    onEngine: (DownloadEngine) -> Unit,
     onDismiss: () -> Unit,
 ) {
     ModalBottomSheet(
@@ -87,7 +92,7 @@ fun CobaltDownloadSheet(
                 return@Column
             }
 
-            QualityLadder(state, onChoose)
+            QualityGrid(state, onChoose, onEngine)
             Spacer(Modifier.height(8.dp))
         }
     }
@@ -113,61 +118,157 @@ private fun Header(state: CobaltDownloadUiState) {
 }
 
 @Composable
-private fun QualityLadder(
+private fun QualityGrid(
     state: CobaltDownloadUiState,
     onChoose: (CobaltDownloadChoice) -> Unit,
+    onEngine: (DownloadEngine) -> Unit,
 ) {
     var showMore by remember { mutableStateOf(false) }
     val selected = state.selection
-    LazyColumn(modifier = Modifier.heightIn(max = 460.dp)) {
-        items(CobaltAudio.LADDER, key = { "audio-${it.format}-${it.bitrate}" }) { choice ->
-            QualityRow(
-                icon = Icons.Rounded.MusicNote,
-                label = audioLabel(choice),
-                selected = selected == CobaltDownloadChoice.Audio(choice.format, choice.bitrate),
-                enabled = !state.isStarting,
-                onClick = { onChoose(CobaltDownloadChoice.Audio(choice.format, choice.bitrate)) },
-            )
-        }
-        item(key = "divider") {
-            HorizontalDivider(
-                modifier = Modifier.padding(start = HorizontalPadding + IconSize + IconLabelGap),
-                color = MaterialTheme.colorScheme.outlineVariant,
-            )
-        }
-        items(videoHeights(showMore), key = { "video-$it" }) { quality ->
-            QualityRow(
+    val enabled = !state.isStarting
+    val heights = if (showMore) CommonHeights + MoreHeights else CommonHeights
+    LazyColumn(
+        modifier = Modifier.heightIn(max = MaxGridHeight),
+        verticalArrangement = Arrangement.spacedBy(SectionSpacing),
+        contentPadding = PaddingValues(bottom = 8.dp),
+    ) {
+        item(key = "video") {
+            QualitySection(
+                title = stringResource(R.string.video),
                 icon = Icons.Rounded.VideoLibrary,
-                label = "$quality" + "p",
-                selected = selected == CobaltDownloadChoice.Video(quality),
-                enabled = !state.isStarting,
-                onClick = { onChoose(CobaltDownloadChoice.Video(quality)) },
-            )
-        }
-        if (!showMore) {
-            item(key = "more") {
-                QualityRow(
-                    icon = Icons.Rounded.ExpandMore,
-                    label = stringResource(R.string.download_quality_more),
-                    selected = false,
-                    enabled = !state.isStarting,
-                    onClick = { showMore = true },
+            ) {
+                heights.forEach { quality ->
+                    QualityChip(
+                        label = quality + "p",
+                        selected = selected == CobaltDownloadChoice.Video(quality),
+                        enabled = enabled,
+                        onClick = { onChoose(CobaltDownloadChoice.Video(quality)) },
+                    )
+                }
+                if (!showMore) {
+                    QualityChip(
+                        label = stringResource(R.string.download_quality_more),
+                        selected = false,
+                        enabled = enabled,
+                        onClick = { showMore = true },
+                    )
+                }
+                QualityChip(
+                    label = stringResource(R.string.download_quality_best),
+                    selected = selected == CobaltDownloadChoice.Video(null),
+                    enabled = enabled,
+                    onClick = { onChoose(CobaltDownloadChoice.Video(null)) },
                 )
             }
         }
-        item(key = "best") {
-            QualityRow(
-                icon = Icons.Rounded.VideoLibrary,
-                label = stringResource(R.string.download_quality_best),
-                selected = selected == CobaltDownloadChoice.Video(null),
-                enabled = !state.isStarting,
-                onClick = { onChoose(CobaltDownloadChoice.Video(null)) },
-            )
+        item(key = "audio") {
+            QualitySection(
+                title = stringResource(R.string.download_audio),
+                icon = Icons.Rounded.MusicNote,
+            ) {
+                CobaltAudio.LADDER.forEach { choice ->
+                    QualityChip(
+                        label = audioLabel(choice),
+                        selected = selected == CobaltDownloadChoice.Audio(choice.format, choice.bitrate),
+                        enabled = enabled,
+                        onClick = { onChoose(CobaltDownloadChoice.Audio(choice.format, choice.bitrate)) },
+                    )
+                }
+            }
+        }
+        item(key = "engine") {
+            QualitySection(
+                title = stringResource(R.string.download_engine),
+                icon = Icons.Rounded.Memory,
+            ) {
+                ENGINE_CHOICES.forEach { engine ->
+                    QualityChip(
+                        label = engineLabel(engine),
+                        selected = state.engine == engine,
+                        enabled = enabled,
+                        onClick = { onEngine(engine) },
+                    )
+                }
+            }
         }
     }
 }
 
-private fun videoHeights(showMore: Boolean): List<String> = if (showMore) CommonHeights + MoreHeights else CommonHeights
+/**
+ * The muxers the sheet offers: cobalt's own output, the app's Kotlin remuxer, and FFmpeg. All three
+ * are always offered; the runner uses the FFmpeg binary when one is bundled and the Kotlin remuxer
+ * otherwise, so a choice always finishes the file.
+ */
+private val ENGINE_CHOICES = listOf(DownloadEngine.COBALT, DownloadEngine.NATIVE, DownloadEngine.FFMPEG)
+
+@Composable
+private fun engineLabel(engine: DownloadEngine): String =
+    stringResource(
+        when (engine) {
+            DownloadEngine.COBALT -> R.string.download_engine_cobalt
+            DownloadEngine.NATIVE -> R.string.download_engine_native
+            DownloadEngine.FFMPEG -> R.string.download_engine_ffmpeg
+        },
+    )
+
+@Composable
+private fun QualitySection(
+    title: String,
+    icon: ImageVector,
+    content: @Composable FlowRowScope.() -> Unit,
+) {
+    Column(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .padding(horizontal = HorizontalPadding),
+        verticalArrangement = Arrangement.spacedBy(HeaderSpacing),
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(HeaderSpacing),
+        ) {
+            Icon(
+                imageVector = icon,
+                contentDescription = null,
+                modifier = Modifier.size(HeaderIconSize),
+                tint = MaterialTheme.colorScheme.primary,
+            )
+            Text(
+                text = title.uppercase(),
+                style = MaterialTheme.typography.labelLarge,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        QualityChips(content = content)
+    }
+}
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun QualityChips(content: @Composable FlowRowScope.() -> Unit) {
+    FlowRow(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(ChipSpacing),
+        verticalArrangement = Arrangement.spacedBy(ChipSpacing),
+        content = content,
+    )
+}
+
+@Composable
+private fun QualityChip(
+    label: String,
+    selected: Boolean,
+    enabled: Boolean,
+    onClick: () -> Unit,
+) {
+    FlowFilterChip(
+        label = label,
+        selected = selected,
+        onClick = { if (enabled) onClick() },
+    )
+}
 
 @Composable
 private fun audioLabel(choice: CobaltAudio.Choice): String =
@@ -176,49 +277,3 @@ private fun audioLabel(choice: CobaltAudio.Choice): String =
         choice.bitrate == null -> choice.format.uppercase()
         else -> "${choice.format.uppercase()} ${choice.bitrate}K"
     }
-
-@Composable
-private fun QualityRow(
-    icon: ImageVector,
-    label: String,
-    selected: Boolean,
-    enabled: Boolean,
-    onClick: () -> Unit,
-) {
-    Row(
-        modifier =
-            Modifier
-                .fillMaxWidth()
-                .height(RowHeight)
-                .clickable(enabled = enabled, onClick = onClick)
-                .padding(horizontal = HorizontalPadding),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Icon(
-            imageVector = icon,
-            contentDescription = null,
-            tint = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.size(IconSize),
-        )
-        Spacer(Modifier.width(IconLabelGap))
-        Text(
-            text = label,
-            style = MaterialTheme.typography.bodyLarge,
-            fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
-            color = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
-            modifier = Modifier.weight(1f),
-        )
-        Box(
-            modifier = Modifier.size(IconSize),
-            contentAlignment = Alignment.Center,
-        ) {
-            if (selected) {
-                Icon(
-                    imageVector = Icons.Rounded.Check,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.primary,
-                )
-            }
-        }
-    }
-}

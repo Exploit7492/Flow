@@ -14,6 +14,19 @@ enum class DownloadSource {
 }
 
 /**
+ * The muxer a download's fetched bytes are finished with. [NATIVE] is the app's own Kotlin remuxer
+ * (Media3 `Mp4Muxer`), which always works and needs no extra binary; [FFMPEG] prefers an FFmpeg
+ * binary when one is present and falls back to [NATIVE] when it is not; [COBALT] keeps the single
+ * file cobalt already merged, rewriting it only when it arrives fragmented.
+ */
+@Serializable
+enum class DownloadEngine {
+    NATIVE,
+    FFMPEG,
+    COBALT,
+}
+
+/**
  * What a cobalt download asked the instance for. cobalt resolves a source URL into one ready file,
  * so there is nothing to merge: the quality and the sound format are the whole choice.
  */
@@ -23,6 +36,8 @@ data class CobaltSelection(
     val videoQuality: String? = null,
     val audioFormat: String? = null,
     val audioBitrate: String? = null,
+    /** The muxer that finishes the file; cobalt's own output is the default. */
+    val engine: DownloadEngine = DownloadEngine.COBALT,
 )
 
 /**
