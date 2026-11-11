@@ -18,6 +18,7 @@ import io.github.aedev.flow.data.video.downloader.request.DownloadEngine
 import io.github.aedev.flow.data.video.downloader.request.DownloadRequest
 import io.github.aedev.flow.data.video.downloader.tags.CoverArtLoader
 import io.github.aedev.flow.data.video.downloader.tags.FfmpegFinalizer
+import io.github.aedev.flow.data.video.downloader.tags.Id3TagWriter
 import io.github.aedev.flow.data.video.downloader.tags.Mp4Boxes
 import io.github.aedev.flow.data.video.downloader.tags.Mp4Remuxer
 import io.github.aedev.flow.data.video.downloader.tags.Mp4TagWriter
@@ -53,6 +54,7 @@ class CobaltDownloadRunner
         private val downloads: VideoDownloadManager,
         private val cobalt: CobaltClient,
         private val tagWriter: Mp4TagWriter,
+        private val id3TagWriter: Id3TagWriter,
         private val remuxer: Mp4Remuxer,
         private val ffmpeg: FfmpegFinalizer,
         private val coverArt: CoverArtLoader,
@@ -222,12 +224,20 @@ class CobaltDownloadRunner
             cover: ByteArray?,
         ) {
             notifier.show(request.videoId, request.tags.title, DownloadPhase.Finishing)
-            val ready = withContext(Dispatchers.IO) { flattenIfFragmented(request, staging, output) }
-            try {
-                tagWriter.write(ready, request.tags, cover)
-            } catch (e: IOException) {
-                Log.w(TAG, "${request.videoId}: tags not written", e)
-            }
+            val ready =
+                withContext(Dispatchers.IO) {
+                    val flattened = flattenIfFragmented(request, staging, output)
+                    try {
+                        if (flattened.extension.equals("mp3", ignoreCase = true)) {
+                            id3TagWriter.write(flattened, request.tags, cover)
+                        } else {
+                            tagWriter.write(flattened, request.tags, cover)
+                        }
+                    } catch (e: IOException) {
+                        Log.w(TAG, "${request.videoId}: tags not written", e)
+                    }
+                    flattened
+                }
             currentCoroutineContext().ensureActive()
             val placed = placement.place(ready, request, extension)
             if (placed == null) {

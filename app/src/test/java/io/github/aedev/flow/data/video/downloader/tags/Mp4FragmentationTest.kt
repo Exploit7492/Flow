@@ -15,8 +15,7 @@ class Mp4FragmentationTest {
     @get:Rule
     val folder = TemporaryFolder()
 
-    private fun write(bytes: ByteArray) =
-        folder.newFile("clip.mp4").apply { writeBytes(bytes) }
+    private fun write(bytes: ByteArray) = folder.newFile("clip.mp4").apply { writeBytes(bytes) }
 
     @Test
     fun `plain moov-last file is not fragmented`() {

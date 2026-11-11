@@ -66,7 +66,12 @@ class EmbeddedTags(
                     }
 
                     is TextInformationFrame -> {
-                        entry.values.firstOrNull()?.let { frames.putIfAbsent(entry.id, it) }
+                        val value = entry.values.firstOrNull()
+                        val field =
+                            entry.description
+                                ?.takeIf { entry.id == FRAME_USER_TEXT }
+                                ?.let(FlowTagFields::fieldFromMdtaKey)
+                        if (field != null) value?.let { fields.putIfAbsent(field, it) } else value?.let { frames.putIfAbsent(entry.id, it) }
                     }
 
                     is CommentFrame -> {
@@ -84,7 +89,7 @@ class EmbeddedTags(
             }
             val title = frames[FRAME_TITLE] ?: fields[FlowTagFields.TITLE]
             if (title != null) fields.putIfAbsent(FlowTagFields.TITLE, title)
-            val flow = FlowTagFields.decode(fields)?.fillFromFrames(frames, comment)
+            val flow = FlowTagFields.decode(fields)?.fillFromFrames(frames, comment, id3Lyrics)
             return EmbeddedTags(
                 flow = flow,
                 title = title,
@@ -102,6 +107,7 @@ class EmbeddedTags(
         private fun DownloadTags.fillFromFrames(
             frames: Map<String, String>,
             comment: String?,
+            id3Lyrics: String?,
         ): DownloadTags {
             val track = frames[FRAME_TRACK]?.split('/')?.map { part -> part.trim().toIntOrNull()?.takeIf { it > 0 } }
             return copy(
@@ -112,7 +118,7 @@ class EmbeddedTags(
                 trackTotal = trackTotal ?: track?.getOrNull(1),
                 releaseDate = releaseDate ?: frames[FRAME_DATE],
                 sourceUrl = sourceUrl ?: comment,
-                lyrics = lyrics ?: frames[FRAME_LYRICS],
+                lyrics = lyrics ?: id3Lyrics ?: frames[FRAME_LYRICS],
             )
         }
 
@@ -123,6 +129,7 @@ class EmbeddedTags(
         private const val FRAME_TRACK = "TRCK"
         private const val FRAME_DATE = "TDRC"
         private const val FRAME_LYRICS = "USLT"
+        private const val FRAME_USER_TEXT = "TXXX"
         private const val VORBIS_DESCRIPTION = "DESCRIPTION"
         private const val VORBIS_COMMENT = "COMMENT"
         private const val VORBIS_LYRICS = "LYRICS"
