@@ -3,14 +3,12 @@ package io.github.aedev.flow.ui.components.shared
 import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.ExperimentalLayoutApi
-import androidx.compose.foundation.layout.FlowRow
-import androidx.compose.foundation.layout.FlowRowScope
+import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
@@ -23,6 +21,8 @@ import androidx.compose.material.icons.filled.Remove
 import androidx.compose.material.icons.rounded.MusicNote
 import androidx.compose.material.icons.rounded.VideoLibrary
 import androidx.compose.material3.BottomSheetDefaults
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.Icon
@@ -64,6 +64,7 @@ private val SectionSpacing = 20.dp
 private val ChipSpacing = 8.dp
 private val HeaderIconSize = 18.dp
 private val MaxSheetBodyHeight = 520.dp
+private const val QUALITY_COLUMNS = 2
 private const val MIN_THREADS = 1
 private const val MAX_THREADS = 8
 
@@ -71,9 +72,9 @@ private const val MAX_THREADS = 8
 private val downloadChoiceScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
 /**
- * The one download sheet: a slide-up glass panel of labelled chip grids, one grid per kind of
+ * The one download sheet: a slide-up glass panel of labelled quality grids, one grid per kind of
  * stream — the video heights with their codecs, then the sound ladder — plus the subtitle and
- * connection choices above them. Tapping a chip starts that download at once, the way a
+ * connection choices above them. Tapping a tile starts that download at once, the way a
  * downloader's own picker does, so the whole ladder reads at a glance and one tap is the whole
  * interaction.
  *
@@ -207,15 +208,14 @@ fun MediaDownloadSheet(
                         QualitySection(
                             title = stringResource(R.string.video),
                             icon = Icons.Rounded.VideoLibrary,
-                        ) {
-                            videoByHeight.forEach { (height, formats) ->
-                                val format = formats.first()
-                                QualityChip(
-                                    label = videoChipLabel(height, format, streamSizes, hdrLabel, separator),
-                                    onClick = { downloadVideo(format) },
-                                )
-                            }
-                        }
+                            options =
+                                videoByHeight.map { (height, formats) ->
+                                    val format = formats.first()
+                                    videoQualityOption(height, format, streamSizes, hdrLabel, separator) {
+                                        downloadVideo(format)
+                                    }
+                                },
+                        )
                     }
                 }
 
@@ -224,14 +224,8 @@ fun MediaDownloadSheet(
                         QualitySection(
                             title = stringResource(R.string.download_audio),
                             icon = Icons.Rounded.MusicNote,
-                        ) {
-                            audioFormats.forEach { format ->
-                                QualityChip(
-                                    label = audioChipLabel(format, separator),
-                                    onClick = { downloadAudio(format) },
-                                )
-                            }
-                        }
+                            options = audioFormats.map { format -> audioQualityOption(format, separator) { downloadAudio(format) } },
+                        )
                     }
                 }
             }
@@ -304,11 +298,18 @@ private fun ThreadsRow(
     }
 }
 
+/** One cell of a quality grid: the quality on its own line, whatever details the stream carries under it. */
+private data class QualityOption(
+    val primary: String,
+    val secondary: String?,
+    val onClick: () -> Unit,
+)
+
 @Composable
 private fun QualitySection(
     title: String,
     icon: ImageVector,
-    content: @Composable FlowRowScope.() -> Unit,
+    options: List<QualityOption>,
 ) {
     Column(
         modifier =
@@ -334,59 +335,113 @@ private fun QualitySection(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
-        QualityChips(content = content)
+        QualityGrid(options = options)
     }
 }
 
-@OptIn(ExperimentalLayoutApi::class)
+/** The two-column grid every quality ladder is laid out in; a long ladder simply grows more rows. */
 @Composable
-private fun QualityChips(content: @Composable FlowRowScope.() -> Unit) {
-    FlowRow(
+private fun QualityGrid(options: List<QualityOption>) {
+    Column(
         modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(ChipSpacing),
         verticalArrangement = Arrangement.spacedBy(ChipSpacing),
-        content = content,
-    )
+    ) {
+        options.chunked(QUALITY_COLUMNS).forEach { rowOptions ->
+            Row(
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .height(IntrinsicSize.Min),
+                horizontalArrangement = Arrangement.spacedBy(ChipSpacing),
+            ) {
+                rowOptions.forEach { option ->
+                    QualityTile(
+                        option = option,
+                        modifier =
+                            Modifier
+                                .weight(1f)
+                                .fillMaxHeight(),
+                    )
+                }
+                // Keeps a lone last tile the same width as every other, so the grid never has a full-width orphan.
+                repeat(QUALITY_COLUMNS - rowOptions.size) {
+                    Spacer(modifier = Modifier.weight(1f))
+                }
+            }
+        }
+    }
 }
 
 @Composable
-private fun QualityChip(
-    label: String,
-    onClick: () -> Unit,
+private fun QualityTile(
+    option: QualityOption,
+    modifier: Modifier = Modifier,
 ) {
-    FlowFilterChip(label = label, selected = false, onClick = onClick)
+    Card(
+        onClick = option.onClick,
+        modifier = modifier,
+        shape = MaterialTheme.shapes.medium,
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHighest),
+    ) {
+        Column(
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
+            verticalArrangement = Arrangement.spacedBy(2.dp),
+        ) {
+            Text(
+                text = option.primary,
+                style = MaterialTheme.typography.titleSmall,
+                fontWeight = FontWeight.SemiBold,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            if (option.secondary != null) {
+                Text(
+                    text = option.secondary,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+        }
+    }
 }
 
-/** "1080p60 · VP9 · ~120 MB", trimmed of whatever the stream does not offer. */
+/** "1080p60" over "VP9 · HDR · ~120 MB", each line trimmed of whatever the stream does not offer. */
 @Composable
-private fun videoChipLabel(
+private fun videoQualityOption(
     height: Int,
     format: PlayerResponse.StreamingData.Format,
     streamSizes: Map<String, Long>,
     hdrLabel: String,
     separator: String,
-): String {
+    onClick: () -> Unit,
+): QualityOption {
     val codec = VideoCodecUtils.codecLabelFromKey(DownloadStreamPolicy.videoCodecKey(format))
     val size = approxDownloadSizeLabel(streamSizes[VideoCodecUtils.streamSizeKey(height, DownloadStreamPolicy.videoCodecKey(format))])
     val hdr = hdrLabel.takeIf { DownloadStreamPolicy.isHdr(format) }
-    return listOfNotNull(
-        VideoCodecUtils.qualityLabelWithFrameRate(height, format.fps ?: 0),
-        codec,
-        hdr,
-        size,
-    ).joinToString(separator)
+    val detail = listOfNotNull(codec, hdr, size).joinToString(separator)
+    return QualityOption(
+        primary = VideoCodecUtils.qualityLabelWithFrameRate(height, format.fps ?: 0),
+        secondary = detail.ifBlank { null },
+        onClick = onClick,
+    )
 }
 
-/** "M4A · 128 kbps · English", trimmed of whatever the stream does not offer. */
+/** "M4A · 128 kbps" over the language, trimmed of whatever the stream does not offer. */
 @Composable
-private fun audioChipLabel(
+private fun audioQualityOption(
     format: PlayerResponse.StreamingData.Format,
     separator: String,
-): String {
+    onClick: () -> Unit,
+): QualityOption {
     val unknown = stringResource(R.string.audio_format_unknown)
     val kbps = stringResource(R.string.kbps)
     val audioFormat = DownloadStreamPolicy.audioFormatLabel(format, unknown)
     val bitrate = "${DownloadStreamPolicy.audioBitrateKbps(format)}$kbps"
-    return listOfNotNull(audioFormat, bitrate, DownloadStreamPolicy.audioLanguageLabel(format))
-        .joinToString(separator)
+    return QualityOption(
+        primary = listOf(audioFormat, bitrate).joinToString(separator),
+        secondary = DownloadStreamPolicy.audioLanguageLabel(format),
+        onClick = onClick,
+    )
 }

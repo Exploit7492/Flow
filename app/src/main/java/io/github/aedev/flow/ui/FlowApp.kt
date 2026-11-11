@@ -34,6 +34,7 @@ import io.github.aedev.flow.player.EnhancedPlayerManager
 import io.github.aedev.flow.player.GlobalPlayerState
 import io.github.aedev.flow.player.SleepTimerManager
 import io.github.aedev.flow.ui.components.donation.DonationPromptHost
+import io.github.aedev.flow.ui.components.downloadcomplete.DownloadCompleteHost
 import io.github.aedev.flow.ui.components.equalizer.LocalEqualizerState
 import io.github.aedev.flow.ui.components.layout.FlowBottomInsets
 import io.github.aedev.flow.ui.components.layout.LocalFlowBottomInsets
@@ -576,6 +577,15 @@ fun FlowApp(
         )
 
         UpdateLaunchEffect(needsOnboarding = needsOnboarding, onOpenUpdate = { navController.navigate(UPDATE_ROUTE) })
+
+        DownloadCompleteHost(
+            enabled = needsOnboarding == false && !isInPipMode,
+            onOpenDownloads = { navController.navigate("downloads") },
+            modifier =
+                Modifier
+                    .align(Alignment.TopCenter)
+                    .statusBarsPadding(),
+        )
 
         DonationPromptHost(
             enabled = needsOnboarding == false && !isInPipMode && !playerVisible,
