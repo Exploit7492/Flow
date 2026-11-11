@@ -9,7 +9,6 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import io.github.aedev.flow.data.local.AutoDownloadMode
 import io.github.aedev.flow.data.local.DEFAULT_CONCURRENT_DOWNLOADS
-import io.github.aedev.flow.data.local.DownloadDialogStyle
 import io.github.aedev.flow.data.local.MusicAudioQuality
 import io.github.aedev.flow.data.local.PlayerPreferences
 import io.github.aedev.flow.data.local.VideoCodec
@@ -91,7 +90,6 @@ class DownloadSettingsViewModel
         val quickQuality = preferences.defaultDownloadQuality.asState(VideoQuality.Q_720P)
         val codec = preferences.defaultDownloadCodec.asState(VideoCodec.AUTO)
         val musicQuality = preferences.musicDownloadQuality.asState(MusicAudioQuality.HIGH)
-        val menuStyle = preferences.downloadDialogStyle.asState(DownloadDialogStyle.FULL)
         val wifiOnly = preferences.downloadOverWifiOnly.asState(false)
         val autoDownloadLikes = preferences.autoDownloadLikedMusic.asState(false)
         val autoDownloadOpened = preferences.autoDownloadOpenedVideos.asState(AutoDownloadMode.OFF)
@@ -160,8 +158,6 @@ class DownloadSettingsViewModel
         fun setCodec(value: VideoCodec) = write { preferences.setDefaultDownloadCodec(value) }
 
         fun setMusicQuality(value: MusicAudioQuality) = write { preferences.setMusicDownloadQuality(value) }
-
-        fun setMenuStyle(value: DownloadDialogStyle) = write { preferences.setDownloadDialogStyle(value) }
 
         // Queued downloads wait on the network the setting allowed when they were queued, so it is re-applied.
         fun setAutoDownloadLikes(value: Boolean) = write { preferences.setAutoDownloadLikedMusic(value) }

@@ -2414,6 +2414,8 @@
     <string name="download_quality_more">More</string>
     <string name="cobalt_download_title">Download</string>
     <string name="cobalt_download_subtitle">Choose a quality</string>
+    <string name="download_sheet_title">Download</string>
+    <string name="download_sheet_subtitle">Choose a quality</string>
     <string name="cobalt_download_resolving">Resolving link…</string>
     <string name="cobalt_download_started">Download started: %1$s</string>
     <string name="download_engine">Muxer</string>

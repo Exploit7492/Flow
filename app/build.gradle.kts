@@ -387,6 +387,7 @@ dependencies {
     implementation(libs.androidx.media3.datasource.okhttp)
     implementation(libs.androidx.media3.muxer)
     implementation(libs.androidx.media3.inspector)
+    implementation(libs.androidx.media3.transformer)
     implementation(libs.androidx.media)
 
     // --- Database & Storage ---

@@ -128,7 +128,6 @@ class PlayerPreferences(
         val MUSIC_DOWNLOAD_LOCATION_TREE = stringPreferencesKey("music_download_location_tree")
 
         // Download dialog style + remembered last-used download options (compact dialog)
-        val DOWNLOAD_DIALOG_STYLE = stringPreferencesKey("download_dialog_style")
         val LAST_DOWNLOAD_TYPE = stringPreferencesKey("last_download_type")
         val LAST_DOWNLOAD_HEIGHT = intPreferencesKey("last_download_height")
         val LAST_DOWNLOAD_CODEC = stringPreferencesKey("last_download_codec")
@@ -3110,20 +3109,6 @@ class PlayerPreferences(
         }
     }
 
-    // Download dialog style (Classic full dialog vs new Compact dialog)
-    val downloadDialogStyle: Flow<DownloadDialogStyle> =
-        context.playerPreferencesDataStore.data
-            .map { preferences ->
-                runCatching { DownloadDialogStyle.valueOf(preferences[Keys.DOWNLOAD_DIALOG_STYLE] ?: DownloadDialogStyle.FULL.name) }
-                    .getOrDefault(DownloadDialogStyle.FULL)
-            }
-
-    suspend fun setDownloadDialogStyle(style: DownloadDialogStyle) {
-        context.playerPreferencesDataStore.edit { preferences ->
-            preferences[Keys.DOWNLOAD_DIALOG_STYLE] = style.name
-        }
-    }
-
     /** Whether a video the viewer opens is also saved for offline, and on which networks. */
     val autoDownloadOpenedVideos: Flow<AutoDownloadMode> =
         context.playerPreferencesDataStore.data
@@ -3890,11 +3875,6 @@ enum class SliderStyle {
     SQUIGGLY,
     EXPRESSIVE_WAVY,
     SLIM,
-}
-
-enum class DownloadDialogStyle {
-    FULL,
-    COMPACT,
 }
 
 /** When an opened video is downloaded on its own: never, only on Wi-Fi, or on any network. */

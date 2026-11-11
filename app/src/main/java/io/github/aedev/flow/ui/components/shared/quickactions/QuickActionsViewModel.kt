@@ -91,7 +91,7 @@ class QuickActionsViewModel
 
         private val _pendingDownload = MutableStateFlow<VideoDownloadOptions?>(null)
 
-        /** The video whose download dialog is open, with its formats already loaded. */
+        /** The video whose download sheet is open, with its formats already loaded. */
         val pendingDownload: StateFlow<VideoDownloadOptions?> = _pendingDownload.asStateFlow()
 
         private val _pendingCobaltUrl = MutableStateFlow<String?>(null)
@@ -240,7 +240,7 @@ class QuickActionsViewModel
             emit(R.string.added_to_queue_toast)
         }
 
-        /** Loads [video]'s formats, then opens the download dialog; a second tap while loading is ignored. */
+        /** Loads [video]'s formats, then opens the download sheet; a second tap while loading is ignored. */
         fun requestDownload(video: Video) {
             if (downloadJob?.isActive == true) return
             emit(R.string.toast_fetching_download_links)

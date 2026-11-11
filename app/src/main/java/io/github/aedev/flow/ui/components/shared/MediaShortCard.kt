@@ -39,7 +39,6 @@ import io.github.aedev.flow.ui.components.shared.quickactions.VideoQuickActionsB
 import io.github.aedev.flow.ui.components.shared.quickactions.sharedQuickActionsViewModel
 import io.github.aedev.flow.ui.theme.extendedColors
 import io.github.aedev.flow.utils.formatViewCount
-import io.github.aedev.flow.utils.youtubeWatchUrl
 
 /** The one size every Shorts grid and strip agrees on, so cells line up across screens. */
 object ShortCardDefaults {
@@ -105,7 +104,7 @@ fun MediaShortCard(
             )
             ShortWatchedIndicator(videoId = video.id)
             MediaDownloadBadge(
-                onClick = { quickActions.requestCobaltDownload(youtubeWatchUrl(video.id)) },
+                onClick = { quickActions.requestDownload(video) },
                 modifier =
                     Modifier
                         .align(Alignment.TopEnd)

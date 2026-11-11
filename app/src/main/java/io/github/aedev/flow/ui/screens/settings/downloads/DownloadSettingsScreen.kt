@@ -48,7 +48,6 @@ import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import io.github.aedev.flow.R
 import io.github.aedev.flow.data.local.AutoDownloadMode
-import io.github.aedev.flow.data.local.DownloadDialogStyle
 import io.github.aedev.flow.data.local.MAX_CONCURRENT_DOWNLOADS
 import io.github.aedev.flow.data.local.MusicAudioQuality
 import io.github.aedev.flow.data.local.VideoCodec
@@ -65,10 +64,8 @@ import io.github.aedev.flow.ui.components.settings.info
 import io.github.aedev.flow.ui.components.settings.nav
 import io.github.aedev.flow.ui.components.settings.slider
 import io.github.aedev.flow.ui.components.settings.switch
-import io.github.aedev.flow.ui.components.settings.toggleGroup
 import io.github.aedev.flow.ui.components.shared.FlowChoice
 import io.github.aedev.flow.ui.components.shared.FlowChoiceDialog
-import io.github.aedev.flow.ui.components.shared.FlowToggleOption
 import io.github.aedev.flow.ui.screens.settings.index.DestinationIndex
 import io.github.aedev.flow.ui.screens.settings.index.DownloadsIndex
 import io.github.aedev.flow.ui.screens.settings.quality.MusicQualities
@@ -100,7 +97,6 @@ internal fun DownloadSettingsScreen(
     val earlierDownloads by viewModel.earlierDownloads.collectAsStateWithLifecycle()
     val earlierDownloadsValue = earlierDownloads?.let { earlierDownloadsLabel(it) }
     val codec by viewModel.codec.collectAsStateWithLifecycle()
-    val menuStyle by viewModel.menuStyle.collectAsStateWithLifecycle()
     val threads by viewModel.threads.collectAsStateWithLifecycle()
     val concurrentDownloads by viewModel.concurrentDownloads.collectAsStateWithLifecycle()
     val autoDownloadOpened by viewModel.autoDownloadOpened.collectAsStateWithLifecycle()
@@ -156,12 +152,6 @@ internal fun DownloadSettingsScreen(
     val audioDeniedLabel = stringResource(R.string.audio_access_denied_subtitle)
     val allFilesLabel =
         stringResource(if (access.allFiles) R.string.files_access_granted_subtitle else R.string.files_access_denied_subtitle)
-    val menuStyles =
-        listOf(
-            FlowToggleOption(DownloadDialogStyle.FULL, stringResource(R.string.download_menu_style_classic)),
-            FlowToggleOption(DownloadDialogStyle.COMPACT, stringResource(R.string.download_menu_style_compact)),
-        )
-
     SettingsPage(
         title = stringResource(R.string.settings_downloads_title),
         onBack = onBack,
@@ -185,7 +175,6 @@ internal fun DownloadSettingsScreen(
             choice(DownloadsIndex.musicQuality, onClick = { picker = DownloadPicker.MUSIC_QUALITY }) {
                 stringResource(musicQualityLabel(musicQuality))
             }
-            toggleGroup(DownloadsIndex.menuStyle, menuStyles, menuStyle, viewModel::setMenuStyle)
             switch(DownloadsIndex.autoDownloadLikes, viewModel.autoDownloadLikes, viewModel::setAutoDownloadLikes)
             choice(DownloadsIndex.autoDownloadOpened, onClick = { picker = DownloadPicker.AUTO_DOWNLOAD }) {
                 stringResource(autoDownloadLabel(autoDownloadOpened))

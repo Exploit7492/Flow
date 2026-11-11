@@ -27,7 +27,6 @@ import io.github.aedev.flow.ui.components.shared.LocalThumbnailQuality
 import io.github.aedev.flow.ui.components.shared.quickactions.QuickActionsViewModel
 import io.github.aedev.flow.ui.components.shared.quickactions.sharedQuickActionsViewModel
 import io.github.aedev.flow.ui.utils.rememberIsOnWifi
-import io.github.aedev.flow.utils.youtubeWatchUrl
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
@@ -130,7 +129,7 @@ fun ProvideVideoCardState(
                 onInterested = quickActions::markAsInteresting,
                 onNotInterested = quickActions::markNotInterested,
                 onWatched = quickActions::markAsWatched,
-                onDownload = { video -> quickActions.requestCobaltDownload(youtubeWatchUrl(video.id)) },
+                onDownload = { video -> quickActions.requestDownload(video) },
             )
         }
 

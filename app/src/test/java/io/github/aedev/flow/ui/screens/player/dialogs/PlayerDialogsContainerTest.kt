@@ -14,8 +14,6 @@ import androidx.compose.ui.test.onRoot
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import io.github.aedev.flow.R
-import io.github.aedev.flow.data.local.DownloadDialogStyle
-import io.github.aedev.flow.data.local.PlayerPreferences
 import io.github.aedev.flow.player.state.EnhancedPlayerState
 import io.github.aedev.flow.ui.components.videoplayer.settings.PlayerSettingsPage
 import io.github.aedev.flow.ui.screens.player.fakePlayerState
@@ -25,8 +23,6 @@ import io.github.aedev.flow.ui.screens.player.relaxedVideoPlayerViewModel
 import io.github.aedev.flow.ui.screens.player.state.PlayerScreenState
 import io.github.aedev.flow.ui.screens.player.state.PlayerSheet
 import io.github.aedev.flow.ui.screens.player.state.rememberVideoPlayerPreferences
-import kotlinx.coroutines.runBlocking
-import org.junit.Ignore
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -73,10 +69,6 @@ class PlayerDialogsContainerTest {
         }
     }
 
-    private fun setDownloadDialogStyle(style: DownloadDialogStyle) {
-        runBlocking { PlayerPreferences(context).setDownloadDialogStyle(style) }
-    }
-
     @Test
     fun rendersNothingWhenNoFlagIsSet() {
         setContainer(PlayerScreenState())
@@ -100,28 +92,13 @@ class PlayerDialogsContainerTest {
     }
 
     @Test
-    fun downloadSheetMountsTheFullDialogWhenPreferred() {
-        setDownloadDialogStyle(DownloadDialogStyle.FULL)
+    fun downloadSheetMountsTheNativeSheet() {
         // No caption tracks: the Subtitles row is a text field, which never idles in a Dialog under
-        // Robolectric. Device twin: DownloadDialogsInstrumentedTest.
+        // Robolectric.
         setContainer(PlayerScreenState().apply { open(PlayerSheet.Download) }, fakePlayerState(availableSubtitles = emptyList()))
 
-        waitForText(R.string.download_video)
-        rule.onNodeWithText(string(R.string.select_quality)).assertExists()
-    }
-
-    @Test
-    @Ignore(
-        "Any Compose text field inside a Dialog window never reaches idle under Robolectric with " +
-            "Compose 1.13.0-alpha01; DownloadQualityDialogCompact's title field trips it. " +
-            "Device twin: DownloadDialogsInstrumentedTest.",
-    )
-    fun downloadSheetMountsTheCompactDialogWhenPreferred() {
-        setDownloadDialogStyle(DownloadDialogStyle.COMPACT)
-        setContainer(PlayerScreenState().apply { open(PlayerSheet.Download) })
-
-        waitForText(R.string.download_video)
-        rule.onNodeWithText(string(R.string.download_title_label)).assertExists()
+        waitForText(R.string.download_sheet_title)
+        rule.onNodeWithText(string(R.string.download_sheet_title)).assertExists()
     }
 
     @Test

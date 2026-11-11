@@ -14,6 +14,7 @@ import io.github.aedev.flow.data.video.OfflineSubtitleStore
 import io.github.aedev.flow.data.video.VideoDownloadManager
 import io.github.aedev.flow.data.video.downloader.request.DownloadRequest
 import io.github.aedev.flow.data.video.downloader.subtitle.DownloadSubtitleFile
+import io.github.aedev.flow.data.video.downloader.tags.AudioMp4Muxer
 import io.github.aedev.flow.data.video.downloader.tags.CoverArtLoader
 import io.github.aedev.flow.data.video.downloader.tags.DownloadKind
 import io.github.aedev.flow.data.video.downloader.tags.Mp4Remuxer
@@ -56,6 +57,7 @@ class DownloadRunner
         private val enricher: DownloadMetadataEnricher,
         private val lyrics: DownloadLyrics,
         private val remuxer: Mp4Remuxer,
+        private val audioMuxer: AudioMp4Muxer,
         private val tagWriter: Mp4TagWriter,
         private val coverArt: CoverArtLoader,
         private val validator: DownloadValidator,
@@ -124,10 +126,23 @@ class DownloadRunner
                     )
                 }
             if (remuxed is Mp4Remuxer.Result.Failure) {
-                currentCoroutineContext().ensureActive()
-                Log.w(TAG, "${request.videoId}: remux failed (${remuxed.reason}): ${remuxed.message}")
-                fail(request, staging, context.getString(R.string.download_failed_merge), keepParts = false)
-                return
+                // Opus, and anything else that is not AAC, cannot be copied into MP4, so an
+                // audio-only download of one is re-encoded to AAC by the Transformer rather than
+                // given up on.
+                val reencoded =
+                    remuxed.reason == Mp4Remuxer.Reason.UNSUPPORTED_AUDIO &&
+                        request.wantsAudioOnly &&
+                        audioMuxer.mux(
+                            inputPath = fetched.audioPart.path,
+                            outputPath = output.path,
+                            isCancelled = { !runJob.isActive },
+                        ) is AudioMp4Muxer.Result.Success
+                if (!reencoded) {
+                    currentCoroutineContext().ensureActive()
+                    Log.w(TAG, "${request.videoId}: remux failed (${remuxed.reason}): ${remuxed.message}")
+                    fail(request, staging, context.getString(R.string.download_failed_merge), keepParts = false)
+                    return
+                }
             }
             try {
                 tagWriter.write(output, request.tags, cover)
